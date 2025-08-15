@@ -1,0 +1,543 @@
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
+import { supabase } from '../lib/supabase'
+
+export interface ChatMessage {
+  id: number
+  session_id: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  created_at: string
+}
+
+export interface ChatSession {
+  id: string
+  user_id: string
+  character_id: number
+  title?: string
+  created_at: string
+}
+
+export interface Character {
+  id: number
+  user_id: string
+  name: string
+  avatar_url?: string
+  prompt_template: any
+  is_public: boolean
+  created_at: string
+}
+
+interface ChatState {
+  currentSession: ChatSession | null
+  currentCharacter: Character | null
+  messages: ChatMessage[]
+  isLoading: boolean
+  isGenerating: boolean
+  error: string | null
+  selectedModel: string | null
+  sessionTitle: string
+}
+
+const initialState: ChatState = {
+  currentSession: null,
+  currentCharacter: null,
+  messages: [],
+  isLoading: false,
+  isGenerating: false,
+  error: null,
+  selectedModel: null,
+  sessionTitle: ''
+}
+
+// 获取角色信息
+export const fetchCharacter = createAsyncThunk(
+  'chat/fetchCharacter',
+  async (characterId: number) => {
+    const { data, error } = await supabase
+      .from('characters')
+      .select('*')
+      .eq('id', characterId)
+      .single()
+
+    if (error) throw error
+    return data
+  }
+)
+
+// 创建新的聊天会话
+export const createChatSession = createAsyncThunk(
+  'chat/createSession',
+  async ({ characterId, title, userId }: { characterId: number, title: string, userId: string }) => {
+    const { data, error } = await supabase
+      .from('chat_sessions')
+      .insert({
+        user_id: userId,
+        character_id: characterId,
+        title: title
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }
+)
+
+// 获取聊天会话信息
+export const fetchChatSession = createAsyncThunk(
+  'chat/fetchSession',
+  async (sessionId: string) => {
+    const { data, error } = await supabase
+      .from('chat_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single()
+
+    if (error) throw error
+    return data
+  }
+)
+
+// 获取聊天消息
+export const fetchMessages = createAsyncThunk(
+  'chat/fetchMessages',
+  async (sessionId: string) => {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+    return data || []
+  }
+)
+
+// 发送消息并获取AI回复
+export const sendMessage = createAsyncThunk(
+  'chat/sendMessage',
+  async ({ 
+    sessionId, 
+    userMessage, 
+    systemPrompt, 
+    apiKey, 
+    model,
+    messages,
+    thinkingBudget
+  }: { 
+    sessionId: string
+    userMessage: string
+    systemPrompt: string
+    apiKey: string
+    model: string
+    messages: ChatMessage[]
+    thinkingBudget?: number
+  }) => {
+    let userMsgData = null
+    
+    // 只有当用户消息不为空时才保存用户消息
+    if (userMessage.trim()) {
+      const { data, error: userMsgError } = await supabase
+        .from('chat_messages')
+        .insert({
+          session_id: sessionId,
+          role: 'user',
+          content: userMessage
+        })
+        .select()
+        .single()
+
+      if (userMsgError) throw userMsgError
+      userMsgData = data
+    }
+
+    // 构建消息历史
+    const messageHistory = messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }))
+
+    // 只有当用户消息不为空时才添加到历史中
+    if (userMessage.trim()) {
+      messageHistory.push({
+        role: 'user',
+        content: userMessage
+      })
+    }
+
+    // 调用后端API获取AI回复
+    const requestBody: any = {
+      messages: messageHistory,
+      systemPrompt,
+      apiKey,
+      model
+    }
+
+    // 只有Gemini 2.5系列模型才添加thinkingBudget
+    if (model.includes('gemini-2.5') && thinkingBudget !== undefined) {
+      requestBody.thinkingBudget = thinkingBudget
+    }
+
+    console.log('发送到API的请求体:', {
+      messages: messageHistory.length,
+      systemPrompt: systemPrompt ? `${systemPrompt.length} chars` : 'undefined',
+      apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'undefined',
+      model,
+      thinkingBudget: requestBody.thinkingBudget
+    })
+
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('API响应错误:', response.status, errorText)
+      throw new Error(`Failed to get AI response: ${response.status} ${errorText}`)
+    }
+
+    const aiResponse = await response.json()
+
+    // 保存AI消息
+    const { data: aiMsgData, error: aiMsgError } = await supabase
+      .from('chat_messages')
+      .insert({
+        session_id: sessionId,
+        role: 'assistant',
+        content: aiResponse.content
+      })
+      .select()
+      .single()
+
+    if (aiMsgError) throw aiMsgError
+
+    return {
+      userMessage: userMsgData,
+      aiMessage: aiMsgData
+    }
+  }
+)
+
+// 重新生成最后一条AI消息
+export const regenerateLastMessage = createAsyncThunk(
+  'chat/regenerateLastMessage',
+  async ({
+    sessionId,
+    systemPrompt,
+    apiKey,
+    model,
+    messages,
+    lastMessageId,
+    thinkingBudget
+  }: {
+    sessionId: string
+    systemPrompt: string
+    apiKey: string
+    model: string
+    messages: ChatMessage[]
+    lastMessageId: number
+    thinkingBudget?: number
+  }) => {
+    // 构建消息历史（不包含要重新生成的消息）
+    const messageHistory = messages
+      .filter(msg => msg.id !== lastMessageId)
+      .map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+
+    // 调用后端API获取新的AI回复
+    const requestBody: any = {
+      messages: messageHistory,
+      systemPrompt,
+      apiKey,
+      model
+    }
+
+    // 只有Gemini 2.5系列模型才添加thinkingBudget
+    if (model.includes('gemini-2.5') && thinkingBudget !== undefined) {
+      requestBody.thinkingBudget = thinkingBudget
+    }
+
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to regenerate AI response')
+    }
+
+    const aiResponse = await response.json()
+
+    // 更新数据库中的消息内容
+    const { data: updatedMsg, error: updateError } = await supabase
+      .from('chat_messages')
+      .update({ content: aiResponse.content })
+      .eq('id', lastMessageId)
+      .select()
+      .single()
+
+    if (updateError) throw updateError
+
+    return updatedMsg
+  }
+)
+
+// 编辑消息
+export const editMessage = createAsyncThunk(
+  'chat/editMessage',
+  async ({
+    messageId,
+    newContent
+  }: {
+    messageId: number
+    newContent: string
+  }) => {
+    const { data: updatedMsg, error } = await supabase
+      .from('chat_messages')
+      .update({ content: newContent })
+      .eq('id', messageId)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return updatedMsg
+  }
+)
+
+// 从某条消息发送新的消息
+export const sendNewMessageFrom = createAsyncThunk(
+  'chat/sendNewMessageFrom',
+  async ({
+    sessionId,
+    systemPrompt,
+    apiKey,
+    model,
+    messages,
+    fromMessageId,
+    thinkingBudget
+  }: {
+    sessionId: string
+    systemPrompt: string
+    apiKey: string
+    model: string
+    messages: ChatMessage[]
+    fromMessageId: number
+    thinkingBudget?: number
+  }) => {
+    // 构建消息历史（包含到指定消息为止的所有消息）
+    const fromMessageIndex = messages.findIndex(msg => msg.id === fromMessageId)
+    const messageHistory = messages
+      .slice(0, fromMessageIndex + 1)
+      .map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+
+    // 调用后端API获取AI回复
+    const requestBody: any = {
+      messages: messageHistory,
+      systemPrompt,
+      apiKey,
+      model
+    }
+
+    if (model.includes('gemini-2.5') && thinkingBudget !== undefined) {
+      requestBody.thinkingBudget = thinkingBudget
+    }
+
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to send new message')
+    }
+
+    const aiResponse = await response.json()
+
+    // 保存新的AI消息
+    const { data: newAiMsg, error: newAiMsgError } = await supabase
+      .from('chat_messages')
+      .insert({
+        session_id: sessionId,
+        role: 'assistant',
+        content: aiResponse.content
+      })
+      .select()
+      .single()
+
+    if (newAiMsgError) throw newAiMsgError
+
+    return newAiMsg
+  }
+)
+
+const chatSlice = createSlice({
+  name: 'chat',
+  initialState,
+  reducers: {
+    setSelectedModel: (state, action: PayloadAction<string>) => {
+      state.selectedModel = action.payload
+    },
+    setSessionTitle: (state, action: PayloadAction<string>) => {
+      state.sessionTitle = action.payload
+    },
+    clearChat: (state) => {
+      state.currentSession = null
+      state.currentCharacter = null
+      state.messages = []
+      state.selectedModel = null
+      state.sessionTitle = ''
+      state.error = null
+    },
+    clearError: (state) => {
+      state.error = null
+    }
+  },
+  extraReducers: (builder) => {
+    builder
+      // Fetch Character
+      .addCase(fetchCharacter.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(fetchCharacter.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.currentCharacter = action.payload
+        state.sessionTitle = action.payload.name
+      })
+      .addCase(fetchCharacter.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.error.message || 'Failed to fetch character'
+      })
+      
+      // Create Session
+      .addCase(createChatSession.pending, (state) => {
+        state.isLoading = true
+      })
+      .addCase(createChatSession.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.currentSession = action.payload
+      })
+      .addCase(createChatSession.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.error.message || 'Failed to create session'
+      })
+      
+      // Fetch Session
+      .addCase(fetchChatSession.fulfilled, (state, action) => {
+        state.currentSession = action.payload
+        state.sessionTitle = action.payload.title || ''
+      })
+      
+      // Fetch Messages
+      .addCase(fetchMessages.fulfilled, (state, action) => {
+        state.messages = action.payload
+      })
+      
+      // Send Message
+      .addCase(sendMessage.pending, (state, action) => {
+        state.isGenerating = true
+        state.error = null
+        // 如果有用户消息，立即添加到消息列表中显示
+        if (action.meta.arg.userMessage.trim()) {
+          const tempUserMessage = {
+            id: Date.now(), // 临时ID
+            session_id: action.meta.arg.sessionId,
+            role: 'user' as const,
+            content: action.meta.arg.userMessage,
+            created_at: new Date().toISOString()
+          }
+          state.messages.push(tempUserMessage)
+        }
+      })
+      .addCase(sendMessage.fulfilled, (state, action) => {
+        state.isGenerating = false
+        // 如果有用户消息，需要更新临时消息的ID为真实ID
+        if (action.payload.userMessage) {
+          // 找到刚才添加的临时用户消息并更新ID
+          const lastUserMsgIndex = state.messages.findLastIndex(msg => msg.role === 'user')
+          if (lastUserMsgIndex !== -1) {
+            state.messages[lastUserMsgIndex] = action.payload.userMessage
+          }
+        }
+        // 添加AI回复
+        state.messages.push(action.payload.aiMessage)
+      })
+      .addCase(sendMessage.rejected, (state, action) => {
+        state.isGenerating = false
+        state.error = action.error.message || 'Failed to send message'
+      })
+      
+      // Regenerate Message
+      .addCase(regenerateLastMessage.pending, (state) => {
+        state.isGenerating = true
+        state.error = null
+      })
+      .addCase(regenerateLastMessage.fulfilled, (state, action) => {
+        state.isGenerating = false
+        // 直接更新对应ID的消息
+        const messageIndex = state.messages.findIndex(msg => msg.id === action.payload.id)
+        if (messageIndex !== -1) {
+          state.messages[messageIndex] = action.payload
+        }
+      })
+      .addCase(regenerateLastMessage.rejected, (state, action) => {
+        state.isGenerating = false
+        state.error = action.error.message || 'Failed to regenerate message'
+      })
+
+      // Edit Message
+      .addCase(editMessage.pending, (state) => {
+        state.error = null
+      })
+      .addCase(editMessage.fulfilled, (state, action) => {
+        // 更新对应ID的消息
+        const messageIndex = state.messages.findIndex(msg => msg.id === action.payload.id)
+        if (messageIndex !== -1) {
+          state.messages[messageIndex] = action.payload
+        }
+      })
+      .addCase(editMessage.rejected, (state, action) => {
+        state.error = action.error.message || 'Failed to edit message'
+      })
+
+      // Send New Message From
+      .addCase(sendNewMessageFrom.pending, (state) => {
+        state.isGenerating = true
+        state.error = null
+      })
+      .addCase(sendNewMessageFrom.fulfilled, (state, action) => {
+        state.isGenerating = false
+        // 添加新的AI消息到消息列表
+        state.messages.push(action.payload)
+      })
+      .addCase(sendNewMessageFrom.rejected, (state, action) => {
+        state.isGenerating = false
+        state.error = action.error.message || 'Failed to send new message'
+      })
+  }
+})
+
+export const { 
+  setSelectedModel, 
+  setSessionTitle, 
+  clearChat, 
+  clearError 
+} = chatSlice.actions
+
+export default chatSlice.reducer 
