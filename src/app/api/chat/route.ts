@@ -28,7 +28,7 @@ async function callDeepSeek(messages: ChatMessage[], systemPrompt: string, apiKe
         ...messages
       ],
       temperature: 0.7,
-      max_tokens: 2000,
+      max_tokens: 5000,
     }),
   })
 
@@ -91,7 +91,7 @@ async function callGemini(messages: ChatMessage[], systemPrompt: string, apiKey:
     contents: contents,
     generationConfig: {
       temperature: 0.7,
-      maxOutputTokens: 2000,
+      maxOutputTokens: 4000,
     }
   }
 
@@ -156,23 +156,72 @@ async function callGemini(messages: ChatMessage[], systemPrompt: string, apiKey:
     throw new Error('Response was blocked by Gemini safety filters')
   }
   
+  // 处理其他finish reasons
+  if (candidate.finishReason === 'RECITATION') {
+    throw new Error('Response was blocked due to recitation concerns')
+  }
+  
+  if (candidate.finishReason === 'OTHER') {
+    console.warn('Gemini finished with reason: OTHER')
+  }
+  
+  // 检查是否因为MAX_TOKENS而截断
+  if (candidate.finishReason === 'MAX_TOKENS') {
+    console.warn('Gemini response was truncated due to MAX_TOKENS. Consider increasing maxOutputTokens.')
+  }
+  
   if (!candidate.content) {
     console.error('No content in candidate:', candidate)
-    throw new Error('No content in Gemini API response')
+    console.error('Full response data:', JSON.stringify(data, null, 2))
+    throw new Error(`No content in Gemini API response. Finish reason: ${candidate.finishReason || 'unknown'}`)
   }
 
-  // 处理响应
+  // 处理响应 - 改进的内容提取逻辑
   let responseText = ''
   
-  if (candidate.content && candidate.content.parts) {
-    for (const part of candidate.content.parts) {
-      if (part.text) {
-        responseText += part.text
+  if (candidate.content) {
+    // 检查是否有 parts 数组
+    if (candidate.content.parts && Array.isArray(candidate.content.parts)) {
+      for (const part of candidate.content.parts) {
+        if (part.text) {
+          responseText += part.text
+        }
+      }
+    } else {
+      // 如果没有 parts 数组，检查是否有直接的文本内容
+      console.warn('Content object missing parts array:', candidate.content)
+      
+      // 尝试其他可能的文本字段
+      if (typeof candidate.content === 'string') {
+        responseText = candidate.content
+      } else if (candidate.content.text) {
+        responseText = candidate.content.text
+      } else {
+        console.error('Unable to extract text from content:', candidate.content)
+        console.error('Full candidate object:', JSON.stringify(candidate, null, 2))
+        
+        // 如果是MAX_TOKENS但没有内容，可能是API问题
+        if (candidate.finishReason === 'MAX_TOKENS') {
+          throw new Error('Response was truncated by MAX_TOKENS and no content was returned. This may be an API issue or the response was completely filtered.')
+        }
       }
     }
   }
 
-  return responseText || 'No response generated'
+  // 如果仍然没有内容
+  if (!responseText || responseText.trim() === '') {
+    console.error('No text content extracted from response')
+    console.error('Candidate:', JSON.stringify(candidate, null, 2))
+    console.error('Full response:', JSON.stringify(data, null, 2))
+    
+    if (candidate.finishReason === 'MAX_TOKENS') {
+      return 'Response was truncated due to length limits. Please try a shorter prompt or increase the token limit.'
+    }
+    
+    return 'No response generated - the API returned empty content'
+  }
+
+  return responseText
 }
 
 // OpenAI API 调用

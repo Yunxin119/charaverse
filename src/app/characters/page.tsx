@@ -180,7 +180,7 @@ export default function CharactersPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-8"
+      className="space-y-6 max-w-7xl mx-auto"
     >
       {/* Header */}
       <motion.div variants={itemVariants}>
@@ -189,12 +189,15 @@ export default function CharactersPage() {
             <h1 className="text-3xl font-bold text-slate-900">我的角色</h1>
             <p className="text-slate-600 mt-1">管理你创建的所有AI角色 ({characters.length}个角色)</p>
           </div>
-          <Button asChild className="bg-slate-900 hover:bg-slate-800">
-            <Link href="/characters/new">
-              <Plus className="w-4 h-4 mr-2" />
-              创建新角色
-            </Link>
-          </Button>
+          <div className="flex items-center space-x-3">
+            <Button asChild className="bg-slate-900 hover:bg-slate-800">
+              <Link href="/characters/new">
+                <Plus className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">创建新角色</span>
+                <span className="sm:hidden">创建</span>
+              </Link>
+            </Button>
+          </div>
         </div>
       </motion.div>
 
@@ -246,22 +249,22 @@ export default function CharactersPage() {
       {/* Characters Grid */}
       {filteredCharacters.length === 0 ? (
         <motion.div variants={itemVariants}>
-          <Card>
-            <CardContent className="pt-16 pb-16 text-center">
-              <div className="w-24 h-24 mx-auto mb-6 bg-slate-100 rounded-full flex items-center justify-center">
-                <Users className="w-12 h-12 text-slate-400" />
+          <Card className="border-slate-200/60">
+            <CardContent className="py-12 px-4 text-center">
+              <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-full flex items-center justify-center">
+                <Users className="w-10 h-10 text-slate-400" />
               </div>
-              <h3 className="text-xl font-semibold text-slate-900 mb-2">
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">
                 {searchQuery || filterType !== 'all' ? '没有找到匹配的角色' : '还没有创建角色'}
               </h3>
-              <p className="text-slate-500 mb-6">
+              <p className="text-slate-500 mb-6 text-sm leading-relaxed max-w-sm mx-auto">
                 {searchQuery || filterType !== 'all' 
                   ? '试试调整搜索条件或筛选选项'
                   : '创建你的第一个AI角色，开始精彩的对话体验'
                 }
               </p>
               {(!searchQuery && filterType === 'all') && (
-                <Button asChild className="bg-slate-900 hover:bg-slate-800">
+                <Button asChild className="bg-blue-600 hover:bg-blue-700 rounded-full px-6">
                   <Link href="/characters/new">
                     <Plus className="w-4 h-4 mr-2" />
                     创建新角色
@@ -272,29 +275,29 @@ export default function CharactersPage() {
           </Card>
         </motion.div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {filteredCharacters.map((character, index) => (
             <motion.div
               key={character.id}
               variants={itemVariants}
               custom={index}
             >
-              <Card className="hover:shadow-lg transition-all duration-200 group">
-                <CardContent className="p-6">
+              <Card className="hover:shadow-lg transition-all duration-200 group border-slate-200/60">
+                <CardContent className="p-4 sm:p-6">
                   {/* Character Header */}
                   <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <Avatar className="w-12 h-12">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      <Avatar className="w-12 h-12 sm:w-14 sm:h-14 ring-2 ring-slate-100">
                         <AvatarImage src={character.avatar_url} />
-                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-medium">
                           {character.name[0]}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
-                        <h3 className="font-semibold text-slate-900 truncate">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-slate-900 truncate text-base sm:text-lg">
                           {character.name}
                         </h3>
-                        <div className="flex items-center space-x-2 text-xs text-slate-500">
+                        <div className="flex items-center space-x-2 text-xs text-slate-500 mt-1">
                           <Calendar className="w-3 h-3" />
                           <span>{formatDate(character.created_at)}</span>
                         </div>
@@ -339,26 +342,31 @@ export default function CharactersPage() {
                     </DropdownMenu>
                   </div>
 
-                  {/* Character Description */}
-                  <div className="mb-4">
-                    <p className="text-sm text-slate-600 line-clamp-2 mb-3">
-                      {character.prompt_template?.basic_info?.description || '暂无描述'}
-                    </p>
+                  {/* Character Introduction & Keywords */}
+                  <div className="mb-4 space-y-3">
+                    {/* 角色说明 */}
+                    <div>
+                      <p className="text-sm text-slate-700 line-clamp-3 leading-relaxed">
+                        {character.prompt_template?.basic_info?.introduction || 
+                         character.prompt_template?.basic_info?.description || 
+                         '这个角色还没有添加说明...'}
+                      </p>
+                    </div>
                     
                     {/* Keywords */}
                     {getCharacterKeywords(character).length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {getCharacterKeywords(character).slice(0, 3).map((keyword: string, idx: number) => (
+                      <div className="flex flex-wrap gap-1.5">
+                        {getCharacterKeywords(character).slice(0, 4).map((keyword: string, idx: number) => (
                           <span
                             key={idx}
-                            className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-600"
+                            className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100"
                           >
                             {keyword}
                           </span>
                         ))}
-                        {getCharacterKeywords(character).length > 3 && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-500">
-                            +{getCharacterKeywords(character).length - 3}
+                        {getCharacterKeywords(character).length > 4 && (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                            +{getCharacterKeywords(character).length - 4}
                           </span>
                         )}
                       </div>
@@ -366,15 +374,15 @@ export default function CharactersPage() {
                   </div>
 
                   {/* Status and Actions */}
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                     <div className="flex items-center space-x-2">
                       {character.is_public ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-700">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
                           <Globe className="w-3 h-3 mr-1" />
                           公开
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-50 text-slate-600 border border-slate-200">
                           <Lock className="w-3 h-3 mr-1" />
                           私人
                         </span>
@@ -382,15 +390,15 @@ export default function CharactersPage() {
                     </div>
                     
                     <div className="flex space-x-2">
-                      <Button asChild size="sm" variant="outline">
+                      <Button asChild size="sm" variant="outline" className="h-8 px-3 text-xs">
                         <Link href={`/characters/${character.id}/edit`}>
-                          <Edit className="w-3 h-3 mr-1" />
+                          <Edit className="w-3 h-3 mr-1.5" />
                           编辑
                         </Link>
                       </Button>
-                      <Button asChild size="sm">
+                      <Button asChild size="sm" className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700">
                         <Link href={`/chat/new?characterId=${character.id}`}>
-                          <MessageCircle className="w-3 h-3 mr-1" />
+                          <MessageCircle className="w-3 h-3 mr-1.5" />
                           聊天
                         </Link>
                       </Button>

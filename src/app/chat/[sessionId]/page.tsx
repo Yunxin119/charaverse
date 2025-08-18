@@ -19,7 +19,11 @@ import {
   MessageSquarePlus,
   Save,
   ChevronDown,
-  MoreVertical
+  MoreVertical,
+  Edit3,
+  ArrowLeft,
+  ChevronRight,
+  RotateCcw
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -41,7 +45,7 @@ import {
   sendNewMessageFrom,
   setSelectedModel,
   setSessionTitle,
-  clearChat,
+  clearChatHistory,
   clearError
 } from '../../store/chatSlice'
 
@@ -80,9 +84,9 @@ export default function ChatSessionPage() {
   const [selectedMessageId, setSelectedMessageId] = useState<number | null>(null)
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null)
   const [editingContent, setEditingContent] = useState('')
-  const [showModelSelect, setShowModelSelect] = useState(false)
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
-  const [isStartingStory, setIsStartingStory] = useState(false) // 新增状态：是否正在开始故事
+  const [isStartingStory, setIsStartingStory] = useState(false)
+  const [chatBackground, setChatBackground] = useState<string | null>(null)
+  const [showSettings, setShowSettings] = useState(false) // 新状态，控制设置页显示
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const sessionId = params.sessionId as string
@@ -104,12 +108,6 @@ export default function ChatSessionPage() {
       const gemini = localStorage.getItem('api_key_gemini')
       const openai = localStorage.getItem('api_key_openai')
       
-      console.log('API Keys found:', {
-        deepseek: deepseek ? `${deepseek.substring(0, 10)}...` : 'None',
-        gemini: gemini ? `${gemini.substring(0, 10)}...` : 'None',
-        openai: openai ? `${openai.substring(0, 10)}...` : 'None'
-      })
-      
       if (deepseek) config.deepseek = deepseek
       if (gemini) config.gemini = gemini
       if (openai) config.openai = openai
@@ -128,7 +126,6 @@ export default function ChatSessionPage() {
         models.push('gpt-4o', 'gpt-4o-mini')
       }
       
-      console.log('Available models:', models)
       setAvailableModels(models)
     }
 
@@ -172,14 +169,15 @@ export default function ChatSessionPage() {
     }
   }, [selectedModel])
 
+  useEffect(() => {
+    const savedBg = localStorage.getItem(`chat_background_${sessionId}`)
+    if (savedBg) {
+      setChatBackground(savedBg)
+    }
+  }, [sessionId])
+
   // 构建系统提示
   const buildSystemPrompt = () => {
-    console.log('buildSystemPrompt 调试:', {
-      currentCharacter: currentCharacter,
-      hasPromptTemplate: !!currentCharacter?.prompt_template,
-      promptTemplate: currentCharacter?.prompt_template
-    })
-    
     if (!currentCharacter?.prompt_template) {
       console.warn('角色或prompt_template为空')
       return ''
@@ -187,12 +185,6 @@ export default function ChatSessionPage() {
     
     const { basic_info, modules } = currentCharacter.prompt_template
     
-    console.log('prompt_template 内容:', {
-      basic_info,
-      modules,
-      modulesLength: modules?.length
-    })
-
     if (!basic_info || !basic_info.name) {
       console.error('basic_info无效:', basic_info)
       return ''
@@ -216,7 +208,6 @@ export default function ChatSessionPage() {
     prompt += `\n`
     
     modules?.forEach((module: any) => {
-      console.log('处理模块:', module)
       if (module.type === '用户角色设定' && (module.userRoleName || module.userRoleAge || module.userRoleGender || module.userRoleDetails)) {
         prompt += `【用户的角色】\n`
         if (module.userRoleName) prompt += `${module.userRoleName}\n`
@@ -244,16 +235,12 @@ export default function ChatSessionPage() {
     })
     
     const finalPrompt = prompt.trim()
-    console.log('最终生成的prompt:', finalPrompt)
     return finalPrompt
   }
 
   // 预览系统提示词
   const previewSystemPrompt = () => {
     const prompt = buildSystemPrompt()
-    console.log('=== 系统提示词预览 ===')
-    console.log(prompt)
-    console.log('=== 预览结束 ===')
     alert('系统提示词已输出到控制台，请按F12查看')
   }
 
@@ -272,9 +259,8 @@ export default function ChatSessionPage() {
   const handleStartStory = async () => {
     if (!currentSelectedModel || !currentCharacter || !user) return
 
-    setIsStartingStory(true) // 立即设置loading状态
-    setHasStarted(true) // 立即切换到聊天界面
-    setShowModelSelect(false) // 关闭设置面板
+    setIsStartingStory(true)
+    setHasStarted(true)
 
     try {
       const session = await dispatch(createChatSession({
@@ -285,20 +271,6 @@ export default function ChatSessionPage() {
 
       const systemPrompt = buildSystemPrompt()
       const apiKey = getApiKeyForModel(currentSelectedModel)
-      
-      console.log('开始故事调试信息:', {
-        currentCharacter: currentCharacter ? {
-          id: currentCharacter.id,
-          name: currentCharacter.name,
-          hasPromptTemplate: !!currentCharacter.prompt_template,
-          promptTemplateKeys: currentCharacter.prompt_template ? Object.keys(currentCharacter.prompt_template) : []
-        } : null,
-        systemPrompt: systemPrompt ? `"${systemPrompt.substring(0, 100)}..."` : 'EMPTY',
-        systemPromptLength: systemPrompt ? systemPrompt.length : 0,
-        apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'NONE',
-        model: currentSelectedModel,
-        sessionId: session.id
-      })
       
       if (!apiKey) {
         throw new Error('未找到对应的API密钥')
@@ -317,6 +289,9 @@ export default function ChatSessionPage() {
         messages: [],
         thinkingBudget: getThinkingBudget(currentSelectedModel)
       }))
+
+      // 保存使用的模型
+      localStorage.setItem(`chat_model_${session.id}`, currentSelectedModel)
 
       router.replace(`/chat/${session.id}`)
     } catch (error) {
@@ -343,21 +318,6 @@ export default function ChatSessionPage() {
 
     const systemPrompt = buildSystemPrompt()
     const apiKey = getApiKeyForModel(currentSelectedModel)
-    
-    console.log('准备发送消息:', {
-      sessionId: currentSession.id,
-      userMessage: userInput.trim(),
-      systemPrompt: systemPrompt ? `${systemPrompt.length} chars` : 'undefined',
-      apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'undefined',
-      model: currentSelectedModel,
-      messagesCount: messages.length,
-      thinkingBudget: getThinkingBudget(currentSelectedModel),
-      currentCharacter: currentCharacter ? {
-        id: currentCharacter.id,
-        name: currentCharacter.name,
-        hasPromptTemplate: !!currentCharacter.prompt_template
-      } : null
-    })
     
     if (!apiKey) {
       console.error('没有找到API密钥')
@@ -442,6 +402,10 @@ export default function ChatSessionPage() {
   const handleModelChange = (model: string) => {
     setCurrentSelectedModel(model)
     dispatch(setSelectedModel(model))
+    // 保存模型选择到localStorage
+    if (sessionId && sessionId !== 'new') {
+      localStorage.setItem(`chat_model_${sessionId}`, model)
+    }
   }
 
   // 处理消息点击
@@ -506,6 +470,45 @@ export default function ChatSessionPage() {
     }
   }
 
+  // 清空聊天记录并重新开始
+  const handleClearAndRestart = async () => {
+    if (!currentSession || !currentSelectedModel || !currentCharacter || isGenerating) return
+
+    // 确认对话框
+    const confirmed = window.confirm('确定要清空所有聊天记录并重新开始吗？此操作不可撤销。')
+    if (!confirmed) return
+
+    try {
+      // 构建系统提示词
+      const systemPrompt = buildSystemPrompt()
+      const apiKey = getApiKeyForModel(currentSelectedModel)
+      
+      if (!apiKey) {
+        throw new Error('未找到对应的API密钥')
+      }
+
+      if (!systemPrompt || systemPrompt.trim() === '') {
+        throw new Error('系统提示词为空，请检查角色配置')
+      }
+
+      // 清空聊天记录并让AI重新开始对话
+      await dispatch(clearChatHistory({
+        sessionId: currentSession.id,
+        systemPrompt,
+        apiKey,
+        model: currentSelectedModel
+      }))
+
+      // 清除任何选中状态
+      setSelectedMessageId(null)
+      setEditingMessageId(null)
+
+    } catch (error) {
+      console.error('清空并重新开始失败:', error)
+      alert(`清空并重新开始失败: ${error}`)
+    }
+  }
+
   // 如果没有API配置
   if (Object.keys(apiConfig).length === 0) {
     return (
@@ -539,88 +542,89 @@ export default function ChatSessionPage() {
   }
 
   return (
-    <div className="h-screen bg-slate-50 flex flex-col">
+    <div 
+      className="h-screen bg-slate-50 flex flex-col transition-all duration-300"
+      style={{
+        backgroundImage: chatBackground ? `url(${chatBackground})` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
       {/* 固定头部 */}
-      <div className="bg-white border-b border-slate-200 px-4 py-3 flex-shrink-0">
+      <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200 px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3 min-w-0 flex-1">
-            <Avatar className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0">
-              <AvatarImage src={currentCharacter?.avatar_url} />
-              <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-sm">
-                {currentCharacter?.name?.[0] || '?'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              {isEditingTitle ? (
-                <div className="flex items-center space-x-2">
-                  <Input
-                    value={tempTitle}
-                    onChange={(e) => setTempTitle(e.target.value)}
-                    className="h-8 text-sm"
-                    autoFocus
-                  />
-                  <Button size="sm" variant="ghost" onClick={handleSaveTitle} className="p-1 h-8 w-8">
-                    <Check className="w-4 h-4" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setIsEditingTitle(false)} className="p-1 h-8 w-8">
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center space-x-2">
-                    <h2 className="text-base sm:text-lg font-semibold truncate">
-                      {sessionTitle || currentCharacter?.name}
-                    </h2>
-                    {!hasStarted && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setTempTitle(sessionTitle || currentCharacter?.name || '')
-                          setIsEditingTitle(true)
-                        }}
-                        className="p-1 h-6 w-6"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                      </Button>
-                    )}
-                  </div>
-                  <p className="text-xs sm:text-sm text-slate-500 truncate">
-                    {currentCharacter?.name}
-                    {currentSelectedModel && (
-                      <span className="hidden sm:inline"> • {getModelDisplayName(currentSelectedModel)}</span>
-                    )}
-                  </p>
-                </>
-              )}
-            </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/characters')}
+              className="p-2 h-8 w-8"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            {hasStarted && currentCharacter && (
+              <div className="flex items-center space-x-2">
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src={currentCharacter.avatar_url} />
+                  <AvatarFallback>{currentCharacter.name?.[0]}</AvatarFallback>
+                </Avatar>
+                <h2 className="text-base font-semibold truncate">
+                  {sessionTitle || currentCharacter.name}
+                </h2>
+              </div>
+            )}
           </div>
           
-          {/* 右侧操作按钮 */}
-          {!hasStarted && (
-            <div className="flex items-center space-x-2">
+          <div className="flex-1 flex justify-center min-w-0">
+            {!hasStarted && (
+              <h2 className="text-lg font-semibold truncate">
+                {sessionTitle || currentCharacter?.name}
+              </h2>
+            )}
+          </div>
+          
+          <div className="flex items-center space-x-1">
+            {hasStarted && (
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setShowModelSelect(!showModelSelect)}
-                className="text-xs px-2 py-1 h-8"
+                onClick={handleClearAndRestart}
+                disabled={isGenerating}
+                className="p-2 h-8 w-8"
+                title="清空聊天记录并重新开始"
               >
-                {currentSelectedModel ? getModelDisplayName(currentSelectedModel) : '选择模型'}
-                <ChevronDown className="w-3 h-3 ml-1" />
+                <RotateCcw className="w-4 h-4" />
               </Button>
-            </div>
-          )}
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => router.push(`/chat/${sessionId}/settings`)}
+              className="p-2 h-8 w-8"
+            >
+              <Settings className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
+      </div>
 
-        {/* 移动端模型选择下拉面板 */}
-        {!hasStarted && showModelSelect && (
-          <div className="mt-3 space-y-3">
-            <div>
-              <Label className="text-sm font-medium">选择AI模型</Label>
+      {/* 消息区域 - 占据剩余空间 */}
+      <div className="flex-1 overflow-hidden">
+        {!hasStarted ? (
+          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+            <Avatar className="w-20 h-20 mb-4">
+              <AvatarImage src={currentCharacter?.avatar_url} />
+              <AvatarFallback className="text-3xl">
+                {currentCharacter?.name?.[0]}
+              </AvatarFallback>
+            </Avatar>
+            <h2 className="text-2xl font-bold mb-1">{currentCharacter?.name}</h2>
+            <p className="text-slate-500 mb-6">准备好开始对话了吗？</p>
+            
+            <div className="w-full max-w-xs space-y-3">
               <Select value={currentSelectedModel || ''} onValueChange={handleModelChange}>
-                <SelectTrigger className="w-full mt-1">
-                  <SelectValue placeholder="选择AI模型" />
+                <SelectTrigger>
+                  <SelectValue placeholder="选择一个模型..." />
                 </SelectTrigger>
                 <SelectContent>
                   {availableModels.map((model) => (
@@ -630,129 +634,18 @@ export default function ChatSessionPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            {/* Gemini高级设置 */}
-            {currentSelectedModel === 'gemini-2.5-flash' && (
-              <div className="space-y-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
-                  className="text-xs px-0"
-                >
-                  高级设置
-                  <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showAdvancedSettings ? 'rotate-180' : ''}`} />
-                </Button>
-                
-                {showAdvancedSettings && (
-                  <div className="space-y-3 p-3 bg-slate-50 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">思维模式</Label>
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-xs ${thinkingBudgetMode === 'auto' ? 'font-medium' : 'text-slate-500'}`}>
-                          Auto
-                        </span>
-                        <Switch
-                          checked={thinkingBudgetMode === 'manual'}
-                          onCheckedChange={(checked) => setThinkingBudgetMode(checked ? 'manual' : 'auto')}
-                        />
-                        <span className={`text-xs ${thinkingBudgetMode === 'manual' ? 'font-medium' : 'text-slate-500'}`}>
-                          Manual
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {thinkingBudgetMode === 'manual' && (
-                      <div>
-                        <Label className="text-sm">思维预算</Label>
-                        <Select value={thinkingBudget.toString()} onValueChange={(value) => setThinkingBudget(Number(value))}>
-                          <SelectTrigger className="w-full mt-1">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="0">0 (关闭)</SelectItem>
-                            <SelectItem value="1000">1000</SelectItem>
-                            <SelectItem value="5000">5000</SelectItem>
-                            <SelectItem value="10000">10000</SelectItem>
-                            <SelectItem value="20000">20000</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    
-                    <p className="text-xs text-slate-500">
-                      {thinkingBudgetMode === 'auto' 
-                        ? 'AI自动决定是否使用思维链，平衡质量与速度' 
-                        : thinkingBudget === 0 
-                          ? '关闭思维链，响应更快，成本更低' 
-                          : '启用思维链，提升回答质量但响应较慢'
-                      }
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Gemini 2.5 Pro 说明 */}
-            {currentSelectedModel === 'gemini-2.5-pro' && (
-              <div className="text-xs text-slate-500 p-3 bg-slate-50 rounded-lg">
-                Gemini 2.5 Pro 默认启用思维链模式，提供最佳回答质量
-              </div>
-            )}
-
-            <div className="flex space-x-2">
-              {currentCharacter && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={previewSystemPrompt}
-                  className="text-xs flex-1"
-                >
-                  预览提示词
-                </Button>
-              )}
+              
               <Button
                 onClick={handleStartStory}
                 disabled={!currentSelectedModel || isStartingStory}
-                size="sm"
-                className="flex-1"
+                size="lg"
+                className="w-full"
               >
-                <Play className="w-4 h-4 mr-1" />
-                {isStartingStory ? '启动中...' : '开始故事'}
+                {isStartingStory ? '正在开始...' : '开始对话'}
+                <ChevronRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
           </div>
-        )}
-      </div>
-
-      {/* 消息区域 - 占据剩余空间 */}
-      <div className="flex-1 overflow-hidden">
-        {!hasStarted ? (
-          // 未开始状态的欢迎界面
-          !showModelSelect && (
-            <div className="h-full flex items-center justify-center p-6">
-              <div className="text-center space-y-6 max-w-sm">
-                <div className="w-16 h-16 mx-auto bg-gradient-to-br from-slate-900 to-slate-700 rounded-full flex items-center justify-center">
-                  <Play className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold mb-2">准备开始你的故事</h3>
-                  <p className="text-slate-600 mb-6 text-sm">
-                    点击上方选择模型，然后开始与 {currentCharacter?.name} 的对话
-                  </p>
-                  <Button
-                    onClick={() => setShowModelSelect(true)}
-                    size="lg"
-                    className="w-full"
-                  >
-                    <Play className="w-5 h-5 mr-2" />
-                    开始配置
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )
         ) : (
           // 消息列表区域
           <div 
@@ -794,7 +687,7 @@ export default function ChatSessionPage() {
                       <div 
                         className={`p-3 sm:p-4 rounded-2xl break-words transition-all duration-200 ${
                           message.role === 'user' 
-                            ? 'bg-slate-900 text-white rounded-br-md' 
+                            ? 'bg-blue-500 text-white rounded-br-md' 
                             : 'bg-white text-slate-900 border border-slate-200 rounded-bl-md hover:bg-slate-50'
                         } ${
                           selectedMessageId === message.id ? 'ring-2 ring-blue-500' : ''
@@ -924,13 +817,13 @@ export default function ChatSessionPage() {
 
       {/* 固定底部输入框 */}
       {hasStarted && (
-        <div className="bg-white border-t border-slate-200 p-3 sm:p-4 flex-shrink-0">
-          <div className="flex space-x-2 sm:space-x-3">
+        <div className="bg-white/80 backdrop-blur-sm border-t border-slate-200 p-3 sm:p-4 flex-shrink-0">
+          <div className="flex items-center space-x-2 sm:space-x-3 bg-slate-100/80 rounded-full p-1">
             <Textarea
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
-              placeholder="输入你的消息..."
-              className="flex-1 resize-none text-sm sm:text-base min-h-[40px] max-h-[120px] border-slate-300 rounded-2xl"
+              placeholder="输入消息..."
+              className="flex-1 resize-none text-sm sm:text-base bg-transparent border-none focus:ring-0 focus:outline-none min-h-[24px] max-h-[120px] px-3 py-1.5"
               rows={1}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -940,7 +833,7 @@ export default function ChatSessionPage() {
               }}
               style={{
                 height: 'auto',
-                minHeight: '40px'
+                minHeight: '24px'
               }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement
@@ -951,9 +844,9 @@ export default function ChatSessionPage() {
             <Button
               onClick={handleSendMessage}
               disabled={!userInput.trim() || isGenerating}
-              className="self-end rounded-full w-10 h-10 sm:w-12 sm:h-12 p-0 flex-shrink-0"
+              className="self-end rounded-full w-8 h-8 sm:w-9 sm:h-9 p-0 flex-shrink-0 bg-blue-500 hover:bg-blue-600 text-white"
             >
-              <Send className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Send className="w-4 h-4" />
             </Button>
           </div>
           

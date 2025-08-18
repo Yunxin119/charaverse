@@ -22,6 +22,8 @@ import { cn } from '@/lib/utils'
 
 interface SidebarProps {
   className?: string
+  isMobileOpen?: boolean
+  onMobileOpenChange?: (open: boolean) => void
 }
 
 const navigation = [
@@ -31,9 +33,8 @@ const navigation = [
   { name: '设置', href: '/settings', icon: Settings },
 ]
 
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar({ className, isMobileOpen = false, onMobileOpenChange }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [isMobileOpen, setIsMobileOpen] = useState(false)
   const pathname = usePathname()
 
   // 检测屏幕尺寸
@@ -53,8 +54,13 @@ export function Sidebar({ className }: SidebarProps) {
   // 移动端点击导航后关闭侧边栏
   const handleNavClick = () => {
     if (window.innerWidth < 768) {
-      setIsMobileOpen(false)
+      onMobileOpenChange?.(false)
     }
+  }
+
+  // 关闭移动端侧边栏
+  const handleMobileClose = () => {
+    onMobileOpenChange?.(false)
   }
 
   const sidebarVariants = {
@@ -93,16 +99,6 @@ export function Sidebar({ className }: SidebarProps) {
 
   return (
     <>
-      {/* 移动端汉堡菜单按钮 */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setIsMobileOpen(true)}
-        className="md:hidden fixed top-4 left-4 z-50 h-10 w-10 p-0 bg-white/90 backdrop-blur-sm border border-slate-200 shadow-lg hover:bg-white"
-      >
-        <Menu className="w-5 h-5" />
-      </Button>
-
       {/* 移动端遮罩 */}
       <AnimatePresence>
         {isMobileOpen && (
@@ -113,7 +109,7 @@ export function Sidebar({ className }: SidebarProps) {
             variants={overlayVariants}
             transition={{ duration: 0.2 }}
             className="md:hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
-            onClick={() => setIsMobileOpen(false)}
+            onClick={() => onMobileOpenChange?.(false)}
           />
         )}
       </AnimatePresence>
@@ -151,7 +147,7 @@ export function Sidebar({ className }: SidebarProps) {
             <SidebarContent 
               isCollapsed={false}
               isMobile={true}
-              onClose={() => setIsMobileOpen(false)}
+              onClose={() => onMobileOpenChange?.(false)}
               onNavClick={handleNavClick}
               contentVariants={contentVariants}
               pathname={pathname}

@@ -123,7 +123,7 @@ export default function SettingsPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="max-w-4xl mx-auto space-y-8"
+      className="max-w-4xl mx-auto space-y-6"
     >
       {/* Header */}
       <motion.div variants={itemVariants}>

@@ -38,6 +38,7 @@ interface BasicInfo {
   description: string
   avatar_url: string
   is_public: boolean
+  introduction: string // 角色说明，给其他用户看的介绍
 }
 
 interface PromptModule {
@@ -64,7 +65,8 @@ export default function NewCharacterPage() {
     keywords: [],
     description: '',
     avatar_url: '',
-    is_public: false
+    is_public: false,
+    introduction: ''
   })
 
   // 关键词输入状态
@@ -283,7 +285,7 @@ export default function NewCharacterPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="max-w-4xl mx-auto space-y-8"
+      className="max-w-4xl mx-auto space-y-6"
     >
       {/* Header */}
       <motion.div variants={itemVariants}>
@@ -433,6 +435,20 @@ export default function NewCharacterPage() {
                       onChange={(e) => handleBasicInfoChange('description', e.target.value)}
                       className="min-h-[120px] resize-none"
                     />
+                    <p className="text-xs text-slate-500">此信息用于AI对话，不会公开显示</p>
+                  </div>
+
+                  {/* Character Introduction */}
+                  <div className="space-y-2">
+                    <Label htmlFor="introduction">角色说明</Label>
+                    <Textarea
+                      id="introduction"
+                      placeholder="为其他用户介绍这个角色，包括角色特点、使用场景、对话风格等..."
+                      value={basicInfo.introduction}
+                      onChange={(e) => handleBasicInfoChange('introduction', e.target.value)}
+                      className="min-h-[100px] resize-none"
+                    />
+                    <p className="text-xs text-slate-500">此说明会在角色列表中显示，帮助其他用户了解角色</p>
                   </div>
 
                   {/* Public Setting */}

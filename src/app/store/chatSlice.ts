@@ -386,6 +386,72 @@ export const sendNewMessageFrom = createAsyncThunk(
   }
 )
 
+// 清空聊天记录并重新开始对话
+export const clearChatHistory = createAsyncThunk(
+  'chat/clearChatHistory',
+  async ({ 
+    sessionId, 
+    systemPrompt, 
+    apiKey, 
+    model 
+  }: { 
+    sessionId: string
+    systemPrompt: string
+    apiKey: string
+    model: string
+  }, { dispatch }) => {
+    // 1. 从数据库删除消息
+    const { error } = await supabase
+      .from('chat_messages')
+      .delete()
+      .eq('session_id', sessionId)
+
+    if (error) {
+      throw new Error('Failed to delete messages from database')
+    }
+
+    // 2. 清空本地状态的消息
+    dispatch(clearMessages())
+
+    // 3. 让AI重新开始对话
+    const requestBody: any = {
+      messages: [],
+      systemPrompt: systemPrompt + '\n\n现在请你作为角色主动开始对话，根据初始情景开始我们的故事。',
+      apiKey,
+      model
+    }
+
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to restart conversation')
+    }
+
+    const aiResponse = await response.json()
+
+    // 4. 保存AI的开场消息
+    const { data: aiMsgData, error: aiMsgError } = await supabase
+      .from('chat_messages')
+      .insert({
+        session_id: sessionId,
+        role: 'assistant',
+        content: aiResponse.content
+      })
+      .select()
+      .single()
+
+    if (aiMsgError) throw aiMsgError
+
+    return aiMsgData
+  }
+)
+
 const chatSlice = createSlice({
   name: 'chat',
   initialState,
@@ -396,12 +462,8 @@ const chatSlice = createSlice({
     setSessionTitle: (state, action: PayloadAction<string>) => {
       state.sessionTitle = action.payload
     },
-    clearChat: (state) => {
-      state.currentSession = null
-      state.currentCharacter = null
+    clearMessages: (state) => {
       state.messages = []
-      state.selectedModel = null
-      state.sessionTitle = ''
       state.error = null
     },
     clearError: (state) => {
@@ -530,13 +592,28 @@ const chatSlice = createSlice({
         state.isGenerating = false
         state.error = action.error.message || 'Failed to send new message'
       })
+      
+      // Clear Chat History
+      .addCase(clearChatHistory.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(clearChatHistory.fulfilled, (state, action) => {
+        state.isLoading = false
+        // 添加AI的新开场消息
+        state.messages.push(action.payload)
+      })
+      .addCase(clearChatHistory.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.error.message || 'Failed to clear chat history'
+      })
   }
 })
 
 export const { 
   setSelectedModel, 
   setSessionTitle, 
-  clearChat, 
+  clearMessages, 
   clearError 
 } = chatSlice.actions
 
