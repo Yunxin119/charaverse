@@ -36,6 +36,8 @@ export type ChatSession = {
   user_id: string
   character_id: number
   title?: string
+  last_diary_cutoff_message_id?: number
+  last_forum_cutoff_message_id?: number
   created_at: string
 }
 
@@ -44,5 +46,19 @@ export type ChatMessage = {
   session_id: string
   role: 'user' | 'assistant' | 'system'
   content: string
+  type: 'message' | 'diary' | 'forum_post'
   created_at: string
+}
+
+export type PromptTemplate = {
+  id: number
+  user_id: string | null
+  name: string
+  template_type: '用户角色设定' | '注意事项' | '初始情景' | '特殊要求' | '自定义模块'
+  content: Record<string, any>
+  description?: string
+  is_public: boolean
+  usage_count: number
+  created_at: string
+  updated_at: string
 } 

@@ -82,7 +82,7 @@ async function callGemini(messages: ChatMessage[], systemPrompt: string, apiKey:
   if (lastContent.role !== 'user') {
     contents.push({
       role: 'user',
-      parts: [{ text: '请继续。' }]
+      parts: [{ text: '【用户未回，请继续。】' }]
     })
   }
 

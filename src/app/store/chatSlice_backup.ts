@@ -34,6 +34,7 @@ interface ChatState {
   messages: ChatMessage[]
   isLoading: boolean
   isGenerating: boolean
+  isGeneratingContent: boolean // 新增：内容生成状态
   isLoadingMessages: boolean
   isLoadingMoreMessages: boolean
   hasMoreMessages: boolean
@@ -48,6 +49,7 @@ const initialState: ChatState = {
   messages: [],
   isLoading: false,
   isGenerating: false,
+  isGeneratingContent: false,
   isLoadingMessages: false,
   isLoadingMoreMessages: false,
   hasMoreMessages: true,
@@ -75,25 +77,6 @@ export const fetchCharacter = createAsyncThunk(
 export const createChatSession = createAsyncThunk(
   'chat/createSession',
   async ({ characterId, title, userId }: { characterId: number, title: string, userId: string }) => {
-    // 首先检查是否已存在该角色的会话
-    const { data: existingSession, error: checkError } = await supabase
-      .from('chat_sessions')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('character_id', characterId)
-      .single()
-
-    if (checkError && checkError.code !== 'PGRST116') {
-      // PGRST116 是"没有找到行"的错误，这是正常的
-      throw checkError
-    }
-
-    // 如果已存在会话，返回现有会话
-    if (existingSession) {
-      return existingSession
-    }
-
-    // 如果不存在，创建新会话
     const { data, error } = await supabase
       .from('chat_sessions')
       .insert({
@@ -106,25 +89,6 @@ export const createChatSession = createAsyncThunk(
 
     if (error) throw error
     return data
-  }
-)
-
-// 获取角色现有会话
-export const getExistingSession = createAsyncThunk(
-  'chat/getExistingSession',
-  async ({ characterId, userId }: { characterId: number, userId: string }) => {
-    const { data, error } = await supabase
-      .from('chat_sessions')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('character_id', characterId)
-      .single()
-
-    if (error && error.code !== 'PGRST116') {
-      throw error
-    }
-
-    return data || null
   }
 )
 
@@ -449,6 +413,120 @@ export const sendNewMessageFrom = createAsyncThunk(
 
 // 清空聊天记录并重新开始对话
 export const clearChatHistory = createAsyncThunk(
+  'chat/clearHistory',
+  async ({ 
+    sessionId, 
+    systemPrompt, 
+    apiKey, 
+    model,
+    thinkingBudget
+  }: { 
+    sessionId: string
+    systemPrompt: string
+    apiKey: string
+    model: string
+    thinkingBudget?: number
+  }) => {
+    // 删除所有消息
+    const { error: deleteError } = await supabase
+      .from('chat_messages')
+      .delete()
+      .eq('session_id', sessionId)
+
+    if (deleteError) throw deleteError
+
+    // 生成新的开场消息
+    const requestBody: any = {
+      messages: [],
+      systemPrompt,
+      apiKey,
+      model
+    }
+
+    if (model.includes('gemini-2.5') && thinkingBudget !== undefined) {
+      requestBody.thinkingBudget = thinkingBudget
+    }
+
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to generate new opening message')
+    }
+
+    const aiResponse = await response.json()
+
+    // 保存新的AI消息
+    const { data: newAiMsg, error: newAiMsgError } = await supabase
+      .from('chat_messages')
+      .insert({
+        session_id: sessionId,
+        role: 'assistant',
+        content: aiResponse.content,
+        type: 'message'
+      })
+      .select()
+      .single()
+
+    if (newAiMsgError) throw newAiMsgError
+
+    return newAiMsg
+  }
+)
+
+// 生成内容（日记或论坛帖子）
+export const generateContent = createAsyncThunk(
+  'chat/generateContent',
+  async ({ 
+    sessionId, 
+    contentType,
+    systemPrompt, 
+    apiKey, 
+    model,
+    thinkingBudget
+  }: { 
+    sessionId: string
+    contentType: 'diary' | 'forum_post'
+    systemPrompt: string
+    apiKey: string
+    model: string
+    thinkingBudget?: number
+  }) => {
+    // 调用后端API生成内容
+    const requestBody: any = {
+      sessionId,
+      contentType,
+      systemPrompt,
+      apiKey,
+      model
+    }
+
+    if (model.includes('gemini-2.5') && thinkingBudget !== undefined) {
+      requestBody.thinkingBudget = thinkingBudget
+    }
+
+    const response = await fetch('/api/generate-content', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(errorText || 'Failed to generate content')
+    }
+
+    const result = await response.json()
+    return result.generatedContent
+  }
+)(
   'chat/clearChatHistory',
   async ({ 
     sessionId, 
@@ -567,15 +645,6 @@ const chatSlice = createSlice({
         state.sessionTitle = action.payload.title || ''
       })
       
-      // Get Existing Session
-      .addCase(getExistingSession.fulfilled, (state, action) => {
-        // 这个action主要用于检查，不需要更新state
-        // 返回值会在组件中处理
-      })
-      .addCase(getExistingSession.rejected, (state, action) => {
-        state.error = action.error.message || 'Failed to check existing session'
-      })
-      
       // Fetch Messages
       .addCase(fetchMessages.pending, (state) => {
         state.isLoadingMessages = true
@@ -629,7 +698,7 @@ const chatSlice = createSlice({
         // 如果有用户消息，需要更新临时消息的ID为真实ID
         if (action.payload.userMessage) {
           // 找到刚才添加的临时用户消息并更新ID
-          const lastUserMsgIndex = state.messages.length - 1 - [...state.messages].reverse().findIndex(msg => msg.role === 'user')
+          const lastUserMsgIndex = state.messages.findLastIndex(msg => msg.role === 'user')
           if (lastUserMsgIndex !== -1) {
             state.messages[lastUserMsgIndex] = action.payload.userMessage
           }

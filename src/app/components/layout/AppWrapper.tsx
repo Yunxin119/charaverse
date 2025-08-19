@@ -16,6 +16,7 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
   
   // 检测是否为聊天页面（个人聊天页面）
   const isChatPage = pathname.startsWith('/chat/') && pathname !== '/chat'
+  const isPublicCharacterPage = pathname.startsWith('/character/public/') && pathname !== '/character'
 
   if (!shouldShowLayout) {
     return <>{children}</>
@@ -23,6 +24,15 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
 
   // 聊天页面使用全屏布局
   if (isChatPage) {
+    return (
+      <div className="h-screen overflow-hidden bg-slate-50">
+        {children}
+      </div>
+    )
+  }
+
+  // 公共角色页面使用全屏布局
+  if (isPublicCharacterPage) {
     return (
       <div className="h-screen overflow-hidden bg-slate-50">
         {children}

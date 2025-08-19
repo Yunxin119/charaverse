@@ -31,6 +31,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { supabase } from '../../../lib/supabase'
 import { useAppSelector } from '../../../store/hooks'
+import { TemplateManager } from '../../../components/TemplateManager'
+import { SimpleAvatarUpload } from '../../../components/AvatarUpload'
+import { uploadCharacterAvatar } from '../../../lib/avatarUpload'
 
 interface BasicInfo {
   name: string
@@ -91,6 +94,7 @@ export default function EditCharacterPage() {
   ])
 
   const [activeTab, setActiveTab] = useState('basic')
+  const [avatarTimestamp, setAvatarTimestamp] = useState(Date.now())
 
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -313,6 +317,27 @@ export default function EditCharacterPage() {
     }
   }
 
+  // 头像上传处理
+  const handleAvatarUpload = async (file: File): Promise<string> => {
+    try {
+      const avatarUrl = await uploadCharacterAvatar(file, parseInt(characterId))
+      
+      // 更新基本信息中的头像URL
+      setBasicInfo(prev => ({
+        ...prev,
+        avatar_url: avatarUrl
+      }))
+
+      // 更新时间戳以强制刷新banner背景
+      setAvatarTimestamp(Date.now())
+
+      return avatarUrl
+    } catch (error) {
+      console.error('头像上传失败:', error)
+      throw error
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -397,30 +422,131 @@ export default function EditCharacterPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="max-w-4xl mx-auto space-y-6"
+      className="max-w-4xl mx-auto space-y-6 pb-6"
     >
-      {/* Header */}
-      <motion.div variants={itemVariants}>
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.back()}
-            className="p-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center">
-            <Sparkles className="w-6 h-6 text-white" />
+      {/* Character Banner - 类似微信朋友圈背景 */}
+      <motion.div variants={itemVariants} className="relative -mx-4 -mt-6 mb-8 sm:-mx-6">
+        {/* Back Button - 绝对定位在左上角 */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.back()}
+          className="absolute top-4 left-4 z-20 bg-black/20 hover:bg-black/40 text-white border-white/20"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        
+        <div className="w-full aspect-[1.8/1] overflow-hidden relative" key={basicInfo.avatar_url || 'no-avatar'}>
+          {/* Avatar Background or Default Background */}
+          {basicInfo.avatar_url ? (
+            <>
+              {/* Avatar as Background */}
+              <div 
+                className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                style={{ backgroundImage: `url(${basicInfo.avatar_url}?t=${avatarTimestamp})` }}
+              ></div>
+              {/* Dark overlay for text readability */}
+              <div className="absolute inset-0 bg-black/50"></div>
+            </>
+          ) : (
+            <>
+              {/* Default gradient background when no avatar */}
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200">
+                {/* Dynamic Background Pattern */}
+                <div className="absolute inset-0 opacity-40">
+                  <div className="absolute top-0 left-1/4 w-40 h-40 bg-blue-400 rounded-full blur-3xl"></div>
+                  <div className="absolute bottom-0 right-1/4 w-48 h-48 bg-purple-400 rounded-full blur-3xl"></div>
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-indigo-300 rounded-full blur-2xl"></div>
+                  <div className="absolute top-1/4 right-1/3 w-24 h-24 bg-pink-300 rounded-full blur-2xl"></div>
+                </div>
+              </div>
+              {/* Gradient Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+            </>
+          )}
+          
+          {/* Character Avatar - 右下角位置 */}
+          <div className="absolute bottom-6 right-6">
+            <motion.div 
+              className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-2xl bg-white cursor-pointer group"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              onClick={() => {
+                // 触发头像上传
+                const fileInput = document.getElementById('avatar-upload') as HTMLInputElement
+                fileInput?.click()
+              }}
+            >
+              {basicInfo.avatar_url ? (
+                <div className="relative w-full h-full">
+                  <img 
+                    src={basicInfo.avatar_url} 
+                    alt={basicInfo.name || '角色头像'}
+                    className="w-full h-full object-cover"
+                  />
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                    <Upload className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center group-hover:from-blue-600 group-hover:to-purple-700 transition-colors duration-200">
+                  <div className="flex flex-col items-center">
+                    <span className="text-white text-4xl font-bold mb-1">
+                      {basicInfo.name ? basicInfo.name[0].toUpperCase() : '?'}
+                    </span>
+                    <Upload className="w-4 h-4 text-white/80" />
+                  </div>
+                </div>
+              )}
+            </motion.div>
           </div>
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900">编辑角色</h1>
-            <p className="text-slate-600 mt-1">修改 {basicInfo.name} 的设定</p>
+          
+          {/* Character Info - 左下角位置 */}
+          <div className="absolute bottom-6 left-6 text-white z-10">
+            <h1 className="text-4xl font-bold drop-shadow-lg mb-2">
+              {basicInfo.name || '编辑角色'}
+            </h1>
+            <p className="text-lg opacity-90 drop-shadow mb-1">
+              {basicInfo.age ? `${basicInfo.age} · ` : ''}
+              {basicInfo.gender ? (basicInfo.gender === 'male' ? '男' : basicInfo.gender === 'female' ? '女' : basicInfo.gender === 'none' ? '无性别' : '其他') : ''}
+            </p>
+            <p className="text-sm opacity-80 drop-shadow">
+              修改角色设定，完善角色形象
+            </p>
+          </div>
+          
+          {/* Upload Hint - 右上角 */}
+          <div className="absolute top-4 right-4">
+            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-1">
+              <p className="text-white text-xs">点击头像更换图片</p>
+            </div>
           </div>
         </div>
       </motion.div>
 
       <form onSubmit={handleSubmit}>
+        {/* Hidden file input for avatar upload */}
+        <input
+          type="file"
+          accept="image/*"
+          onChange={async (e) => {
+            const file = e.target.files?.[0]
+            if (file) {
+              try {
+                await handleAvatarUpload(file)
+              } catch (error) {
+                console.error('头像上传失败:', error)
+                alert(error instanceof Error ? error.message : '头像上传失败，请重试')
+              }
+            }
+            e.target.value = '' // 清空input值，允许重复选择同一文件
+          }}
+          className="hidden"
+          id="avatar-upload"
+        />
+        
         <motion.div variants={itemVariants}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-2">
@@ -436,30 +562,7 @@ export default function EditCharacterPage() {
                   <CardDescription>设置角色的基本属性和外观</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Avatar Section */}
-                  <div className="flex items-center space-x-6">
-                    <Avatar className="w-24 h-24">
-                      <AvatarImage src={basicInfo.avatar_url} />
-                      <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-2xl">
-                        {basicInfo.name ? basicInfo.name[0] : '?'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="space-y-2">
-                      <Label htmlFor="avatar">角色头像</Label>
-                      <div className="flex space-x-2">
-                        <Input
-                          id="avatar"
-                          placeholder="头像URL（可选）"
-                          value={basicInfo.avatar_url}
-                          onChange={(e) => handleBasicInfoChange('avatar_url', e.target.value)}
-                          className="flex-1"
-                        />
-                        <Button type="button" variant="outline" size="sm">
-                          <Upload className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Character Name */}
@@ -635,7 +738,7 @@ export default function EditCharacterPage() {
                             className="border border-slate-200 rounded-lg p-6 space-y-4"
                           >
                             {/* Module Header */}
-                            <div className="flex items-center justify-between">
+                                                        <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-3">
                                 <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
                                   <Icon className="w-4 h-4 text-slate-600" />
@@ -643,18 +746,62 @@ export default function EditCharacterPage() {
                                 <span className="font-medium text-slate-900">{module.type}</span>
                                 <span className="text-sm text-slate-500">#{index + 1}</span>
                               </div>
-                              {modules.length > 1 && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeModule(module.id)}
-                                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <X className="w-4 h-4" />
-                                </Button>
-                              )}
-      </div>
+                              <div className="flex items-center space-x-2">
+                                <TemplateManager
+                                  templateType={module.type}
+                                  currentContent={module.type === '用户角色设定' ? {
+                                    userRoleName: module.userRoleName || '',
+                                    userRoleAge: module.userRoleAge || '',
+                                    userRoleGender: module.userRoleGender || '',
+                                    userRoleDetails: module.userRoleDetails || ''
+                                  } : module.type === '自定义模块' ? {
+                                    name: module.name || '',
+                                    content: module.content || ''
+                                  } : {
+                                    content: module.content || ''
+                                  }}
+                                  onLoadTemplate={(content) => {
+                                    if (module.type === '用户角色设定') {
+                                      setModules(prev => prev.map(m => 
+                                        m.id === module.id ? {
+                                          ...m,
+                                          userRoleName: content.userRoleName || '',
+                                          userRoleAge: content.userRoleAge || '',
+                                          userRoleGender: content.userRoleGender || '',
+                                          userRoleDetails: content.userRoleDetails || ''
+                                        } : m
+                                      ))
+                                    } else if (module.type === '自定义模块') {
+                                      setModules(prev => prev.map(m => 
+                                        m.id === module.id ? {
+                                          ...m,
+                                          name: content.name || '',
+                                          content: content.content || ''
+                                        } : m
+                                      ))
+                                    } else {
+                                      setModules(prev => prev.map(m => 
+                                        m.id === module.id ? {
+                                          ...m,
+                                          content: content.content || ''
+                                        } : m
+                                      ))
+                                    }
+                                  }}
+                                />
+                                {modules.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeModule(module.id)}
+                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
       
                             {/* 用户角色设定的特殊字段 */}
                             {module.type === '用户角色设定' && (
@@ -747,7 +894,7 @@ export default function EditCharacterPage() {
         {/* Action Buttons */}
         <motion.div variants={itemVariants}>
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 pb-6">
               <div className="flex justify-between">
                 <Button
                   type="button"

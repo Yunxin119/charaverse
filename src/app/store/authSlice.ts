@@ -29,13 +29,31 @@ export const signIn = createAsyncThunk(
 
 export const signUp = createAsyncThunk(
   'auth/signUp',
-  async ({ email, password }: { email: string; password: string }) => {
+  async ({ email, password, username }: { email: string; password: string; username: string }) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
     })
     
     if (error) throw error
+
+    // 如果注册成功，创建用户资料
+    if (data.user) {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: data.user.id,
+          username: username.trim(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+
+      if (profileError) {
+        console.error('创建用户资料失败:', profileError)
+        // 不抛出错误，因为用户已经注册成功
+      }
+    }
+
     return data.user
   }
 )

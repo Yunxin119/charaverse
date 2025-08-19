@@ -28,9 +28,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useAppSelector } from '../store/hooks'
 import { supabase } from '../lib/supabase'
 import { Character } from '../store/chatSlice'
+import { useAppDispatch } from '../store/hooks'
+import { getExistingSession } from '../store/chatSlice'
 
 export default function CharactersPage() {
   const { user } = useAppSelector((state) => state.auth)
+  const dispatch = useAppDispatch()
   const router = useRouter()
   
   const [characters, setCharacters] = useState<Character[]>([])
@@ -107,6 +110,31 @@ export default function CharactersPage() {
       setCharacters(prev => prev.filter(char => char.id !== characterId))
     } catch (error) {
       console.error('删除角色失败:', error)
+    }
+  }
+
+  // 处理聊天按钮点击
+  const handleChatClick = async (characterId: number) => {
+    if (!user) return
+    
+    try {
+      // 检查是否已有该角色的会话
+      const existingSession = await dispatch(getExistingSession({ 
+        characterId, 
+        userId: user.id 
+      })).unwrap()
+      
+      if (existingSession) {
+        // 如果已有会话，跳转到现有会话
+        router.push(`/chat/${existingSession.id}`)
+      } else {
+        // 如果没有会话，创建新会话
+        router.push(`/chat/new?characterId=${characterId}`)
+      }
+    } catch (error) {
+      console.error('检查会话失败:', error)
+      // 如果检查失败，默认创建新会话
+      router.push(`/chat/new?characterId=${characterId}`)
     }
   }
 
@@ -389,20 +417,22 @@ export default function CharactersPage() {
                       )}
                     </div>
                     
-                    <div className="flex space-x-2">
-                      <Button asChild size="sm" variant="outline" className="h-8 px-3 text-xs">
-                        <Link href={`/characters/${character.id}/edit`}>
-                          <Edit className="w-3 h-3 mr-1.5" />
-                          编辑
-                        </Link>
-                      </Button>
-                      <Button asChild size="sm" className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700">
-                        <Link href={`/chat/new?characterId=${character.id}`}>
+                                          <div className="flex space-x-2">
+                        <Button asChild size="sm" variant="outline" className="h-8 px-3 text-xs">
+                          <Link href={`/characters/${character.id}/edit`}>
+                            <Edit className="w-3 h-3 mr-1.5" />
+                            编辑
+                          </Link>
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700"
+                          onClick={() => handleChatClick(character.id)}
+                        >
                           <MessageCircle className="w-3 h-3 mr-1.5" />
                           聊天
-                        </Link>
-                      </Button>
-                    </div>
+                        </Button>
+                      </div>
                   </div>
                 </CardContent>
               </Card>

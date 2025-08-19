@@ -20,9 +20,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAppSelector } from './store/hooks'
+import { useAppDispatch } from './store/hooks'
+import { getExistingSession } from './store/chatSlice'
+import { supabase } from './lib/supabase'
 
 export default function DashboardPage() {
   const { user, loading } = useAppSelector((state) => state.auth)
+  const dispatch = useAppDispatch()
   const router = useRouter()
 
   useEffect(() => {
@@ -145,6 +149,31 @@ export default function DashboardPage() {
     }
   ]
 
+  // 处理聊天按钮点击
+  const handleChatClick = async (characterId: number) => {
+    if (!user) return
+    
+    try {
+      // 检查是否已有该角色的会话
+      const existingSession = await dispatch(getExistingSession({ 
+        characterId, 
+        userId: user.id 
+      })).unwrap()
+      
+      if (existingSession) {
+        // 如果已有会话，跳转到现有会话
+        router.push(`/chat/${existingSession.id}`)
+      } else {
+        // 如果没有会话，创建新会话
+        router.push(`/chat/new?characterId=${characterId}`)
+      }
+    } catch (error) {
+      console.error('检查会话失败:', error)
+      // 如果检查失败，默认创建新会话
+      router.push(`/chat/new?characterId=${characterId}`)
+    }
+  }
+
   return (
     <motion.div
       variants={containerVariants}
@@ -266,11 +295,12 @@ export default function DashboardPage() {
                           编辑
                         </Link>
                       </Button>
-                      <Button asChild size="sm">
-                        <Link href={`/chat/new?characterId=${character.id}`}>
-                          <MessageCircle className="w-4 h-4 mr-2" />
-                          开始聊天
-                        </Link>
+                      <Button 
+                        size="sm"
+                        onClick={() => handleChatClick(character.id)}
+                      >
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        开始聊天
                       </Button>
                     </div>
                   </div>

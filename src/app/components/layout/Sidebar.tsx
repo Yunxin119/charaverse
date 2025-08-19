@@ -15,7 +15,8 @@ import {
   ChevronRight,
   Bot,
   X,
-  Menu
+  Menu,
+  Globe
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -29,6 +30,7 @@ interface SidebarProps {
 const navigation = [
   { name: '仪表盘', href: '/', icon: Home },
   { name: '我的角色', href: '/characters', icon: Users },
+  { name: '探索', href: '/explore', icon: Globe },
   { name: '聊天记录', href: '/chat', icon: MessageSquare },
   { name: '设置', href: '/settings', icon: Settings },
 ]

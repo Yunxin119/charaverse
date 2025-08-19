@@ -14,6 +14,7 @@ import { Loader2, Mail, Lock, User, Sparkles } from 'lucide-react'
 export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   
@@ -42,7 +43,7 @@ export default function LoginPage() {
 
     try {
       if (isSignUp) {
-        await dispatch(signUp({ email, password })).unwrap()
+        await dispatch(signUp({ email, password, username })).unwrap()
       } else {
         await dispatch(signIn({ email, password })).unwrap()
       }
@@ -142,6 +143,31 @@ export default function LoginPage() {
                   </div>
                 </motion.div>
 
+                {isSignUp && (
+                  <motion.div 
+                    variants={itemVariants}
+                    initial="hidden"
+                    animate="visible"
+                    className="space-y-2"
+                  >
+                    <Label htmlFor="username" className="text-sm font-medium text-slate-700">
+                      用户名
+                    </Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <Input
+                        id="username"
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        className="pl-10 h-12 border-slate-200 focus:border-slate-400 focus:ring-slate-400 bg-white/50"
+                        placeholder="设置你的用户名"
+                        required={isSignUp}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
                 <motion.div variants={itemVariants} className="space-y-2">
                   <Label htmlFor="password" className="text-sm font-medium text-slate-700">
                     密码
@@ -224,6 +250,7 @@ export default function LoginPage() {
                         setIsSignUp(!isSignUp)
                         dispatch(clearError())
                         setConfirmPassword('')
+                        setUsername('')
                       }}
                       className="text-sm text-slate-600 hover:text-slate-900 transition-colors duration-200"
                     >

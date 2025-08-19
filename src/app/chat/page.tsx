@@ -20,6 +20,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useAppSelector } from '../store/hooks'
 import { supabase } from '../lib/supabase'
+import { useAppDispatch } from '../store/hooks'
+import { getExistingSession } from '../store/chatSlice'
 
 interface ChatSessionWithCharacter {
   id: string
@@ -38,6 +40,7 @@ interface ChatSessionWithCharacter {
 
 export default function ChatPage() {
   const { user } = useAppSelector((state) => state.auth)
+  const dispatch = useAppDispatch()
   const router = useRouter()
   
   const [sessions, setSessions] = useState<ChatSessionWithCharacter[]>([])
@@ -135,6 +138,11 @@ export default function ChatPage() {
     } catch (error) {
       console.error('删除聊天记录失败:', error)
     }
+  }
+
+  // 处理开始新对话
+  const handleStartNewChat = async () => {
+    router.push('/characters')
   }
 
   // 过滤和搜索会话
@@ -295,12 +303,13 @@ export default function ChatPage() {
               }
             </p>
             {!searchQuery && (
-              <Link href="/characters">
-                <Button className="bg-blue-500 hover:bg-blue-600 rounded-full px-6">
-                  <Plus className="w-4 h-4 mr-2" />
-                  开始新对话
-                </Button>
-              </Link>
+              <Button 
+                className="bg-blue-500 hover:bg-blue-600 rounded-full px-6"
+                onClick={handleStartNewChat}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                开始新对话
+              </Button>
             )}
           </motion.div>
         ) : (

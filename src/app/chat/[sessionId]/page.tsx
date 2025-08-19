@@ -48,6 +48,7 @@ import {
   clearChatHistory,
   clearError
 } from '../../store/chatSlice'
+import { supabase } from '../../lib/supabase'
 
 interface APIConfig {
   deepseek?: string
@@ -164,15 +165,48 @@ export default function ChatSessionPage() {
 
   // 同步模型选择状态
   useEffect(() => {
-    if (selectedModel) {
+    // 加载保存的模型选择
+    const savedModel = localStorage.getItem(`chat_model_${sessionId}`)
+    if (savedModel && availableModels.includes(savedModel)) {
+      setCurrentSelectedModel(savedModel)
+      dispatch(setSelectedModel(savedModel))
+    } else if (selectedModel) {
       setCurrentSelectedModel(selectedModel)
+    } else if (availableModels.length > 0) {
+      // 如果没有保存的模型，使用第一个可用模型
+      const defaultModel = availableModels[0]
+      setCurrentSelectedModel(defaultModel)
+      dispatch(setSelectedModel(defaultModel))
+      localStorage.setItem(`chat_model_${sessionId}`, defaultModel)
     }
-  }, [selectedModel])
+  }, [selectedModel, availableModels, sessionId, dispatch])
 
   useEffect(() => {
     const savedBg = localStorage.getItem(`chat_background_${sessionId}`)
     if (savedBg) {
       setChatBackground(savedBg)
+    }
+
+    // 监听localStorage变化（跨窗口）
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === `chat_background_${sessionId}`) {
+        setChatBackground(e.newValue)
+      }
+    }
+
+    // 监听自定义背景变更事件（同窗口）
+    const handleCustomBackgroundChange = (e: CustomEvent) => {
+      if (e.detail.sessionId === sessionId) {
+        setChatBackground(e.detail.background)
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    window.addEventListener('chatBackgroundChanged', handleCustomBackgroundChange as EventListener)
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('chatBackgroundChanged', handleCustomBackgroundChange as EventListener)
     }
   }, [sessionId])
 
@@ -268,6 +302,19 @@ export default function ChatSessionPage() {
         title: sessionTitle,
         userId: user.id
       })).unwrap()
+
+      // 检查是否是新创建的会话（通过检查是否有消息来判断）
+      const { data: existingMessages } = await supabase
+        .from('chat_messages')
+        .select('id')
+        .eq('session_id', session.id)
+        .limit(1)
+
+      // 如果已有消息，说明是现有会话，直接跳转
+      if (existingMessages && existingMessages.length > 0) {
+        router.replace(`/chat/${session.id}`)
+        return
+      }
 
       const systemPrompt = buildSystemPrompt()
       const apiKey = getApiKeyForModel(currentSelectedModel)
@@ -583,7 +630,36 @@ export default function ChatSessionPage() {
             )}
           </div>
           
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center space-x-2">
+            {/* Model Selection */}
+            {availableModels.length > 0 && (
+              <Select
+                value={currentSelectedModel || selectedModel || ''}
+                onValueChange={(value) => {
+                  setCurrentSelectedModel(value)
+                  dispatch(setSelectedModel(value))
+                  localStorage.setItem(`chat_model_${sessionId}`, value)
+                }}
+              >
+                <SelectTrigger className="w-32 h-8 text-xs">
+                  <SelectValue placeholder="选择模型" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableModels.map((model) => (
+                    <SelectItem key={model} value={model} className="text-xs">
+                      {model === 'deepseek-chat' && 'DeepSeek Chat'}
+                      {model === 'deepseek-coder' && 'DeepSeek Coder'}
+                      {model === 'gemini-2.5-flash' && 'Gemini 2.5 Flash'}
+                      {model === 'gemini-2.5-pro' && 'Gemini 2.5 Pro'}
+                      {model === 'gpt-4o' && 'GPT-4o'}
+                      {model === 'gpt-4o-mini' && 'GPT-4o Mini'}
+                      {!['deepseek-chat', 'deepseek-coder', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gpt-4o', 'gpt-4o-mini'].includes(model) && model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            
             {hasStarted && (
               <Button
                 size="sm"

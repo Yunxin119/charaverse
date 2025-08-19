@@ -14,7 +14,6 @@ import {
   fetchCharacter,
   fetchChatSession,
   clearChatHistory,
-  sendMessage,
 } from '../../../store/chatSlice'
 
 export default function ChatSettingsPage() {
@@ -25,9 +24,7 @@ export default function ChatSettingsPage() {
   const { 
     sessionTitle: currentTitle, 
     currentCharacter,
-    selectedModel,
-    currentSession,
-    isGenerating 
+    selectedModel 
   } = useAppSelector((state) => state.chat)
   
   const [sessionTitle, setLocalSessionTitle] = useState('')
@@ -39,21 +36,13 @@ export default function ChatSettingsPage() {
   const sessionId = params.sessionId as string
 
   useEffect(() => {
-    const initializeSettings = async () => {
-      try {
-        // 先获取session信息
-        const session = await dispatch(fetchChatSession(sessionId)).unwrap()
-        
-        // 然后获取角色信息
-        if (session.character_id) {
-          dispatch(fetchCharacter(session.character_id))
-        }
-      } catch (error) {
-        console.error('加载设置失败:', error)
-      }
+    dispatch(fetchChatSession(sessionId))
+    if (currentCharacter?.id) {
+      dispatch(fetchCharacter(currentCharacter.id))
     }
 
-    initializeSettings()
+    setLocalSessionTitle(currentTitle || '')
+    setTempTitle(currentTitle || '')
 
     const savedBg = localStorage.getItem(`chat_background_${sessionId}`)
     if (savedBg) {
@@ -71,13 +60,7 @@ export default function ChatSettingsPage() {
     if (openai) config.openai = openai
     
     setApiConfig(config)
-  }, [sessionId, dispatch])
-
-  // 单独处理标题更新
-  useEffect(() => {
-    setLocalSessionTitle(currentTitle || '')
-    setTempTitle(currentTitle || '')
-  }, [currentTitle])
+  }, [currentTitle, sessionId, dispatch, currentCharacter?.id])
 
   const handleSaveTitle = () => {
     dispatch(setSessionTitle(tempTitle))
@@ -164,54 +147,28 @@ export default function ChatSettingsPage() {
     return null
   }
 
-  // 获取thinking budget值
-  const getThinkingBudget = (model: string) => {
-    if (model === 'gemini-2.5-pro') {
-      return undefined // Pro版本始终使用auto模式
-    } else if (model === 'gemini-2.5-flash') {
-      return undefined // 这里可以根据需要设置thinking budget
-    } else {
-      return undefined // 其他模型不支持
-    }
-  }
-
-  const handleClearChat = async () => {
-    if (!currentSession || !currentCharacter || isGenerating) return
-
-    // 确认对话框
-    const confirmed = window.confirm('确定要清空所有聊天记录并重新开始吗？此操作不可撤销。')
-    if (!confirmed) return
-
-    try {
-      // 获取当前使用的模型
+  const handleClearChat = () => {
+    if (window.confirm('你确定要清空所有聊天记录吗？清空后AI会重新开始对话。')) {
       const currentModel = selectedModel || localStorage.getItem(`chat_model_${sessionId}`) || 'deepseek-chat'
-      
-      // 构建系统提示词
       const systemPrompt = buildSystemPrompt()
       const apiKey = getApiKeyForModel(currentModel)
       
+      if (!systemPrompt) {
+        alert('角色信息不完整，无法重新开始对话')
+        return
+      }
+      
       if (!apiKey) {
-        throw new Error('未找到对应的API密钥')
+        alert('未找到对应的API密钥')
+        return
       }
 
-      if (!systemPrompt || systemPrompt.trim() === '') {
-        throw new Error('系统提示词为空，请检查角色配置')
-      }
-
-      // 清空聊天记录并让AI重新开始对话
-      await dispatch(clearChatHistory({
-        sessionId: currentSession.id,
+      dispatch(clearChatHistory({
+        sessionId,
         systemPrompt,
         apiKey,
         model: currentModel
       }))
-
-      // 返回聊天页面
-      router.back()
-
-    } catch (error) {
-      console.error('清空并重新开始失败:', error)
-      alert(`清空并重新开始失败: ${error}`)
     }
   }
 

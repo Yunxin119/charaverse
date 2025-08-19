@@ -8,14 +8,18 @@ import {
   Users, 
   MessageSquare, 
   Settings,
-  Plus
+  Plus,
+  BookTemplate,
+  Globe
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navigation = [
   { name: '首页', href: '/', icon: Home },
   { name: '角色', href: '/characters', icon: Users },
+  { name: '探索', href: '/explore', icon: Globe },
   { name: '聊天', href: '/chat', icon: MessageSquare },
+  { name: '模板', href: '/templates', icon: BookTemplate },
   { name: '设置', href: '/settings', icon: Settings },
 ]
 
@@ -32,7 +36,7 @@ export function BottomNavbar() {
         boxShadow: '0 -1px 20px rgba(0, 0, 0, 0.08)',
       }}
     >
-      <div className="flex items-center justify-around max-w-md mx-auto">
+      <div className="flex items-center justify-around max-w-lg mx-auto">
         {navigation.map((item) => {
           const isActive = pathname === item.href || (item.href === '/chat' && pathname.startsWith('/chat'))
           const Icon = item.icon
@@ -77,7 +81,7 @@ export function BottomNavbar() {
         })}
         
         {/* 创建按钮 - 更小更精致 */}
-        <Link href="/characters/new">
+        {/* <Link href="/characters/new">
           <motion.div
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -85,7 +89,7 @@ export function BottomNavbar() {
           >
             <Plus className="w-5 h-5 text-white" />
           </motion.div>
-        </Link>
+        </Link> */}
       </div>
     </motion.div>
   )
