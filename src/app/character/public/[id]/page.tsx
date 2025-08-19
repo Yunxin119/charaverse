@@ -25,7 +25,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '../../../lib/supabase'
 import { useAppSelector } from '../../../store/hooks'
-import { BottomNavbar } from '../../../components/layout/BottomNavbar'
 import ImageUpload from '../../../components/ImageUpload'
 import ImageViewer from '../../../components/ImageViewer'
 import { uploadCommentImages, type CompressedImage } from '../../../lib/imageUtils'
@@ -349,7 +348,6 @@ export default function PublicCharacterPage() {
             <p className="text-slate-600">加载中...</p>
           </div>
         </div>
-        <BottomNavbar />
       </div>
     )
   }
@@ -379,7 +377,6 @@ export default function PublicCharacterPage() {
             </Button>
           </div>
         </div>
-        <BottomNavbar />
       </div>
     )
   }
@@ -483,9 +480,17 @@ export default function PublicCharacterPage() {
                       </span>
                     </div>
                   </div>
-                  <p className="text-sm opacity-90 drop-shadow">
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (character.user_id) {
+                        router.push(`/user/${character.user_id}`)
+                      }
+                    }}
+                    className="text-sm opacity-90 drop-shadow hover:opacity-100 hover:underline transition-all duration-200"
+                  >
                     {character.profiles?.username || '匿名用户'}
-                  </p>
+                  </button>
                 </div>
               </div>
             </div>
@@ -786,8 +791,7 @@ export default function PublicCharacterPage() {
         </div>
       </main>
 
-      {/* 固定底部导航 */}
-      <BottomNavbar />
+
       
       {/* 图片查看器 */}
       <ImageViewer

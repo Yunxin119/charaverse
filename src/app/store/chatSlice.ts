@@ -461,7 +461,18 @@ export const clearChatHistory = createAsyncThunk(
     apiKey: string
     model: string
   }, { dispatch }) => {
-    // 1. 从数据库删除消息
+    // 1. 先删除相关的日记（避免外键约束冲突）
+    const { error: diaryError } = await supabase
+      .from('diaries')
+      .delete()
+      .eq('session_id', sessionId)
+
+    if (diaryError) {
+      console.error('Failed to delete diaries:', diaryError)
+      // 不阻止整个流程，只记录错误
+    }
+
+    // 2. 然后删除消息
     const { error } = await supabase
       .from('chat_messages')
       .delete()
@@ -471,10 +482,10 @@ export const clearChatHistory = createAsyncThunk(
       throw new Error('Failed to delete messages from database')
     }
 
-    // 2. 清空本地状态的消息
+    // 3. 清空本地状态的消息
     dispatch(clearMessages())
 
-    // 3. 让AI重新开始对话
+    // 4. 让AI重新开始对话
     const requestBody: any = {
       messages: [],
       systemPrompt: systemPrompt + '\n\n现在请你作为角色主动开始对话，根据初始情景开始我们的故事。',
@@ -496,7 +507,7 @@ export const clearChatHistory = createAsyncThunk(
 
     const aiResponse = await response.json()
 
-    // 4. 保存AI的开场消息
+    // 5. 保存AI的开场消息
     const { data: aiMsgData, error: aiMsgError } = await supabase
       .from('chat_messages')
       .insert({

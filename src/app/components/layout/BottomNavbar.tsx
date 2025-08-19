@@ -20,7 +20,7 @@ const navigation = [
   { name: '探索', href: '/explore', icon: Globe },
   { name: '聊天', href: '/chat', icon: MessageSquare },
   { name: '模板', href: '/templates', icon: BookTemplate },
-  { name: '设置', href: '/settings', icon: Settings },
+  { name: '我的', href: '/settings', icon: Users },
 ]
 
 export function BottomNavbar() {
@@ -31,7 +31,7 @@ export function BottomNavbar() {
       initial={{ y: 100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200/60 px-4 py-2 z-50 safe-area-pb"
+      className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200/60 px-4 py-3 z-50 safe-area-pb"
       style={{
         boxShadow: '0 -1px 20px rgba(0, 0, 0, 0.08)',
       }}

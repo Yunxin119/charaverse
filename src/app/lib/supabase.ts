@@ -50,6 +50,17 @@ export type ChatMessage = {
   created_at: string
 }
 
+export type Diary = {
+  id: number
+  session_id: string
+  user_id: string
+  content: string
+  created_at: string
+  updated_at: string
+  source_message_id_start?: number
+  source_message_id_end?: number
+}
+
 export type PromptTemplate = {
   id: number
   user_id: string | null

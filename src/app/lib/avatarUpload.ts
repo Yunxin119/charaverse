@@ -269,3 +269,74 @@ export const uploadCharacterAvatar = async (
     throw error
   }
 }
+
+// 用户Banner上传功能
+export const uploadUserBanner = async (file: File): Promise<string> => {
+  try {
+    // 获取当前用户资料，准备删除旧banner
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      throw new Error('用户未登录')
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('banner_url')
+      .eq('id', user.id)
+      .single()
+
+    // 压缩banner图片（横屏比例，更大尺寸）
+    const compressedFile = await compressImage(file, 1200, 600, 0.85)
+
+    // 生成唯一文件名
+    const fileExt = 'jpg'
+    const fileName = `banner-${user.id}-${Date.now()}.${fileExt}`
+    const filePath = `banners/${fileName}`
+
+    // 上传banner到Supabase Storage (使用avatars存储桶)
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, compressedFile, {
+        cacheControl: '3600',
+        upsert: true
+      })
+
+    if (uploadError) {
+      throw new Error(`Banner上传失败: ${uploadError.message}`)
+    }
+
+    // 获取公开URL
+    const { data: urlData } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(filePath)
+
+    if (!urlData?.publicUrl) {
+      throw new Error('获取Banner URL失败')
+    }
+
+    const newBannerUrl = urlData.publicUrl
+
+    // 更新用户资料中的banner_url
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert({
+        id: user.id,
+        banner_url: newBannerUrl,
+        updated_at: new Date().toISOString()
+      })
+
+    if (profileError) {
+      throw new Error(`更新用户Banner失败: ${profileError.message}`)
+    }
+
+    // 删除旧banner
+    if (profile?.banner_url) {
+      await deleteAvatar(profile.banner_url, 'avatars')
+    }
+
+    return newBannerUrl
+  } catch (error) {
+    console.error('用户Banner上传失败:', error)
+    throw error
+  }
+}

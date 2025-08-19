@@ -23,7 +23,8 @@ import {
   Edit3,
   ArrowLeft,
   ChevronRight,
-  RotateCcw
+  RotateCcw,
+  BookOpen
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -670,6 +671,17 @@ export default function ChatSessionPage() {
                 title="清空聊天记录并重新开始"
               >
                 <RotateCcw className="w-4 h-4" />
+              </Button>
+            )}
+            {hasStarted && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => router.push(`/chat/${sessionId}/diary`)}
+                className="p-2 h-8 w-8"
+                title="查看日记"
+              >
+                <BookOpen className="w-4 h-4" />
               </Button>
             )}
             <Button
