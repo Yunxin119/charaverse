@@ -61,6 +61,19 @@ export type Diary = {
   source_message_id_end?: number
 }
 
+export type ChatSummary = {
+  id: number
+  session_id: string
+  user_id: string
+  content: string
+  created_at: string
+  updated_at: string
+  start_message_id?: number
+  end_message_id?: number
+  original_message_count: number
+  summary_method: string
+}
+
 export type PromptTemplate = {
   id: number
   user_id: string | null

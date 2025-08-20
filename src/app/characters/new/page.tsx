@@ -42,6 +42,7 @@ interface BasicInfo {
   avatar_url: string
   is_public: boolean
   introduction: string // 角色说明，给其他用户看的介绍
+  initialMessage?: string // 初始对话，角色的开场白
 }
 
 interface PromptModule {
@@ -69,7 +70,8 @@ export default function NewCharacterPage() {
     description: '',
     avatar_url: '',
     is_public: false,
-    introduction: ''
+    introduction: '',
+    initialMessage: ''
   })
 
   // 关键词输入状态
@@ -552,6 +554,22 @@ export default function NewCharacterPage() {
                     <p className="text-xs text-slate-500">此说明会在角色列表中显示，帮助其他用户了解角色</p>
                   </div>
 
+                  {/* Initial Message */}
+                  <div className="space-y-2">
+                    <Label htmlFor="initialMessage" className="flex items-center">
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      初始对话（可选）
+                    </Label>
+                    <Textarea
+                      id="initialMessage"
+                      placeholder="设置角色的开场白，如：“你好，我是...”。如果不填写，AI将自动生成第一句话。"
+                      value={basicInfo.initialMessage || ''}
+                      onChange={(e) => handleBasicInfoChange('initialMessage', e.target.value)}
+                      className="min-h-[80px] resize-none"
+                    />
+                    <p className="text-xs text-slate-500">每位用户进入聊天时都会看到这句话，让角色体验更一致</p>
+                  </div>
+
                   {/* Public Setting */}
                   <div className="flex items-center space-x-3">
                     <input
@@ -576,13 +594,13 @@ export default function NewCharacterPage() {
             <TabsContent value="settings" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
+                  <div className="space-y-4 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
                     <div>
-                      <CardTitle>模块化设定</CardTitle>
-                      <CardDescription>通过添加不同模块来构建你的角色设定</CardDescription>
+                      <CardTitle className="text-lg sm:text-xl">模块化设定</CardTitle>
+                      <CardDescription className="text-sm">通过添加不同模块来构建你的角色设定</CardDescription>
                     </div>
                     <Select onValueChange={(value) => addModule(value)}>
-                      <SelectTrigger className="w-48">
+                      <SelectTrigger className="w-full sm:w-48 h-10">
                         <SelectValue placeholder="添加设定模块" />
                       </SelectTrigger>
                       <SelectContent>
@@ -613,18 +631,37 @@ export default function NewCharacterPage() {
                           <motion.div
                             key={module.id}
                             variants={itemVariants}
-                            className="border border-slate-200 rounded-lg p-6 space-y-4"
+                            className="border border-slate-200 rounded-lg p-4 sm:p-6 space-y-4 bg-white"
                           >
-                            {/* Module Header */}
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                                  <Icon className="w-4 h-4 text-slate-600" />
+                            {/* Module Header - 移动端优化 */}
+                            <div className="space-y-3">
+                              {/* 标题行 - 移动端单独一行 */}
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                    <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-600" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <h3 className="font-medium text-slate-900 text-sm sm:text-base truncate">{module.type}</h3>
+                                    <p className="text-xs text-slate-500 sm:hidden">模块 #{index + 1}</p>
+                                  </div>
+                                  <span className="text-sm text-slate-500 hidden sm:inline">#{index + 1}</span>
                                 </div>
-                                <span className="font-medium text-slate-900">{module.type}</span>
-                                <span className="text-sm text-slate-500">#{index + 1}</span>
+                                {modules.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeModule(module.id)}
+                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 flex-shrink-0 ml-2 h-8 w-8 p-0"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                )}
                               </div>
-                              <div className="flex items-center space-x-2">
+                              
+                              {/* 操作按钮行 - 移动端独立一行 */}
+                              <div className="flex justify-start">
                                 <TemplateManager
                                   templateType={module.type}
                                   currentContent={module.type === '用户角色设定' ? {
@@ -667,47 +704,39 @@ export default function NewCharacterPage() {
                                     }
                                   }}
                                 />
-                                {modules.length > 1 && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeModule(module.id)}
-                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </Button>
-                                )}
                               </div>
                             </div>
 
-                            {/* 用户角色设定的特殊字段 */}
+                            {/* 用户角色设定的特殊字段 - 移动端优化 */}
                             {module.type === '用户角色设定' && (
                               <div className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {/* 移动端采用单列布局，桌面端保持三列 */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                                   <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-slate-600">用户角色姓名</Label>
+                                    <Label className="text-sm font-medium text-slate-600">姓名</Label>
                                     <Input
                                       placeholder="用户角色姓名"
                                       value={module.userRoleName || ''}
                                       onChange={(e) => updateModule(module.id, 'userRoleName', e.target.value)}
+                                      className="h-10"
                                     />
                                   </div>
                                   <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-slate-600">用户角色年龄</Label>
+                                    <Label className="text-sm font-medium text-slate-600">年龄</Label>
                                     <Input
                                       placeholder="用户角色年龄"
                                       value={module.userRoleAge || ''}
                                       onChange={(e) => updateModule(module.id, 'userRoleAge', e.target.value)}
+                                      className="h-10"
                                     />
                                   </div>
-                                  <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-slate-600">用户角色性别</Label>
+                                  <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+                                    <Label className="text-sm font-medium text-slate-600">性别</Label>
                                     <Select 
                                       value={module.userRoleGender || ''} 
                                       onValueChange={(value) => updateModule(module.id, 'userRoleGender', value)}
                                     >
-                                      <SelectTrigger>
+                                      <SelectTrigger className="h-10">
                                         <SelectValue placeholder="选择性别" />
                                       </SelectTrigger>
                                       <SelectContent>
@@ -721,12 +750,12 @@ export default function NewCharacterPage() {
                                   </div>
                                 </div>
                                 <div className="space-y-2">
-                                  <Label className="text-sm font-medium text-slate-600">用户角色详细设定</Label>
+                                  <Label className="text-sm font-medium text-slate-600">详细设定</Label>
                                   <Textarea
                                     placeholder="详细描述用户角色的背景、性格、经历等..."
                                     value={module.userRoleDetails || ''}
                                     onChange={(e) => updateModule(module.id, 'userRoleDetails', e.target.value)}
-                                    className="min-h-[100px] resize-none"
+                                    className="min-h-[100px] resize-none text-sm"
                                   />
                                 </div>
                               </div>
@@ -740,6 +769,7 @@ export default function NewCharacterPage() {
                                   placeholder="自定义模块名称"
                                   value={module.name || ''}
                                   onChange={(e) => updateModule(module.id, 'name', e.target.value)}
+                                  className="h-10"
                                 />
                               </div>
                             )}
@@ -754,7 +784,7 @@ export default function NewCharacterPage() {
                                   placeholder={`输入${module.type}内容...`}
                                   value={module.content}
                                   onChange={(e) => updateModule(module.id, 'content', e.target.value)}
-                                  className="min-h-[100px] resize-none"
+                                  className="min-h-[100px] resize-none text-sm"
                                 />
                               </div>
                             )}
@@ -769,31 +799,34 @@ export default function NewCharacterPage() {
           </Tabs>
         </motion.div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons - 移动端优化 */}
         <motion.div variants={itemVariants}>
           <Card>
-            <CardContent className="pt-6 pb-6">
-              <div className="flex justify-between">
+            <CardContent className="pt-4 pb-4 sm:pt-6 sm:pb-6">
+              {/* 移动端垂直布局，桌面端水平布局 */}
+              <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:justify-between sm:items-center">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => router.back()}
+                  className="w-full sm:w-auto h-11 sm:h-10"
                 >
                   取消
                 </Button>
-                <div className="flex space-x-3">
-                  <Button
+                <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:space-x-3">
+                  {/* <Button
                     type="button"
                     variant="outline"
                     disabled={!basicInfo.name.trim()}
+                    className="w-full sm:w-auto h-11 sm:h-10"
                   >
                     <Eye className="w-4 h-4 mr-2" />
                     预览
-                  </Button>
+                  </Button> */}
                   <Button
                     type="submit"
                     disabled={isLoading || !basicInfo.name.trim()}
-                    className="bg-slate-900 hover:bg-slate-800"
+                    className="bg-slate-900 hover:bg-slate-800 w-full sm:w-auto h-11 sm:h-10"
                   >
                     {isLoading ? (
                       <>

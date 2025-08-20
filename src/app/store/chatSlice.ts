@@ -454,12 +454,14 @@ export const clearChatHistory = createAsyncThunk(
     sessionId, 
     systemPrompt, 
     apiKey, 
-    model 
+    model,
+    initialMessage 
   }: { 
     sessionId: string
     systemPrompt: string
     apiKey: string
     model: string
+    initialMessage?: string
   }, { dispatch }) => {
     // 1. 先删除相关的日记（避免外键约束冲突）
     const { error: diaryError } = await supabase
@@ -485,42 +487,58 @@ export const clearChatHistory = createAsyncThunk(
     // 3. 清空本地状态的消息
     dispatch(clearMessages())
 
-    // 4. 让AI重新开始对话
-    const requestBody: any = {
-      messages: [],
-      systemPrompt: systemPrompt + '\n\n现在请你作为角色主动开始对话，根据初始情景开始我们的故事。',
-      apiKey,
-      model
-    }
+    // 4. 检查是否有初始对话
+    if (initialMessage && initialMessage.trim()) {
+      // 使用初始对话
+      const { data: aiMsgData, error: aiMsgError } = await supabase
+        .from('chat_messages')
+        .insert({
+          session_id: sessionId,
+          role: 'assistant',
+          content: initialMessage.trim()
+        })
+        .select()
+        .single()
 
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    })
+      if (aiMsgError) throw aiMsgError
+      return aiMsgData
+    } else {
+      // 使用AI生成开场
+      const requestBody: any = {
+        messages: [],
+        systemPrompt: systemPrompt + '\n\n现在请你作为角色主动开始对话，根据初始情景开始我们的故事。',
+        apiKey,
+        model
+      }
 
-    if (!response.ok) {
-      throw new Error('Failed to restart conversation')
-    }
-
-    const aiResponse = await response.json()
-
-    // 5. 保存AI的开场消息
-    const { data: aiMsgData, error: aiMsgError } = await supabase
-      .from('chat_messages')
-      .insert({
-        session_id: sessionId,
-        role: 'assistant',
-        content: aiResponse.content
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
       })
-      .select()
-      .single()
 
-    if (aiMsgError) throw aiMsgError
+      if (!response.ok) {
+        throw new Error('Failed to restart conversation')
+      }
 
-    return aiMsgData
+      const aiResponse = await response.json()
+
+      // 5. 保存AI的开场消息
+      const { data: aiMsgData, error: aiMsgError } = await supabase
+        .from('chat_messages')
+        .insert({
+          session_id: sessionId,
+          role: 'assistant',
+          content: aiResponse.content
+        })
+        .select()
+        .single()
+
+      if (aiMsgError) throw aiMsgError
+      return aiMsgData
+    }
   }
 )
 

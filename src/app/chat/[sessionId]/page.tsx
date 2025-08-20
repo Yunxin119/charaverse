@@ -23,7 +23,6 @@ import {
   Edit3,
   ArrowLeft,
   ChevronRight,
-  RotateCcw,
   BookOpen
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -46,10 +45,10 @@ import {
   sendNewMessageFrom,
   setSelectedModel,
   setSessionTitle,
-  clearChatHistory,
   clearError
 } from '../../store/chatSlice'
 import { supabase } from '../../lib/supabase'
+import { sendMessageWithContext, getContextConfigSuggestions } from '../../lib/enhancedChatSlice'
 
 interface APIConfig {
   deepseek?: string
@@ -90,8 +89,40 @@ export default function ChatSessionPage() {
   const [chatBackground, setChatBackground] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false) // 新状态，控制设置页显示
   
+  // 从localStorage加载上下文配置
+  const [contextConfig, setContextConfig] = useState({
+    maxContextTokens: 4000,
+    reservedTokens: 1000,
+    enableSummary: true,
+    summaryThreshold: 20,
+    keepRecentMessages: 10
+  })
+  const [useEnhancedContext, setUseEnhancedContext] = useState(true) // 默认开启智能模式以节省tokens
+  
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const sessionId = params.sessionId as string
+  
+  // 加载保存的上下文配置
+  useEffect(() => {
+    const savedContextConfig = localStorage.getItem(`context_config_${sessionId}`)
+    if (savedContextConfig) {
+      try {
+        const config = JSON.parse(savedContextConfig)
+        setContextConfig(prev => ({ ...prev, ...config }))
+      } catch (e) {
+        console.warn('Failed to parse saved context config')
+      }
+    }
+    
+    const savedUseEnhanced = localStorage.getItem(`use_enhanced_context_${sessionId}`)
+    if (savedUseEnhanced) {
+      setUseEnhancedContext(savedUseEnhanced === 'true')
+    } else {
+      // 如果没有保存的设置，默认开启智能模式
+      setUseEnhancedContext(true)
+      localStorage.setItem(`use_enhanced_context_${sessionId}`, 'true')
+    }
+  }, [sessionId])
 
   // 滚动到底部
   const scrollToBottom = () => {
@@ -317,26 +348,48 @@ export default function ChatSessionPage() {
         return
       }
 
-      const systemPrompt = buildSystemPrompt()
-      const apiKey = getApiKeyForModel(currentSelectedModel)
+      // 检查角色是否有初始对话
+      const initialMessage = currentCharacter?.prompt_template?.basic_info?.initialMessage
       
-      if (!apiKey) {
-        throw new Error('未找到对应的API密钥')
-      }
+      if (initialMessage && initialMessage.trim()) {
+        // 使用初始对话，直接保存到数据库
+        const { data: aiMsgData, error: aiMsgError } = await supabase
+          .from('chat_messages')
+          .insert({
+            session_id: session.id,
+            role: 'assistant',
+            content: initialMessage.trim()
+          })
+          .select()
+          .single()
 
-      if (!systemPrompt || systemPrompt.trim() === '') {
-        throw new Error('系统提示词为空，请检查角色配置')
-      }
+        if (aiMsgError) throw aiMsgError
 
-      await dispatch(sendMessage({
-        sessionId: session.id,
-        userMessage: '',
-        systemPrompt: systemPrompt + '\n\n现在请你作为角色主动开始对话，根据初始情景开始我们的故事。',
-        apiKey,
-        model: currentSelectedModel,
-        messages: [],
-        thinkingBudget: getThinkingBudget(currentSelectedModel)
-      }))
+        // 重新获取消息来更新Redux状态
+        dispatch(fetchMessages(session.id))
+      } else {
+        // 没有初始对话，使用AI生成
+        const systemPrompt = buildSystemPrompt()
+        const apiKey = getApiKeyForModel(currentSelectedModel)
+        
+        if (!apiKey) {
+          throw new Error('未找到对应的API密钥')
+        }
+
+        if (!systemPrompt || systemPrompt.trim() === '') {
+          throw new Error('系统提示词为空，请检查角色配置')
+        }
+
+        await dispatch(sendMessage({
+          sessionId: session.id,
+          userMessage: '',
+          systemPrompt: systemPrompt + '\n\n现在请你作为角色主动开始对话，根据初始情景开始我们的故事。',
+          apiKey,
+          model: currentSelectedModel,
+          messages: [],
+          thinkingBudget: getThinkingBudget(currentSelectedModel)
+        }))
+      }
 
       // 保存使用的模型
       localStorage.setItem(`chat_model_${session.id}`, currentSelectedModel)
@@ -379,15 +432,33 @@ export default function ChatSessionPage() {
     }
 
     try {
-      await dispatch(sendMessage({
-        sessionId: currentSession.id,
-        userMessage: userInput.trim(),
-        systemPrompt,
-        apiKey,
-        model: currentSelectedModel,
-        messages,
-        thinkingBudget: getThinkingBudget(currentSelectedModel)
-      }))
+      if (useEnhancedContext) {
+        // 使用增强的上下文管理
+        const result = await dispatch(sendMessageWithContext({
+          sessionId: currentSession.id,
+          userMessage: userInput.trim(),
+          systemPrompt,
+          apiKey,
+          model: currentSelectedModel,
+          messages,
+          thinkingBudget: getThinkingBudget(currentSelectedModel),
+          contextConfig,
+          characterName: currentCharacter?.name || '角色'
+        }))
+        
+        // 上下文统计信息在设置页显示
+      } else {
+        // 使用原有的发送方式
+        await dispatch(sendMessage({
+          sessionId: currentSession.id,
+          userMessage: userInput.trim(),
+          systemPrompt,
+          apiKey,
+          model: currentSelectedModel,
+          messages,
+          thinkingBudget: getThinkingBudget(currentSelectedModel)
+        }))
+      }
       
       setUserInput('')
     } catch (error) {
@@ -518,44 +589,6 @@ export default function ChatSessionPage() {
     }
   }
 
-  // 清空聊天记录并重新开始
-  const handleClearAndRestart = async () => {
-    if (!currentSession || !currentSelectedModel || !currentCharacter || isGenerating) return
-
-    // 确认对话框
-    const confirmed = window.confirm('确定要清空所有聊天记录并重新开始吗？此操作不可撤销。')
-    if (!confirmed) return
-
-    try {
-      // 构建系统提示词
-      const systemPrompt = buildSystemPrompt()
-      const apiKey = getApiKeyForModel(currentSelectedModel)
-      
-      if (!apiKey) {
-        throw new Error('未找到对应的API密钥')
-      }
-
-      if (!systemPrompt || systemPrompt.trim() === '') {
-        throw new Error('系统提示词为空，请检查角色配置')
-      }
-
-      // 清空聊天记录并让AI重新开始对话
-      await dispatch(clearChatHistory({
-        sessionId: currentSession.id,
-        systemPrompt,
-        apiKey,
-        model: currentSelectedModel
-      }))
-
-      // 清除任何选中状态
-      setSelectedMessageId(null)
-      setEditingMessageId(null)
-
-    } catch (error) {
-      console.error('清空并重新开始失败:', error)
-      alert(`清空并重新开始失败: ${error}`)
-    }
-  }
 
   // 如果没有API配置
   if (Object.keys(apiConfig).length === 0) {
@@ -632,47 +665,6 @@ export default function ChatSessionPage() {
           </div>
           
           <div className="flex items-center space-x-2">
-            {/* Model Selection */}
-            {availableModels.length > 0 && (
-              <Select
-                value={currentSelectedModel || selectedModel || ''}
-                onValueChange={(value) => {
-                  setCurrentSelectedModel(value)
-                  dispatch(setSelectedModel(value))
-                  localStorage.setItem(`chat_model_${sessionId}`, value)
-                }}
-              >
-                <SelectTrigger className="w-32 h-8 text-xs">
-                  <SelectValue placeholder="选择模型" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableModels.map((model) => (
-                    <SelectItem key={model} value={model} className="text-xs">
-                      {model === 'deepseek-chat' && 'DeepSeek Chat'}
-                      {model === 'deepseek-coder' && 'DeepSeek Coder'}
-                      {model === 'gemini-2.5-flash' && 'Gemini 2.5 Flash'}
-                      {model === 'gemini-2.5-pro' && 'Gemini 2.5 Pro'}
-                      {model === 'gpt-4o' && 'GPT-4o'}
-                      {model === 'gpt-4o-mini' && 'GPT-4o Mini'}
-                      {!['deepseek-chat', 'deepseek-coder', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gpt-4o', 'gpt-4o-mini'].includes(model) && model}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            
-            {hasStarted && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleClearAndRestart}
-                disabled={isGenerating}
-                className="p-2 h-8 w-8"
-                title="清空聊天记录并重新开始"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </Button>
-            )}
             {hasStarted && (
               <Button
                 size="sm"
@@ -696,6 +688,7 @@ export default function ChatSessionPage() {
         </div>
       </div>
 
+
       {/* 消息区域 - 占据剩余空间 */}
       <div className="flex-1 overflow-hidden">
         {!hasStarted ? (
@@ -710,18 +703,9 @@ export default function ChatSessionPage() {
             <p className="text-slate-500 mb-6">准备好开始对话了吗？</p>
             
             <div className="w-full max-w-xs space-y-3">
-              <Select value={currentSelectedModel || ''} onValueChange={handleModelChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="选择一个模型..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableModels.map((model) => (
-                    <SelectItem key={model} value={model}>
-                      {getModelDisplayName(model)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <p className="text-slate-500 text-sm text-center">
+                可以在设置中选择AI模型和配置上下文管理
+              </p>
               
               <Button
                 onClick={handleStartStory}
