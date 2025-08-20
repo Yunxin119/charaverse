@@ -33,6 +33,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAppSelector, useAppDispatch } from '../../store/hooks'
 import { 
   fetchCharacter, 
@@ -88,6 +89,7 @@ export default function ChatSessionPage() {
   const [isStartingStory, setIsStartingStory] = useState(false)
   const [chatBackground, setChatBackground] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false) // 新状态，控制设置页显示
+  const [currentMode, setCurrentMode] = useState<'story' | 'casual'>('story') // Phase 5: 当前聊天模式
   
   // 从localStorage加载上下文配置
   const [contextConfig, setContextConfig] = useState({
@@ -589,6 +591,14 @@ export default function ChatSessionPage() {
     }
   }
 
+  // Phase 5: 处理模式切换
+  const handleModeChange = (value: string) => {
+    const newMode = value as 'story' | 'casual'
+    console.log(`模式切换: ${currentMode} -> ${newMode}`)
+    setCurrentMode(newMode)
+    // Step 1: 暂时只更新本地状态，不调用API
+  }
+
 
   // 如果没有API配置
   if (Object.keys(apiConfig).length === 0) {
@@ -656,8 +666,16 @@ export default function ChatSessionPage() {
             )}
           </div>
           
-          <div className="flex-1 flex justify-center min-w-0">
-            {!hasStarted && (
+          {/* Phase 5: 模式切换UI */}
+          <div className="flex-1 flex justify-end mr-1 min-w-0">
+            {hasStarted ? (
+              <Tabs defaultValue="story" value={currentMode} onValueChange={handleModeChange}>
+                <TabsList className="grid w-full grid-cols-2 h-8">
+                  <TabsTrigger value="story" className="text-xs">剧情</TabsTrigger>
+                  <TabsTrigger value="casual" className="text-xs">闲聊</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            ) : (
               <h2 className="text-lg font-semibold truncate">
                 {sessionTitle || currentCharacter?.name}
               </h2>
