@@ -4,7 +4,6 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
-  Home, 
   Users, 
   MessageSquare, 
   Settings,
@@ -15,12 +14,11 @@ import {
 import { cn } from '@/lib/utils'
 
 const navigation = [
-  { name: '首页', href: '/', icon: Home },
   { name: '角色', href: '/characters', icon: Users },
   { name: '探索', href: '/explore', icon: Globe },
   { name: '聊天', href: '/chat', icon: MessageSquare },
   { name: '模板', href: '/templates', icon: BookTemplate },
-  { name: '我的', href: '/settings', icon: Users },
+  { name: '我的', href: '/settings', icon: Settings },
 ]
 
 export function BottomNavbar() {
