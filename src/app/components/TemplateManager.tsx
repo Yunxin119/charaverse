@@ -40,8 +40,8 @@ import {
   deletePromptTemplate,
   incrementTemplateUsage,
   getTemplateDefaultContent,
-  type PromptTemplate 
 } from '../lib/promptTemplates'
+import { type PromptTemplate } from '../lib/supabase'
 
 interface TemplateManagerProps {
   templateType: string

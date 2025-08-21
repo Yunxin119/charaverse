@@ -113,7 +113,7 @@ async function callGemini(messages: ChatMessage[], systemPrompt: string, apiKey:
     generationConfig: {
       temperature: number
       maxOutputTokens: number
-      thinkingConfig?: { thinkingBudget?: number } | {}
+      thinkingConfig?: { thinkingBudget?: number } | Record<string, never>
     }
   } = {
     contents: contents,
@@ -348,7 +348,7 @@ async function callRelayAPI(messages: ChatMessage[], systemPrompt: string, apiKe
   const apiUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`
   
   // 构建请求体
-  const requestBody: any = {
+  const requestBody: Record<string, unknown> = {
     model: actualModel,
     messages: [
       { role: 'system', content: systemPrompt },

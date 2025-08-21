@@ -115,7 +115,7 @@ export class ContextManager {
 
     // 1. 总是保留最近的几条消息
     const recentMessages = messages.slice(-this.config.keepRecentMessages)
-    let selectedMessages = [...recentMessages]
+    const selectedMessages = [...recentMessages]
     let usedTokens = selectedMessages.reduce((sum, msg) => 
       sum + estimateTokens(msg.content), 0
     )

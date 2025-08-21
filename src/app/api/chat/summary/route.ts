@@ -98,8 +98,8 @@ ${conversationText}
 合并后的超级摘要：`
       
       messageCount = parentSummaryIds?.length || 0
-      effectiveStartMessageId = null
-      effectiveEndMessageId = null
+      effectiveStartMessageId = undefined
+      effectiveEndMessageId = undefined
     } else {
       // 普通摘要模式
       if (!startMessageId || !endMessageId) {
@@ -144,7 +144,7 @@ ${conversationText}
 
     // 调用AI API生成摘要
     const serverBaseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-    const requestBody: any = {
+    const requestBody: Record<string, unknown> = {
       messages: [{ role: 'user', content: summaryPrompt }],
       systemPrompt: '你是一个专业的对话摘要助手，能够准确提取对话中的关键信息。',
       apiKey: apiKey || '',
@@ -175,7 +175,7 @@ ${conversationText}
     const generatedSummary = aiResult.content || '摘要生成失败'
 
     // 保存摘要到数据库
-    const insertData: any = {
+    const insertData: Record<string, unknown> = {
       session_id: sessionId,
       user_id: userId,
       content: generatedSummary,

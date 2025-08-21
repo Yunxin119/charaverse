@@ -1,18 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-
-interface ChatMessage {
-  id: number
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  created_at: string
-}
-
-interface Character {
-  id: number
-  name: string
-  prompt_template: any
-}
+import { Character, ChatMessage } from '@/app/types/character'
 
 interface DiaryGenerateRequest {
   sessionId: string
@@ -230,7 +218,7 @@ async function callRelayAPI(prompt: string, apiKey: string, actualModel: string,
     apiKeyPrefix: apiKey.substring(0, 10) + '...'
   })
   
-  const requestBody: any = {
+  const requestBody: Record<string, unknown> = {
     model: actualModel,
     messages: [
       { role: 'user', content: prompt }
