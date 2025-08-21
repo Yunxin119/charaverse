@@ -96,6 +96,19 @@ export default function ChatSettingsPage() {
     if (openai) {
       models.push('gpt-4o', 'gpt-4o-mini')
     }
+
+    // 加载命名的中转配置并添加到可用模型
+    const savedNamedConfigs = localStorage.getItem('named_relay_configs')
+    if (savedNamedConfigs) {
+      try {
+        const namedConfigs = JSON.parse(savedNamedConfigs)
+        namedConfigs.forEach((namedConfig: any) => {
+          models.push(`named-relay-${namedConfig.id}`)
+        })
+      } catch (e) {
+        console.warn('Failed to parse named relay configs')
+      }
+    }
     
     setAvailableModels(models)
     
@@ -112,11 +125,21 @@ export default function ChatSettingsPage() {
       localStorage.setItem(`chat_model_${sessionId}`, defaultModel)
     }
     
+  }, [currentTitle, sessionId, dispatch, currentCharacter?.id])
+
+  // 单独的配置加载effect，只在sessionId变化时执行
+  useEffect(() => {
     // 加载上下文配置
     const savedContextConfig = localStorage.getItem(`context_config_${sessionId}`)
+    console.log('🔧 Settings独立加载配置:', {
+      sessionId,
+      savedConfig: savedContextConfig
+    })
+    
     if (savedContextConfig) {
       try {
         const config = JSON.parse(savedContextConfig)
+        console.log('✅ Settings独立应用配置:', config)
         setContextConfig(prev => ({ ...prev, ...config }))
       } catch (e) {
         console.warn('Failed to parse saved context config')
@@ -127,11 +150,14 @@ export default function ChatSettingsPage() {
     if (savedUseEnhanced) {
       setUseEnhancedContext(savedUseEnhanced === 'true')
     } else {
-      // 如果没有保存的设置，默认开启智能模式
       setUseEnhancedContext(true)
       localStorage.setItem(`use_enhanced_context_${sessionId}`, 'true')
     }
-  }, [currentTitle, sessionId, dispatch, currentCharacter?.id])
+    
+    // 标记初始化完成
+    setIsInitialized(true)
+    console.log('✅ Settings初始化完成')
+  }, [sessionId])
 
   const handleSaveTitle = () => {
     dispatch(setSessionTitle(tempTitle))
@@ -168,19 +194,44 @@ export default function ChatSettingsPage() {
       'gpt-4o': 'GPT-4o',
       'gpt-4o-mini': 'GPT-4o Mini'
     }
+    
+    // 处理命名中转API模型
+    if (model.startsWith('named-relay-')) {
+      const configId = model.replace('named-relay-', '')
+      const savedNamedConfigs = localStorage.getItem('named_relay_configs')
+      if (savedNamedConfigs) {
+        try {
+          const namedConfigs = JSON.parse(savedNamedConfigs)
+          const config = namedConfigs.find((c: any) => c.id === configId)
+          if (config) {
+            return config.name
+          }
+        } catch (e) {
+          console.warn('Failed to parse named relay configs')
+        }
+      }
+      return `中转配置 ${configId}`
+    }
+    
     return modelNames[model] || model
   }
 
   // 保存上下文配置
   const saveContextConfig = () => {
+    console.log('💾 Settings保存配置:', contextConfig)
     localStorage.setItem(`context_config_${sessionId}`, JSON.stringify(contextConfig))
     localStorage.setItem(`use_enhanced_context_${sessionId}`, String(useEnhancedContext))
   }
 
-  // 当配置改变时自动保存
+  // 标记是否已完成初始化加载
+  const [isInitialized, setIsInitialized] = useState(false)
+
+  // 当配置改变时自动保存（但跳过初始化阶段）
   useEffect(() => {
-    saveContextConfig()
-  }, [contextConfig, useEnhancedContext, sessionId])
+    if (isInitialized) {
+      saveContextConfig()
+    }
+  }, [contextConfig, useEnhancedContext, sessionId, isInitialized])
 
   // 构建系统提示
   const buildSystemPrompt = () => {
@@ -246,6 +297,19 @@ export default function ChatSettingsPage() {
     if (model.startsWith('deepseek')) return apiConfig.deepseek || null
     if (model.startsWith('gemini')) return apiConfig.gemini || null
     if (model.startsWith('gpt')) return apiConfig.openai || null
+    if (model.startsWith('named-relay-')) {
+      const configId = model.replace('named-relay-', '')
+      const savedNamedConfigs = localStorage.getItem('named_relay_configs')
+      if (savedNamedConfigs) {
+        try {
+          const namedConfigs = JSON.parse(savedNamedConfigs)
+          const config = namedConfigs.find((c: any) => c.id === configId)
+          return config?.apiKey || null
+        } catch (e) {
+          console.warn('Failed to parse named relay configs')
+        }
+      }
+    }
     return null
   }
 

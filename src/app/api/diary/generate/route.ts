@@ -24,8 +24,18 @@ async function generateDiaryContent(
   character: Character,
   conversationMessages: ChatMessage[],
   apiKey: string,
-  model: string
+  model: string,
+  baseUrl?: string,
+  actualModel?: string
 ): Promise<string> {
+  console.log('📝 Generating diary content with:', {
+    characterName: character.name,
+    messageCount: conversationMessages.length,
+    model,
+    actualModel,
+    baseUrl: baseUrl ? baseUrl.substring(0, 30) + '...' : 'none',
+    apiKeyPrefix: apiKey.substring(0, 10) + '...'
+  })
   // 构建角色信息
   const characterInfo = character.prompt_template?.basic_info
   const characterName = character.name
@@ -43,13 +53,13 @@ async function generateDiaryContent(
 ${characterPersonality ? `性格特征：${characterPersonality}` : ''}
 
 [任务指令]
-请以${characterName}的第一人称视角，根据下面的对话内容写一篇日记。
+请以${characterName}的第一人称视角，根据下面的对话内容写一篇日记，注意感情细腻，贴合人物。
 要求：
 1. 以第一人称视角（"我"）来写
 2. 不要只是复述对话，要展现内心的情感和思考
 3. 体现你的性格特征和感受
 4. 日记风格要自然，像真正的个人日记
-5. 字数控制在200-500字之间
+5. 字数控制在500-1200字之间，根据对话内容多少、剧情多少和人物性格决定。
 6. 不要在开头写"日记"或日期等标题
 
 [最近的对话内容]
@@ -58,7 +68,12 @@ ${conversationText}
 [请开始写你的日记]`
 
   // 根据模型调用相应的API
-  if (model.startsWith('deepseek')) {
+  if (model.startsWith('named-relay-')) {
+    if (!baseUrl || !actualModel) {
+      throw new Error('中转API需要baseUrl和actualModel参数')
+    }
+    return await callRelayAPI(diaryPrompt, apiKey, actualModel, baseUrl)
+  } else if (model.startsWith('deepseek')) {
     return await callDeepSeek(diaryPrompt, apiKey, model)
   } else if (model.startsWith('gemini')) {
     return await callGemini(diaryPrompt, apiKey, model)
@@ -83,7 +98,7 @@ async function callDeepSeek(prompt: string, apiKey: string, model: string): Prom
         { role: 'user', content: prompt }
       ],
       temperature: 0.8,
-      max_tokens: 1500,
+      max_tokens: 3000,
     }),
   })
 
@@ -203,6 +218,75 @@ async function callOpenAI(prompt: string, apiKey: string, model: string): Promis
   return data.choices[0].message.content
 }
 
+// 中转API调用（支持OpenAI格式的中转服务）
+async function callRelayAPI(prompt: string, apiKey: string, actualModel: string, baseUrl: string): Promise<string> {
+  // 确保baseUrl以/v1结尾
+  const apiUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`
+  
+  console.log('📝 Diary Relay API Call:', {
+    apiUrl: `${apiUrl}/chat/completions`,
+    actualModel,
+    promptLength: prompt.length,
+    apiKeyPrefix: apiKey.substring(0, 10) + '...'
+  })
+  
+  const requestBody: any = {
+    model: actualModel,
+    messages: [
+      { role: 'user', content: prompt }
+    ],
+    temperature: 0.8,
+    max_tokens: 1500,
+  }
+
+  // 如果actualModel是Gemini 2.5系列，添加thinking配置
+  if (actualModel.includes('gemini-2.5')) {
+    console.log('📝 Adding thinking config for Gemini 2.5 model:', actualModel)
+    if (actualModel === 'gemini-2.5-pro') {
+      // Pro版本使用auto模式
+      requestBody.thinkingConfig = {}
+      console.log('📝 Using auto thinking mode for Pro')
+    } else if (actualModel.includes('gemini-2.5-flash')) {
+      // Flash版本也使用auto模式（日记生成不需要手动限制）
+      requestBody.thinkingConfig = {}
+      console.log('📝 Using auto thinking mode for Flash')
+    }
+  }
+
+  console.log('📝 Diary Relay Request Body:', JSON.stringify(requestBody, null, 2))
+  
+  const response = await fetch(`${apiUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'User-Agent': 'Charaverse/1.0.0',
+    },
+    body: JSON.stringify(requestBody),
+  })
+
+  console.log('📝 Diary Relay Response Status:', response.status, response.statusText)
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('📝 Diary Relay API Error Response:', errorText)
+    throw new Error(`Relay API error: ${response.statusText} - ${errorText}`)
+  }
+
+  const data = await response.json()
+  console.log('📝 Diary Relay Response Data:', JSON.stringify(data, null, 2))
+  
+  if (!data.choices || data.choices.length === 0) {
+    console.error('📝 Diary Relay API returned no choices:', data)
+    throw new Error('Relay API returned no choices')
+  }
+  
+  const content = data.choices[0].message.content
+  console.log('📝 Diary Relay Final Content:', content?.substring(0, 200) + '...')
+  
+  return content
+}
+
 export async function POST(request: NextRequest) {
   try {
     // 创建Supabase客户端
@@ -227,6 +311,8 @@ export async function POST(request: NextRequest) {
     // 获取API密钥和模型（从header中）
     const apiKey = request.headers.get('x-api-key')
     const model = request.headers.get('x-model') || 'deepseek-chat'
+    const baseUrl = request.headers.get('x-base-url')
+    const actualModel = request.headers.get('x-actual-model')
     
     if (!apiKey) {
       return NextResponse.json({ error: '缺少API密钥' }, { status: 400 })
@@ -305,12 +391,26 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. 调用AI生成日记内容
+    console.log('📝 About to generate diary with params:', {
+      model,
+      baseUrl,
+      actualModel,
+      messageCount: newMessages.length
+    })
+    
     const diaryContent = await generateDiaryContent(
       character,
       newMessages,
       apiKey,
-      model
+      model,
+      baseUrl || undefined,
+      actualModel || undefined
     )
+
+    console.log('📝 Generated diary content:', {
+      length: diaryContent?.length || 0,
+      preview: diaryContent?.substring(0, 100) + '...'
+    })
 
     // 7. 保存日记到数据库
     const { data: newDiary, error: insertError } = await supabase

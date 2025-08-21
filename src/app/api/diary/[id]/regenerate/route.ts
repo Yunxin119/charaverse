@@ -19,7 +19,9 @@ async function generateDiaryContent(
   character: Character,
   conversationMessages: ChatMessage[],
   apiKey: string,
-  model: string
+  model: string,
+  baseUrl?: string,
+  actualModel?: string
 ): Promise<string> {
   // 构建角色信息
   const characterInfo = character.prompt_template?.basic_info
@@ -53,7 +55,12 @@ ${conversationText}
 [请开始写你的日记]`
 
   // 根据模型调用相应的API
-  if (model.startsWith('deepseek')) {
+  if (model.startsWith('named-relay-')) {
+    if (!baseUrl || !actualModel) {
+      throw new Error('中转API需要baseUrl和actualModel参数')
+    }
+    return await callRelayAPI(diaryPrompt, apiKey, actualModel, baseUrl)
+  } else if (model.startsWith('deepseek')) {
     return await callDeepSeek(diaryPrompt, apiKey, model)
   } else if (model.startsWith('gemini')) {
     return await callGemini(diaryPrompt, apiKey, model)
@@ -187,12 +194,81 @@ async function callOpenAI(prompt: string, apiKey: string, model: string): Promis
   return data.choices[0].message.content
 }
 
+// 中转API调用（支持OpenAI格式的中转服务）
+async function callRelayAPI(prompt: string, apiKey: string, actualModel: string, baseUrl: string): Promise<string> {
+  // 确保baseUrl以/v1结尾
+  const apiUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`
+  
+  console.log('📝 Diary Regenerate Relay API Call:', {
+    apiUrl: `${apiUrl}/chat/completions`,
+    actualModel,
+    promptLength: prompt.length,
+    apiKeyPrefix: apiKey.substring(0, 10) + '...'
+  })
+  
+  const requestBody: any = {
+    model: actualModel,
+    messages: [
+      { role: 'user', content: prompt }
+    ],
+    temperature: 0.8,
+    max_tokens: 1500,
+  }
+
+  // 如果actualModel是Gemini 2.5系列，添加thinking配置
+  if (actualModel.includes('gemini-2.5')) {
+    console.log('📝 Adding thinking config for Gemini 2.5 model:', actualModel)
+    if (actualModel === 'gemini-2.5-pro') {
+      // Pro版本使用auto模式
+      requestBody.thinkingConfig = {}
+      console.log('📝 Using auto thinking mode for Pro')
+    } else if (actualModel.includes('gemini-2.5-flash')) {
+      // Flash版本也使用auto模式（日记生成不需要手动限制）
+      requestBody.thinkingConfig = {}
+      console.log('📝 Using auto thinking mode for Flash')
+    }
+  }
+
+  console.log('📝 Diary Regenerate Request Body:', JSON.stringify(requestBody, null, 2))
+  
+  const response = await fetch(`${apiUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'User-Agent': 'Charaverse/1.0.0',
+    },
+    body: JSON.stringify(requestBody),
+  })
+
+  console.log('📝 Diary Regenerate Response Status:', response.status, response.statusText)
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('📝 Diary Regenerate API Error Response:', errorText)
+    throw new Error(`Relay API error: ${response.statusText} - ${errorText}`)
+  }
+
+  const data = await response.json()
+  console.log('📝 Diary Regenerate Response Data:', JSON.stringify(data, null, 2))
+  
+  if (!data.choices || data.choices.length === 0) {
+    console.error('📝 Diary Regenerate API returned no choices:', data)
+    throw new Error('Relay API returned no choices')
+  }
+  
+  const content = data.choices[0].message.content
+  console.log('📝 Diary Regenerate Final Content:', content?.substring(0, 200) + '...')
+  
+  return content
+}
+
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const diaryId = params.id
+    const { id: diaryId } = await params
 
     // 创建Supabase客户端
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -216,6 +292,8 @@ export async function POST(
     // 获取API密钥和模型（从header中）
     const apiKey = request.headers.get('x-api-key')
     const model = request.headers.get('x-model') || 'deepseek-chat'
+    const baseUrl = request.headers.get('x-base-url')
+    const actualModel = request.headers.get('x-actual-model')
     
     if (!apiKey) {
       return NextResponse.json({ error: '缺少API密钥' }, { status: 400 })
@@ -280,15 +358,16 @@ export async function POST(
       character,
       messages,
       apiKey,
-      model
+      model,
+      baseUrl || undefined,
+      actualModel || undefined
     )
 
     // 更新日记内容
     const { data: updatedDiary, error: updateError } = await supabase
       .from('diaries')
       .update({
-        content: newDiaryContent,
-        updated_at: new Date().toISOString()
+        content: newDiaryContent
       })
       .eq('id', diaryId)
       .eq('user_id', user.id)

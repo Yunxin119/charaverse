@@ -4,8 +4,11 @@ import { createClient } from '@supabase/supabase-js'
 interface SummaryGenerateRequest {
   sessionId: string
   userId: string
-  startMessageId: number
-  endMessageId: number
+  startMessageId?: number
+  endMessageId?: number
+  summaryContent?: string    // 用于超级摘要
+  summaryType?: 'normal' | 'super'  // 摘要类型
+  parentSummaryIds?: number[]  // 父摘要ID数组
   characterName: string
 }
 
@@ -33,6 +36,8 @@ export async function POST(request: NextRequest) {
     // 获取API密钥和模型（从header中）
     const apiKey = request.headers.get('x-api-key')
     const model = request.headers.get('x-model') || 'deepseek-chat'
+    const baseUrl = request.headers.get('x-base-url') || ''
+    const actualModel = request.headers.get('x-actual-model') || ''
     
     if (!apiKey) {
       return NextResponse.json({ error: '缺少API密钥' }, { status: 400 })
@@ -45,10 +50,18 @@ export async function POST(request: NextRequest) {
     }
 
     // 解析请求体
-    const { sessionId, userId, startMessageId, endMessageId, characterName } = 
-      await request.json() as SummaryGenerateRequest
+    const { 
+      sessionId, 
+      userId, 
+      startMessageId, 
+      endMessageId, 
+      summaryContent,
+      summaryType = 'normal',
+      parentSummaryIds,
+      characterName 
+    } = await request.json() as SummaryGenerateRequest
     
-    if (!sessionId || !userId || !startMessageId || !endMessageId || !characterName) {
+    if (!sessionId || !userId || !characterName) {
       return NextResponse.json({ error: '缺少必需参数' }, { status: 400 })
     }
 
@@ -57,25 +70,61 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '无权限操作' }, { status: 403 })
     }
 
-    // 获取要摘要的消息
-    const { data: messages, error: messagesError } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('session_id', sessionId)
-      .gte('id', startMessageId)
-      .lte('id', endMessageId)
-      .order('created_at', { ascending: true })
+    let conversationText = ''
+    let summaryPrompt = ''
+    let messageCount = 0
+    let effectiveStartMessageId = startMessageId
+    let effectiveEndMessageId = endMessageId
 
-    if (messagesError || !messages || messages.length === 0) {
-      return NextResponse.json({ error: '找不到要摘要的消息' }, { status: 404 })
-    }
+    if (summaryType === 'super' && summaryContent) {
+      // 超级摘要模式
+      conversationText = summaryContent
+      summaryPrompt = `请将以下多个摘要合并为一个更精炼的超级摘要，重点记录：
+1. 最关键的事件和情节发展
+2. 重要的约定、决定或承诺
+3. 角色关系的显著变化  
+4. 对后续对话有重大影响的信息
 
-    // 生成摘要
-    const conversationText = messages
-      .map(msg => `${msg.role === 'user' ? '用户' : characterName}: ${msg.content}`)
-      .join('\n')
+要求：
+- 使用第三人称描述
+- 保持客观中性的语调
+- 控制在300字以内
+- 整合重复信息，突出核心内容
+- 保留时间线和逻辑关系
 
-    const summaryPrompt = `请为以下对话生成一个简洁的摘要，重点记录：
+多个摘要内容：
+${conversationText}
+
+合并后的超级摘要：`
+      
+      messageCount = parentSummaryIds?.length || 0
+      effectiveStartMessageId = null
+      effectiveEndMessageId = null
+    } else {
+      // 普通摘要模式
+      if (!startMessageId || !endMessageId) {
+        return NextResponse.json({ error: '普通摘要缺少消息ID范围' }, { status: 400 })
+      }
+
+      // 获取要摘要的消息
+      const { data: messages, error: messagesError } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .gte('id', startMessageId)
+        .lte('id', endMessageId)
+        .order('created_at', { ascending: true })
+
+      if (messagesError || !messages || messages.length === 0) {
+        return NextResponse.json({ error: '找不到要摘要的消息' }, { status: 404 })
+      }
+
+      messageCount = messages.length
+      conversationText = messages
+        .map(msg => `${msg.role === 'user' ? '用户' : characterName}: ${msg.content}`)
+        .join('\n')
+
+      summaryPrompt = `请为以下对话生成一个简洁的摘要，重点记录：
 1. 关键事件和情节发展
 2. 重要的约定、决定或承诺  
 3. 角色关系的变化
@@ -91,40 +140,65 @@ export async function POST(request: NextRequest) {
 ${conversationText}
 
 摘要：`
+    }
 
     // 调用AI API生成摘要
-    const response = await fetch('/api/chat', {
+    const serverBaseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+    const requestBody: any = {
+      messages: [{ role: 'user', content: summaryPrompt }],
+      systemPrompt: '你是一个专业的对话摘要助手，能够准确提取对话中的关键信息。',
+      apiKey: apiKey || '',
+      model: model || 'deepseek-chat'
+    }
+    
+    // 如果有中转API参数，添加到请求体中
+    if (baseUrl && actualModel) {
+      requestBody.baseUrl = baseUrl
+      requestBody.actualModel = actualModel
+    }
+    
+    const response = await fetch(`${serverBaseUrl}/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        messages: [{ role: 'user', content: summaryPrompt }],
-        systemPrompt: '你是一个专业的对话摘要助手，能够准确提取对话中的关键信息。',
-        apiKey,
-        model
-      }),
+      body: JSON.stringify(requestBody),
     })
 
     if (!response.ok) {
-      throw new Error('摘要生成失败')
+      const errorText = await response.text()
+      console.error('AI API调用失败:', response.status, errorText)
+      throw new Error(`摘要生成失败: ${response.status} ${errorText}`)
     }
 
     const aiResult = await response.json()
-    const summaryContent = aiResult.content || '摘要生成失败'
+    const generatedSummary = aiResult.content || '摘要生成失败'
 
     // 保存摘要到数据库
+    const insertData: any = {
+      session_id: sessionId,
+      user_id: userId,
+      content: generatedSummary,
+      original_message_count: messageCount,
+      summary_method: 'ai_generated',
+      summary_level: summaryType === 'super' ? 2 : 1,
+      is_active: true
+    }
+
+    // 添加消息范围（仅限普通摘要）
+    if (effectiveStartMessageId && effectiveEndMessageId) {
+      insertData.start_message_id = effectiveStartMessageId
+      insertData.end_message_id = effectiveEndMessageId
+    }
+
+    // 添加父摘要ID（仅限超级摘要）
+    if (summaryType === 'super' && parentSummaryIds && parentSummaryIds.length > 0) {
+      insertData.parent_summaries = parentSummaryIds
+    }
+
     const { data: summary, error: insertError } = await supabase
       .from('chat_summaries')
-      .insert({
-        session_id: sessionId,
-        user_id: userId,
-        content: summaryContent,
-        start_message_id: startMessageId,
-        end_message_id: endMessageId,
-        original_message_count: messages.length,
-        summary_method: 'ai_generated'
-      })
+      .insert(insertData)
       .select()
       .single()
 

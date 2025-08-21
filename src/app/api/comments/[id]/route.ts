@@ -4,10 +4,10 @@ import { supabase } from '../../../lib/supabase'
 // 删除评论
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const commentId = params.id
+    const { id: commentId } = await params
     const body = await request.json()
     const { userId } = body
 
@@ -42,10 +42,10 @@ export async function DELETE(
 // 更新评论
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const commentId = params.id
+    const { id: commentId } = await params
     const body = await request.json()
     const { content, userId } = body
 

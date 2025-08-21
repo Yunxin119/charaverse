@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
 import { supabase } from '../lib/supabase'
+import { sendMessageWithContext, regenerateMessageWithContext } from '../lib/enhancedChatSlice'
 
 export interface ChatMessage {
   id: number
@@ -184,7 +185,9 @@ export const sendMessage = createAsyncThunk(
     apiKey, 
     model,
     messages,
-    thinkingBudget
+    thinkingBudget,
+    baseUrl,
+    actualModel
   }: { 
     sessionId: string
     userMessage: string
@@ -193,6 +196,8 @@ export const sendMessage = createAsyncThunk(
     model: string
     messages: ChatMessage[]
     thinkingBudget?: number
+    baseUrl?: string
+    actualModel?: string
   }) => {
     let userMsgData = null
     
@@ -237,6 +242,14 @@ export const sendMessage = createAsyncThunk(
     // 只有Gemini 2.5系列模型才添加thinkingBudget
     if (model.includes('gemini-2.5') && thinkingBudget !== undefined) {
       requestBody.thinkingBudget = thinkingBudget
+    }
+
+    // 添加中转API参数
+    if (baseUrl) {
+      requestBody.baseUrl = baseUrl
+    }
+    if (actualModel) {
+      requestBody.actualModel = actualModel
     }
 
     console.log('发送到API的请求体:', {
@@ -293,7 +306,9 @@ export const regenerateLastMessage = createAsyncThunk(
     model,
     messages,
     lastMessageId,
-    thinkingBudget
+    thinkingBudget,
+    baseUrl,
+    actualModel
   }: {
     sessionId: string
     systemPrompt: string
@@ -302,6 +317,8 @@ export const regenerateLastMessage = createAsyncThunk(
     messages: ChatMessage[]
     lastMessageId: number
     thinkingBudget?: number
+    baseUrl?: string
+    actualModel?: string
   }) => {
     // 构建消息历史（不包含要重新生成的消息）
     const messageHistory = messages
@@ -322,6 +339,14 @@ export const regenerateLastMessage = createAsyncThunk(
     // 只有Gemini 2.5系列模型才添加thinkingBudget
     if (model.includes('gemini-2.5') && thinkingBudget !== undefined) {
       requestBody.thinkingBudget = thinkingBudget
+    }
+
+    // 添加中转API参数
+    if (baseUrl) {
+      requestBody.baseUrl = baseUrl
+    }
+    if (actualModel) {
+      requestBody.actualModel = actualModel
     }
 
     const response = await fetch('/api/chat', {
@@ -375,6 +400,25 @@ export const editMessage = createAsyncThunk(
   }
 )
 
+// 删除消息
+export const deleteMessage = createAsyncThunk(
+  'chat/deleteMessage',
+  async ({
+    messageId
+  }: {
+    messageId: number
+  }) => {
+    const { error } = await supabase
+      .from('chat_messages')
+      .delete()
+      .eq('id', messageId)
+
+    if (error) throw error
+
+    return messageId
+  }
+)
+
 // 从某条消息发送新的消息
 export const sendNewMessageFrom = createAsyncThunk(
   'chat/sendNewMessageFrom',
@@ -385,7 +429,9 @@ export const sendNewMessageFrom = createAsyncThunk(
     model,
     messages,
     fromMessageId,
-    thinkingBudget
+    thinkingBudget,
+    baseUrl,
+    actualModel
   }: {
     sessionId: string
     systemPrompt: string
@@ -394,6 +440,8 @@ export const sendNewMessageFrom = createAsyncThunk(
     messages: ChatMessage[]
     fromMessageId: number
     thinkingBudget?: number
+    baseUrl?: string
+    actualModel?: string
   }) => {
     // 构建消息历史（包含到指定消息为止的所有消息）
     const fromMessageIndex = messages.findIndex(msg => msg.id === fromMessageId)
@@ -414,6 +462,14 @@ export const sendNewMessageFrom = createAsyncThunk(
 
     if (model.includes('gemini-2.5') && thinkingBudget !== undefined) {
       requestBody.thinkingBudget = thinkingBudget
+    }
+
+    // 添加中转API参数
+    if (baseUrl) {
+      requestBody.baseUrl = baseUrl
+    }
+    if (actualModel) {
+      requestBody.actualModel = actualModel
     }
 
     const response = await fetch('/api/chat', {
@@ -474,7 +530,18 @@ export const clearChatHistory = createAsyncThunk(
       // 不阻止整个流程，只记录错误
     }
 
-    // 2. 然后删除消息
+    // 2. 删除相关的摘要
+    const { error: summaryError } = await supabase
+      .from('chat_summaries')
+      .delete()
+      .eq('session_id', sessionId)
+
+    if (summaryError) {
+      console.error('Failed to delete summaries:', summaryError)
+      // 不阻止整个流程，只记录错误
+    }
+
+    // 3. 然后删除消息
     const { error } = await supabase
       .from('chat_messages')
       .delete()
@@ -484,10 +551,10 @@ export const clearChatHistory = createAsyncThunk(
       throw new Error('Failed to delete messages from database')
     }
 
-    // 3. 清空本地状态的消息
+    // 4. 清空本地状态的消息
     dispatch(clearMessages())
 
-    // 4. 检查是否有初始对话
+    // 5. 检查是否有初始对话
     if (initialMessage && initialMessage.trim()) {
       // 使用初始对话
       const { data: aiMsgData, error: aiMsgError } = await supabase
@@ -658,7 +725,8 @@ const chatSlice = createSlice({
         // 如果有用户消息，需要更新临时消息的ID为真实ID
         if (action.payload.userMessage) {
           // 找到刚才添加的临时用户消息并更新ID
-          const lastUserMsgIndex = state.messages.length - 1 - [...state.messages].reverse().findIndex(msg => msg.role === 'user')
+          // 使用 findLastIndex 来找到最后一个用户消息的索引
+          const lastUserMsgIndex = state.messages.findLastIndex(msg => msg.role === 'user')
           if (lastUserMsgIndex !== -1) {
             state.messages[lastUserMsgIndex] = action.payload.userMessage
           }
@@ -669,6 +737,41 @@ const chatSlice = createSlice({
       .addCase(sendMessage.rejected, (state, action) => {
         state.isGenerating = false
         state.error = action.error.message || 'Failed to send message'
+      })
+
+      // Enhanced Send Message With Context
+      .addCase(sendMessageWithContext.pending, (state, action) => {
+        state.isGenerating = true
+        state.error = null
+        // 添加临时用户消息到状态中（如果有用户消息）
+        if (action.meta.arg.userMessage.trim()) {
+          const tempUserMessage = {
+            id: -Date.now(), // 临时ID
+            session_id: action.meta.arg.sessionId,
+            role: 'user' as const,
+            content: action.meta.arg.userMessage,
+            type: 'message' as const,
+            created_at: new Date().toISOString()
+          }
+          state.messages.push(tempUserMessage)
+        }
+      })
+      .addCase(sendMessageWithContext.fulfilled, (state, action) => {
+        state.isGenerating = false
+        // 如果有用户消息，需要更新临时消息的ID为真实ID
+        if (action.payload.userMessage) {
+          // 使用 findLastIndex 来找到最后一个用户消息的索引
+          const lastUserMsgIndex = state.messages.findLastIndex(msg => msg.role === 'user')
+          if (lastUserMsgIndex !== -1) {
+            state.messages[lastUserMsgIndex] = action.payload.userMessage
+          }
+        }
+        // 添加AI回复
+        state.messages.push(action.payload.aiMessage)
+      })
+      .addCase(sendMessageWithContext.rejected, (state, action) => {
+        state.isGenerating = false
+        state.error = action.error.message || 'Failed to send message with context'
       })
       
       // Regenerate Message
@@ -688,6 +791,24 @@ const chatSlice = createSlice({
         state.isGenerating = false
         state.error = action.error.message || 'Failed to regenerate message'
       })
+      
+      // Regenerate Message with Context
+      .addCase(regenerateMessageWithContext.pending, (state) => {
+        state.isGenerating = true
+        state.error = null
+      })
+      .addCase(regenerateMessageWithContext.fulfilled, (state, action) => {
+        state.isGenerating = false
+        // 直接更新对应ID的消息
+        const messageIndex = state.messages.findIndex(msg => msg.id === action.payload.id)
+        if (messageIndex !== -1) {
+          state.messages[messageIndex] = action.payload
+        }
+      })
+      .addCase(regenerateMessageWithContext.rejected, (state, action) => {
+        state.isGenerating = false
+        state.error = action.error.message || 'Failed to regenerate message with context'
+      })
 
       // Edit Message
       .addCase(editMessage.pending, (state) => {
@@ -702,6 +823,18 @@ const chatSlice = createSlice({
       })
       .addCase(editMessage.rejected, (state, action) => {
         state.error = action.error.message || 'Failed to edit message'
+      })
+
+      // Delete Message
+      .addCase(deleteMessage.pending, (state) => {
+        state.error = null
+      })
+      .addCase(deleteMessage.fulfilled, (state, action) => {
+        // 从消息列表中移除被删除的消息
+        state.messages = state.messages.filter(msg => msg.id !== action.payload)
+      })
+      .addCase(deleteMessage.rejected, (state, action) => {
+        state.error = action.error.message || 'Failed to delete message'
       })
 
       // Send New Message From

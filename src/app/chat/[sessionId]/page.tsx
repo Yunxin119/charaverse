@@ -23,7 +23,8 @@ import {
   Edit3,
   ArrowLeft,
   ChevronRight,
-  BookOpen
+  BookOpen,
+  Trash2
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -42,18 +43,31 @@ import {
   sendMessage,
   regenerateLastMessage,
   editMessage,
+  deleteMessage,
   sendNewMessageFrom,
   setSelectedModel,
   setSessionTitle,
   clearError
 } from '../../store/chatSlice'
 import { supabase } from '../../lib/supabase'
-import { sendMessageWithContext, getContextConfigSuggestions } from '../../lib/enhancedChatSlice'
+import { sendMessageWithContext, getContextConfigSuggestions, regenerateMessageWithContext } from '../../lib/enhancedChatSlice'
 
 interface APIConfig {
   deepseek?: string
   gemini?: string
   openai?: string
+}
+
+interface NamedRelayConfig {
+  id: string
+  name: string
+  baseUrl: string
+  apiKey: string
+  modelName: string
+  description?: string
+  supportsThinking?: boolean
+  thinkingBudgetMode?: 'auto' | 'manual'
+  thinkingBudget?: number
 }
 
 export default function ChatSessionPage() {
@@ -105,13 +119,22 @@ export default function ChatSessionPage() {
   // 加载保存的上下文配置
   useEffect(() => {
     const savedContextConfig = localStorage.getItem(`context_config_${sessionId}`)
+    console.log('🔧 加载上下文配置:', {
+      sessionId,
+      savedConfig: savedContextConfig,
+      currentConfig: contextConfig
+    })
+    
     if (savedContextConfig) {
       try {
         const config = JSON.parse(savedContextConfig)
+        console.log('✅ 应用保存的配置:', config)
         setContextConfig(prev => ({ ...prev, ...config }))
       } catch (e) {
         console.warn('Failed to parse saved context config')
       }
+    } else {
+      console.log('ℹ️ 没有保存的配置，使用默认配置')
     }
     
     const savedUseEnhanced = localStorage.getItem(`use_enhanced_context_${sessionId}`)
@@ -122,6 +145,29 @@ export default function ChatSessionPage() {
       setUseEnhancedContext(true)
       localStorage.setItem(`use_enhanced_context_${sessionId}`, 'true')
     }
+  }, [sessionId])
+
+  // 监听localStorage变化，实时更新配置
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === `context_config_${sessionId}` && e.newValue) {
+        try {
+          const config = JSON.parse(e.newValue)
+          console.log('📡 检测到配置变化，更新:', config)
+          setContextConfig(prev => ({ ...prev, ...config }))
+        } catch (e) {
+          console.warn('Failed to parse updated context config')
+        }
+      }
+      
+      if (e.key === `use_enhanced_context_${sessionId}` && e.newValue !== null) {
+        console.log('📡 检测到智能模式切换:', e.newValue)
+        setUseEnhancedContext(e.newValue === 'true')
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
   }, [sessionId])
 
   // 滚动到底部
@@ -159,7 +205,25 @@ export default function ChatSessionPage() {
         models.push('gpt-4o', 'gpt-4o-mini')
       }
       
+      // 加载命名的中转配置并添加到可用模型
+      const savedNamedConfigs = localStorage.getItem('named_relay_configs')
+      if (savedNamedConfigs) {
+        try {
+          const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs)
+          namedConfigs.forEach((namedConfig) => {
+            models.push(`named-relay-${namedConfig.id}`)
+          })
+        } catch (e) {
+          console.warn('Failed to parse named relay configs')
+        }
+      }
+      
       setAvailableModels(models)
+      
+      // 如果没有任何模型可用，确保用户能看到错误提示
+      if (models.length === 0) {
+        console.warn('No models available - user needs to configure API keys')
+      }
     }
 
     loadApiConfig()
@@ -256,7 +320,7 @@ export default function ChatSessionPage() {
       return ''
     }
     
-    let prompt = `来玩角色扮演，接下来，你将完全成为"${basic_info.name}"与我对话。注意回复简短自然，日常对话即可。你不可以自己预测我的行为。\n\n`
+    let prompt = `来玩角色扮演，接下来，你将完全成为"${basic_info.name}"与我对话。注意回复简短自然，日常对话即可。你不可以自己预测我的行为。你必须给予回复。\n\n`
     
     prompt += `【你的角色】\n`
     prompt += `${basic_info.name}\n`
@@ -312,11 +376,64 @@ export default function ChatSessionPage() {
 
   // 获取thinking budget值
   const getThinkingBudget = (model: string) => {
+    console.log('🧠 Getting thinking budget for model:', model)
+    
+    // 检查是否是命名中转配置
+    if (model.startsWith('named-relay-')) {
+      const configId = model.replace('named-relay-', '')
+      console.log('🔍 Looking for config ID:', configId)
+      
+      const savedNamedConfigs = localStorage.getItem('named_relay_configs')
+      console.log('💾 Raw localStorage data:', savedNamedConfigs)
+      
+      if (savedNamedConfigs) {
+        try {
+          const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs)
+          console.log('📋 Parsed configs:', namedConfigs)
+          
+          const config = namedConfigs.find(c => c.id === configId)
+          console.log('🎯 Found matching config:', config)
+          
+          if (config) {
+            console.log('📊 Config details:')
+            console.log('  - supportsThinking:', config.supportsThinking)
+            console.log('  - thinkingBudgetMode:', config.thinkingBudgetMode)
+            console.log('  - thinkingBudget:', config.thinkingBudget)
+            
+            if (config.supportsThinking) {
+              if (config.thinkingBudgetMode === 'manual') {
+                const budget = config.thinkingBudget || 0
+                console.log('✅ Manual mode, returning budget:', budget)
+                return budget
+              } else {
+                console.log('✅ Auto mode, returning undefined')
+                return undefined // auto模式
+              }
+            } else {
+              console.log('❌ Thinking not supported for this config')
+            }
+          } else {
+            console.log('❌ No matching config found for ID:', configId)
+          }
+        } catch (e) {
+          console.warn('❌ Failed to parse named relay configs:', e)
+        }
+      } else {
+        console.log('❌ No named_relay_configs found in localStorage')
+      }
+      return undefined
+    }
+    
+    // 原有的Gemini模型逻辑
     if (model === 'gemini-2.5-pro') {
+      console.log('✅ Gemini 2.5 Pro: using auto mode')
       return undefined // Pro版本始终使用auto模式
     } else if (model === 'gemini-2.5-flash') {
-      return thinkingBudgetMode === 'auto' ? undefined : thinkingBudget
+      const result = thinkingBudgetMode === 'auto' ? undefined : thinkingBudget
+      console.log('✅ Gemini 2.5 Flash: mode=', thinkingBudgetMode, 'returning=', result)
+      return result
     } else {
+      console.log('❌ Model does not support thinking:', model)
       return undefined // 其他模型不支持
     }
   }
@@ -370,9 +487,9 @@ export default function ChatSessionPage() {
       } else {
         // 没有初始对话，使用AI生成
         const systemPrompt = buildSystemPrompt()
-        const apiKey = getApiKeyForModel(currentSelectedModel)
+        const modelConfig = getModelConfig(currentSelectedModel)
         
-        if (!apiKey) {
+        if (!modelConfig.apiKey) {
           throw new Error('未找到对应的API密钥')
         }
 
@@ -384,10 +501,12 @@ export default function ChatSessionPage() {
           sessionId: session.id,
           userMessage: '',
           systemPrompt: systemPrompt + '\n\n现在请你作为角色主动开始对话，根据初始情景开始我们的故事。',
-          apiKey,
+          apiKey: modelConfig.apiKey,
           model: currentSelectedModel,
           messages: [],
-          thinkingBudget: getThinkingBudget(currentSelectedModel)
+          thinkingBudget: getThinkingBudget(currentSelectedModel),
+          baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
+          actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
         }))
       }
 
@@ -418,9 +537,9 @@ export default function ChatSessionPage() {
     }
 
     const systemPrompt = buildSystemPrompt()
-    const apiKey = getApiKeyForModel(currentSelectedModel)
+    const modelConfig = getModelConfig(currentSelectedModel)
     
-    if (!apiKey) {
+    if (!modelConfig.apiKey) {
       console.error('没有找到API密钥')
       return
     }
@@ -434,16 +553,18 @@ export default function ChatSessionPage() {
     try {
       if (useEnhancedContext) {
         // 使用增强的上下文管理
-        const result = await dispatch(sendMessageWithContext({
+        await dispatch(sendMessageWithContext({
           sessionId: currentSession.id,
           userMessage: userInput.trim(),
           systemPrompt,
-          apiKey,
+          apiKey: modelConfig.apiKey,
           model: currentSelectedModel,
           messages,
           thinkingBudget: getThinkingBudget(currentSelectedModel),
           contextConfig,
-          characterName: currentCharacter?.name || '角色'
+          characterName: currentCharacter?.name || '角色',
+          baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
+          actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
         }))
         
         // 上下文统计信息在设置页显示
@@ -453,10 +574,12 @@ export default function ChatSessionPage() {
           sessionId: currentSession.id,
           userMessage: userInput.trim(),
           systemPrompt,
-          apiKey,
+          apiKey: modelConfig.apiKey,
           model: currentSelectedModel,
           messages,
-          thinkingBudget: getThinkingBudget(currentSelectedModel)
+          thinkingBudget: getThinkingBudget(currentSelectedModel),
+          baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
+          actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
         }))
       }
       
@@ -471,31 +594,97 @@ export default function ChatSessionPage() {
     if (!currentSession || !currentSelectedModel || isGenerating) return
 
     const systemPrompt = buildSystemPrompt()
-    const apiKey = getApiKeyForModel(currentSelectedModel)
+    const modelConfig = getModelConfig(currentSelectedModel)
     
-    if (!apiKey) return
+    if (!modelConfig.apiKey) return
 
     try {
-      await dispatch(regenerateLastMessage({
-        sessionId: currentSession.id,
-        systemPrompt,
-        apiKey,
-        model: currentSelectedModel,
-        messages,
-        lastMessageId: messageId,
-        thinkingBudget: getThinkingBudget(currentSelectedModel)
-      }))
+      if (useEnhancedContext) {
+        // 使用智能上下文管理重新生成
+        await dispatch(regenerateMessageWithContext({
+          sessionId: currentSession.id,
+          systemPrompt,
+          apiKey: modelConfig.apiKey,
+          model: currentSelectedModel,
+          messages,
+          lastMessageId: messageId,
+          thinkingBudget: getThinkingBudget(currentSelectedModel),
+          contextConfig,
+          characterName: currentCharacter?.name || '角色',
+          baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
+          actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
+        }))
+      } else {
+        // 使用原有的重新生成方式
+        await dispatch(regenerateLastMessage({
+          sessionId: currentSession.id,
+          systemPrompt,
+          apiKey: modelConfig.apiKey,
+          model: currentSelectedModel,
+          messages,
+          lastMessageId: messageId,
+          thinkingBudget: getThinkingBudget(currentSelectedModel),
+          baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
+          actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
+        }))
+      }
     } catch (error) {
       console.error('重新生成消息失败:', error)
     }
   }
 
-  // 获取模型对应的API密钥
+  // 获取模型对应的API密钥和配置
   const getApiKeyForModel = (model: string): string | null => {
     if (model.startsWith('deepseek')) return apiConfig.deepseek || null
     if (model.startsWith('gemini')) return apiConfig.gemini || null
     if (model.startsWith('gpt')) return apiConfig.openai || null
+    
+    // 处理命名中转配置
+    if (model.startsWith('named-relay-')) {
+      const configId = model.replace('named-relay-', '')
+      const savedNamedConfigs = localStorage.getItem('named_relay_configs')
+      if (savedNamedConfigs) {
+        try {
+          const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs)
+          const config = namedConfigs.find(c => c.id === configId)
+          return config?.apiKey || null
+        } catch (e) {
+          console.warn('Failed to parse named relay configs')
+        }
+      }
+    }
+    
     return null
+  }
+
+  // 获取模型的完整配置（包括中转API的baseUrl）
+  const getModelConfig = (model: string) => {
+    // 命名中转配置
+    if (model.startsWith('named-relay-')) {
+      const configId = model.replace('named-relay-', '')
+      const savedNamedConfigs = localStorage.getItem('named_relay_configs')
+      if (savedNamedConfigs) {
+        try {
+          const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs)
+          const config = namedConfigs.find(c => c.id === configId)
+          if (config) {
+            return {
+              apiKey: config.apiKey,
+              baseUrl: config.baseUrl,
+              modelName: config.modelName,
+              isRelay: true
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to parse named relay configs')
+        }
+      }
+    }
+    
+    return {
+      apiKey: getApiKeyForModel(model),
+      isRelay: false
+    }
   }
 
   // 保存会话标题
@@ -514,6 +703,25 @@ export default function ChatSessionPage() {
       'gpt-4o': 'GPT-4o',
       'gpt-4o-mini': 'GPT-4o Mini'
     }
+    
+    // 处理命名中转API模型
+    if (model.startsWith('named-relay-')) {
+      const configId = model.replace('named-relay-', '')
+      const savedNamedConfigs = localStorage.getItem('named_relay_configs')
+      if (savedNamedConfigs) {
+        try {
+          const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs)
+          const config = namedConfigs.find(c => c.id === configId)
+          if (config) {
+            return config.name
+          }
+        } catch (e) {
+          console.warn('Failed to parse named relay configs')
+        }
+      }
+      return `中转配置 ${configId}`
+    }
+    
     return modelNames[model] || model
   }
 
@@ -568,19 +776,21 @@ export default function ChatSessionPage() {
     if (!currentSession || !currentSelectedModel || isGenerating) return
 
     const systemPrompt = buildSystemPrompt()
-    const apiKey = getApiKeyForModel(currentSelectedModel)
+    const modelConfig = getModelConfig(currentSelectedModel)
     
-    if (!apiKey || !systemPrompt) return
+    if (!modelConfig.apiKey || !systemPrompt) return
 
     try {
       await dispatch(sendNewMessageFrom({
         sessionId: currentSession.id,
         systemPrompt,
-        apiKey,
+        apiKey: modelConfig.apiKey,
         model: currentSelectedModel,
         messages,
         fromMessageId: messageId,
-        thinkingBudget: getThinkingBudget(currentSelectedModel)
+        thinkingBudget: getThinkingBudget(currentSelectedModel),
+        baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
+        actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
       }))
       
       setSelectedMessageId(null)
@@ -589,9 +799,43 @@ export default function ChatSessionPage() {
     }
   }
 
+  // 删除消息
+  const handleDeleteMessage = async (messageId: number) => {
+    if (window.confirm('确定要删除这条消息吗？此操作不可撤销。')) {
+      try {
+        await dispatch(deleteMessage({ messageId }))
+        setSelectedMessageId(null)
+        setEditingMessageId(null)
+      } catch (error) {
+        console.error('删除消息失败:', error)
+      }
+    }
+  }
 
-  // 如果没有API配置
-  if (Object.keys(apiConfig).length === 0) {
+
+  // 检查是否有任何可用的API配置（包括命名中转配置）
+  const hasAnyApiConfig = () => {
+    // 检查标准API配置
+    if (Object.keys(apiConfig).length > 0) {
+      return true
+    }
+    
+    // 检查命名中转配置
+    const savedNamedConfigs = localStorage.getItem('named_relay_configs')
+    if (savedNamedConfigs) {
+      try {
+        const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs)
+        return namedConfigs.length > 0
+      } catch (e) {
+        console.warn('Failed to parse named relay configs')
+      }
+    }
+    
+    return false
+  }
+
+  // 如果没有任何API配置
+  if (!hasAnyApiConfig()) {
     return (
       <div className="h-screen bg-slate-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-sm">
@@ -599,7 +843,7 @@ export default function ChatSessionPage() {
             <AlertCircle className="w-12 h-12 mx-auto text-amber-500" />
             <h3 className="text-lg font-semibold">需要配置API密钥</h3>
             <p className="text-slate-600 text-sm">
-              你似乎还没有配置API密钥，请前往设置页面配置你的AI服务密钥。
+              你似乎还没有配置API密钥，请前往设置页面配置你的AI服务密钥或中转API服务。
             </p>
             <Button onClick={() => router.push('/settings')} className="w-full">
               <Settings className="w-4 h-4 mr-2" />
@@ -764,9 +1008,9 @@ export default function ChatSessionPage() {
                         } ${
                           selectedMessageId === message.id ? 'ring-2 ring-blue-500' : ''
                         } ${
-                          message.role === 'assistant' ? 'cursor-pointer' : ''
+                          'cursor-pointer'
                         }`}
-                        onClick={() => message.role === 'assistant' && handleMessageClick(message.id)}
+                        onClick={() => handleMessageClick(message.id)}
                       >
                         {/* 编辑模式 */}
                         {editingMessageId === message.id ? (
@@ -818,37 +1062,73 @@ export default function ChatSessionPage() {
                       </div>
 
                       {/* 消息操作按钮 - 移动端优化 */}
-                      {message.role === 'assistant' && selectedMessageId === message.id && (
+                      {selectedMessageId === message.id && (
                         <div className="flex flex-wrap justify-center gap-1 mt-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleRegenerateMessage(message.id)}
-                            disabled={isGenerating}
-                            className="h-7 px-2 text-xs bg-white border border-slate-200"
-                          >
-                            <RefreshCw className={`w-3 h-3 mr-1 ${isGenerating ? 'animate-spin' : ''}`} />
-                            重新生成
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEditMessage(message.id, message.content)}
-                            className="h-7 px-2 text-xs bg-white border border-slate-200"
-                          >
-                            <Edit2 className="w-3 h-3 mr-1" />
-                            编辑
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleSendNewMessageFrom(message.id)}
-                            disabled={isGenerating}
-                            className="h-7 px-2 text-xs bg-white border border-slate-200"
-                          >
-                            <MessageSquarePlus className="w-3 h-3 mr-1" />
-                            续写
-                          </Button>
+                          {message.role === 'assistant' ? (
+                            // AI消息的操作按钮
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleRegenerateMessage(message.id)}
+                                disabled={isGenerating}
+                                className="h-7 px-2 text-xs bg-white border border-slate-200"
+                              >
+                                <RefreshCw className={`w-3 h-3 mr-1 ${isGenerating ? 'animate-spin' : ''}`} />
+                                重新生成
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleEditMessage(message.id, message.content)}
+                                className="h-7 px-2 text-xs bg-white border border-slate-200"
+                              >
+                                <Edit2 className="w-3 h-3 mr-1" />
+                                编辑
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleSendNewMessageFrom(message.id)}
+                                disabled={isGenerating}
+                                className="h-7 px-2 text-xs bg-white border border-slate-200"
+                              >
+                                <MessageSquarePlus className="w-3 h-3 mr-1" />
+                                续写
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeleteMessage(message.id)}
+                                className="h-7 px-2 text-xs bg-white border border-slate-200 hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+                              >
+                                <Trash2 className="w-3 h-3 mr-1" />
+                                删除
+                              </Button>
+                            </>
+                          ) : (
+                            // 用户消息的操作按钮
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleEditMessage(message.id, message.content)}
+                                className="h-7 px-2 text-xs bg-white border border-slate-200"
+                              >
+                                <Edit2 className="w-3 h-3 mr-1" />
+                                编辑
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeleteMessage(message.id)}
+                                className="h-7 px-2 text-xs bg-white border border-slate-200 hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+                              >
+                                <Trash2 className="w-3 h-3 mr-1" />
+                                删除
+                              </Button>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>

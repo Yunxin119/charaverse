@@ -72,6 +72,11 @@ export type ChatSummary = {
   end_message_id?: number
   original_message_count: number
   summary_method: string
+  summary_level: number          // 摘要层级：1=原始摘要，2=超级摘要
+  parent_summaries?: number[]    // 父摘要ID数组（用于超级摘要）
+  is_active: boolean            // 摘要是否有效
+  invalidated_at?: string       // 失效时间
+  compressed_at?: string        // 压缩时间
 }
 
 export type PromptTemplate = {

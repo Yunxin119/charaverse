@@ -12,10 +12,10 @@ interface DiaryRegenerateRequest {
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const diaryId = params.id
+    const { id: diaryId } = await params
 
     // 创建Supabase客户端
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -79,10 +79,10 @@ export async function DELETE(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const diaryId = params.id
+    const { id: diaryId } = await params
 
     // 创建Supabase客户端
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -132,8 +132,7 @@ export async function PUT(
     const { data: updatedDiary, error: updateError } = await supabase
       .from('diaries')
       .update({
-        content: content.trim(),
-        updated_at: new Date().toISOString()
+        content: content.trim()
       })
       .eq('id', diaryId)
       .eq('user_id', user.id)

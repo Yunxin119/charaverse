@@ -30,6 +30,18 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { supabase, type Diary, type ChatSession, type Character } from '@/app/lib/supabase'
 import { useAppSelector } from '@/app/store/hooks'
 
+interface NamedRelayConfig {
+  id: string
+  name: string
+  baseUrl: string
+  apiKey: string
+  modelName: string
+  description?: string
+  supportsThinking?: boolean
+  thinkingBudgetMode?: 'auto' | 'manual'
+  thinkingBudget?: number
+}
+
 interface DiaryPageData {
   session: ChatSession | null
   character: Character | null
@@ -61,6 +73,60 @@ export default function DiaryPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [isRegenerating, setIsRegenerating] = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState<number | null>(null)
+
+  // 获取模型对应的API密钥
+  const getApiKeyForModel = (model: string): string | null => {
+    if (model.startsWith('deepseek')) return localStorage.getItem('api_key_deepseek')
+    if (model.startsWith('gemini')) return localStorage.getItem('api_key_gemini')
+    if (model.startsWith('gpt')) return localStorage.getItem('api_key_openai')
+    
+    // 处理命名中转配置
+    if (model.startsWith('named-relay-')) {
+      const configId = model.replace('named-relay-', '')
+      const savedNamedConfigs = localStorage.getItem('named_relay_configs')
+      if (savedNamedConfigs) {
+        try {
+          const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs)
+          const config = namedConfigs.find(c => c.id === configId)
+          return config?.apiKey || null
+        } catch (e) {
+          console.warn('Failed to parse named relay configs')
+        }
+      }
+    }
+    
+    return null
+  }
+
+  // 获取模型的完整配置（包括中转API的baseUrl）
+  const getModelConfig = (model: string) => {
+    // 命名中转配置
+    if (model.startsWith('named-relay-')) {
+      const configId = model.replace('named-relay-', '')
+      const savedNamedConfigs = localStorage.getItem('named_relay_configs')
+      if (savedNamedConfigs) {
+        try {
+          const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs)
+          const config = namedConfigs.find(c => c.id === configId)
+          if (config) {
+            return {
+              apiKey: config.apiKey,
+              baseUrl: config.baseUrl,
+              modelName: config.modelName,
+              isRelay: true
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to parse named relay configs')
+        }
+      }
+    }
+    
+    return {
+      apiKey: getApiKeyForModel(model),
+      isRelay: false
+    }
+  }
 
   // 获取页面数据
   const fetchData = async () => {
@@ -126,18 +192,9 @@ export default function DiaryPage() {
 
       // 从 localStorage 获取 API 配置
       const model = localStorage.getItem(`chat_model_${sessionId}`) || 'deepseek-chat'
-      
-      // 根据模型获取对应的API密钥
-      let apiKey: string | null = null
-      if (model.startsWith('deepseek')) {
-        apiKey = localStorage.getItem('api_key_deepseek')
-      } else if (model.startsWith('gemini')) {
-        apiKey = localStorage.getItem('api_key_gemini')
-      } else if (model.startsWith('gpt')) {
-        apiKey = localStorage.getItem('api_key_openai')
-      }
+      const modelConfig = getModelConfig(model)
 
-      if (!apiKey) {
+      if (!modelConfig.apiKey) {
         throw new Error('请先在设置中配置对应的 API Key')
       }
 
@@ -147,14 +204,22 @@ export default function DiaryPage() {
         throw new Error('用户session已过期，请重新登录')
       }
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'x-api-key': modelConfig.apiKey,
+        'x-model': model
+      }
+
+      // 如果是中转API，添加额外的headers
+      if (modelConfig.isRelay) {
+        headers['x-base-url'] = modelConfig.baseUrl || ''
+        headers['x-actual-model'] = modelConfig.modelName || ''
+      }
+
       const response = await fetch('/api/diary/generate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'x-api-key': apiKey,
-          'x-model': model
-        },
+        headers,
         body: JSON.stringify({
           sessionId,
           userId: user.id
@@ -301,16 +366,9 @@ export default function DiaryPage() {
 
       // 获取API配置
       const model = localStorage.getItem(`chat_model_${sessionId}`) || 'deepseek-chat'
-      let apiKey: string | null = null
-      if (model.startsWith('deepseek')) {
-        apiKey = localStorage.getItem('api_key_deepseek')
-      } else if (model.startsWith('gemini')) {
-        apiKey = localStorage.getItem('api_key_gemini')
-      } else if (model.startsWith('gpt')) {
-        apiKey = localStorage.getItem('api_key_openai')
-      }
+      const modelConfig = getModelConfig(model)
 
-      if (!apiKey) {
+      if (!modelConfig.apiKey) {
         throw new Error('请先在设置中配置对应的 API Key')
       }
 
@@ -320,14 +378,22 @@ export default function DiaryPage() {
         throw new Error('用户session已过期，请重新登录')
       }
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'x-api-key': modelConfig.apiKey,
+        'x-model': model
+      }
+
+      // 如果是中转API，添加额外的headers
+      if (modelConfig.isRelay) {
+        headers['x-base-url'] = modelConfig.baseUrl || ''
+        headers['x-actual-model'] = modelConfig.modelName || ''
+      }
+
       const response = await fetch(`/api/diary/${diaryId}/regenerate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'x-api-key': apiKey,
-          'x-model': model
-        }
+        headers
       })
 
       const result = await response.json()
