@@ -12,8 +12,9 @@ async function handleSummaryGeneration(params: {
   model: string
   baseUrl?: string
   actualModel?: string
+  thinkingBudget?: number
 }): Promise<{ summaries: string[], actualSummarizedCount: number }> {
-  const { contextManager, currentMessages, sessionId, characterName, apiKey, model, baseUrl, actualModel } = params
+  const { contextManager, currentMessages, sessionId, characterName, apiKey, model, baseUrl, actualModel, thinkingBudget } = params
   
   let summaries: string[] = []
   
@@ -51,7 +52,8 @@ async function handleSummaryGeneration(params: {
           model,
           accessToken: session.access_token,
           baseUrl,
-          actualModel
+          actualModel,
+          thinkingBudget
         })
 
         if (newSummary) {
@@ -89,7 +91,8 @@ async function handleSummaryGeneration(params: {
                 model,
                 accessToken: session.access_token,
                 baseUrl,
-                actualModel
+                actualModel,
+                thinkingBudget
               })
               
               if (superSummary) {
@@ -239,6 +242,7 @@ export const generateSuperSummary = async (params: {
   accessToken: string
   baseUrl?: string
   actualModel?: string
+  thinkingBudget?: number
 }): Promise<ChatSummary | null> => {
   try {
     if (!params.apiKey || !params.accessToken) {
@@ -267,7 +271,8 @@ export const generateSuperSummary = async (params: {
         'x-api-key': params.apiKey,
         'x-model': params.model || 'deepseek-chat',
         'x-base-url': params.baseUrl || '',
-        'x-actual-model': params.actualModel || ''
+        'x-actual-model': params.actualModel || '',
+        'x-thinking-budget': params.thinkingBudget?.toString() || ''
       },
       body: JSON.stringify({
         sessionId: params.sessionId,
@@ -318,6 +323,7 @@ export const generateSummary = async (params: {
   accessToken: string
   baseUrl?: string
   actualModel?: string
+  thinkingBudget?: number
 }): Promise<ChatSummary | null> => {
   try {
     // 验证必需参数
@@ -333,7 +339,8 @@ export const generateSummary = async (params: {
       userId: params.userId,
       model: params.model,
       apiKey: params.apiKey ? '***' : 'undefined',
-      accessToken: params.accessToken ? '***' : 'undefined'
+      accessToken: params.accessToken ? '***' : 'undefined',
+      thinkingBudget: params.thinkingBudget
     })
     
     const response = await fetch('/api/chat/summary', {
@@ -344,7 +351,8 @@ export const generateSummary = async (params: {
         'x-api-key': params.apiKey,
         'x-model': params.model || 'deepseek-chat',
         'x-base-url': params.baseUrl || '',
-        'x-actual-model': params.actualModel || ''
+        'x-actual-model': params.actualModel || '',
+        'x-thinking-budget': params.thinkingBudget?.toString() || ''
       },
       body: JSON.stringify({
         sessionId: params.sessionId,
@@ -421,7 +429,8 @@ export const sendMessageWithContext = createAsyncThunk(
       apiKey,
       model,
       baseUrl,
-      actualModel
+      actualModel,
+      thinkingBudget
     })
 
     // 5. 构建最终上下文
@@ -552,7 +561,8 @@ export const regenerateMessageWithContext = createAsyncThunk(
       apiKey,
       model,
       baseUrl,
-      actualModel
+      actualModel,
+      thinkingBudget
     })
 
     // 4. 构建最终上下文
@@ -710,6 +720,7 @@ export const rebuildSummarySystem = async (params: {
   accessToken: string
   baseUrl?: string
   actualModel?: string
+  thinkingBudget?: number
 }): Promise<{ summaries: string[], actualSummarizedCount: number }> => {
   try {
     console.log('🔄 开始智能重建摘要系统...')
@@ -786,7 +797,8 @@ export const rebuildSummarySystem = async (params: {
           model: params.model,
           accessToken: params.accessToken,
           baseUrl: params.baseUrl,
-          actualModel: params.actualModel
+          actualModel: params.actualModel,
+          thinkingBudget: params.thinkingBudget
         })
         
         if (superSummary) {

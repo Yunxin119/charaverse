@@ -113,13 +113,15 @@ async function callGemini(messages: ChatMessage[], systemPrompt: string, apiKey:
     generationConfig: {
       temperature: number
       maxOutputTokens: number
+      topP: number
       thinkingConfig?: { thinkingBudget?: number } | Record<string, never>
     }
   } = {
     contents: contents,
     generationConfig: {
-      temperature: 0.7,
+      temperature: 1.0,
       maxOutputTokens: 4000,
+      topP: 0.95,
     }
   }
 

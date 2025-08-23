@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
     const model = request.headers.get('x-model') || 'deepseek-chat'
     const baseUrl = request.headers.get('x-base-url') || ''
     const actualModel = request.headers.get('x-actual-model') || ''
+    const thinkingBudget = request.headers.get('x-thinking-budget') ? parseInt(request.headers.get('x-thinking-budget')!) : undefined
     
     if (!apiKey) {
       return NextResponse.json({ error: '缺少API密钥' }, { status: 400 })
@@ -149,6 +150,11 @@ ${conversationText}
       systemPrompt: '你是一个专业的对话摘要助手，能够准确提取对话中的关键信息。',
       apiKey: apiKey || '',
       model: model || 'deepseek-chat'
+    }
+    
+    // 添加thinking budget参数（如果有）
+    if (thinkingBudget !== undefined) {
+      requestBody.thinkingBudget = thinkingBudget
     }
     
     // 如果有中转API参数，添加到请求体中
