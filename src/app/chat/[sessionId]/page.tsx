@@ -1229,13 +1229,33 @@ export default function ChatSessionPage() {
             <Textarea
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
-              placeholder="输入消息..."
+              placeholder={
+                // 检测是否为移动设备
+                /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768
+                  ? "输入消息... (Ctrl+Enter发送)"
+                  : "输入消息... (Enter发送，Shift+Enter换行)"
+              }
               className="flex-1 resize-none text-sm sm:text-base bg-transparent border-none focus:ring-0 focus:outline-none min-h-[24px] max-h-[120px] px-3 py-1.5"
               rows={1}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSendMessage()
+                // 检测是否为移动设备
+                const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768
+                
+                if (e.key === 'Enter') {
+                  if (isMobile) {
+                    // 移动端：需要 Ctrl+Enter 或 Cmd+Enter 才发送消息
+                    if (e.ctrlKey || e.metaKey) {
+                      e.preventDefault()
+                      handleSendMessage()
+                    }
+                    // 普通 Enter 键不做任何处理，允许换行
+                  } else {
+                    // 桌面端：Enter 发送，Shift+Enter 换行
+                    if (!e.shiftKey) {
+                      e.preventDefault()
+                      handleSendMessage()
+                    }
+                  }
                 }
               }}
               style={{
