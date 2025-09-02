@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生成PWA图标</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .icon-preview { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+        .icon-item { text-align: center; }
+        canvas { border: 1px solid #ccc; margin-bottom: 5px; }
+        button { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #2563eb; }
+        .download-all { background: #10b981; }
+        .download-all:hover { background: #059669; }
+    </style>
+</head>
+<body>
+    <h1>CharaVerse PWA 图标生成器</h1>
+    <p>这个工具会根据SVG图标生成所有需要的PNG格式图标。</p>
+    
+    <div id="svg-container" style="margin: 20px 0;">
+        <!-- SVG会被插入到这里 -->
+    </div>
+    
+    <button onclick="generateAllIcons()">生成所有图标</button>
+    <button onclick="downloadAll()" class="download-all">下载所有图标</button>
+    
+    <div class="icon-preview" id="icon-preview">
+        <!-- 生成的图标预览会显示在这里 -->
+    </div>
+
+    <script>
+        const iconSizes = [72, 96, 128, 144, 152, 192, 384, 512];
+        const svgContent = `<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="256" cy="256" r="256" fill="url(#gradient)"/>
+  <g transform="translate(256, 256)">
+    <path d="M-80 -40 C-80 -62.091 -62.091 -80 -40 -80 L40 -80 C62.091 -80 80 -62.091 80 -40 L80 20 C80 42.091 62.091 60 40 60 L-20 60 L-50 80 L-50 60 L-40 60 C-62.091 60 -80 42.091 -80 20 Z" fill="white"/>
+    <circle cx="0" cy="-10" r="25" fill="#3b82f6"/>
+    <circle cx="-8" cy="-18" r="3" fill="white"/>
+    <circle cx="8" cy="-18" r="3" fill="white"/>
+    <path d="M-10 -5 Q0 5 10 -5" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <g transform="translate(60, -60)">
+      <path d="M0 -8 L2 -2 L8 -2 L3 2 L5 8 L0 4 L-5 8 L-3 2 L-8 -2 L-2 -2 Z" fill="#fbbf24"/>
+    </g>
+    <g transform="translate(-70, 40)">
+      <path d="M0 -6 L1.5 -1.5 L6 -1.5 L2.5 1.5 L4 6 L0 3 L-4 6 L-2.5 1.5 L-6 -1.5 L-1.5 -1.5 Z" fill="#f59e0b"/>
+    </g>
+    <rect x="45" y="-15" width="15" height="2" rx="1" fill="#3b82f6" opacity="0.7"/>
+    <rect x="45" y="-10" width="20" height="2" rx="1" fill="#3b82f6" opacity="0.7"/>
+    <rect x="45" y="-5" width="12" height="2" rx="1" fill="#3b82f6" opacity="0.7"/>
+  </g>
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea"/>
+      <stop offset="100%" style="stop-color:#764ba2"/>
+    </linearGradient>
+  </defs>
+</svg>`;
+
+        let generatedCanvases = [];
+
+        function generateAllIcons() {
+            const previewContainer = document.getElementById('icon-preview');
+            previewContainer.innerHTML = '';
+            generatedCanvases = [];
+
+            iconSizes.forEach(size => {
+                const iconItem = document.createElement('div');
+                iconItem.className = 'icon-item';
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                canvas.style.width = '64px';
+                canvas.style.height = '64px';
+                
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                
+                img.onload = function() {
+                    ctx.drawImage(img, 0, 0, size, size);
+                };
+                
+                const svgBlob = new Blob([svgContent], {type: 'image/svg+xml'});
+                const url = URL.createObjectURL(svgBlob);
+                img.src = url;
+                
+                const label = document.createElement('div');
+                label.textContent = size + 'x' + size;
+                
+                const downloadBtn = document.createElement('button');
+                downloadBtn.textContent = '下载';
+                downloadBtn.onclick = () => downloadIcon(canvas, size);
+                
+                iconItem.appendChild(canvas);
+                iconItem.appendChild(label);
+                iconItem.appendChild(downloadBtn);
+                previewContainer.appendChild(iconItem);
+                
+                generatedCanvases.push({canvas, size});
+            });
+        }
+
+        function downloadIcon(canvas, size) {
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = \`icon-\${size}x\${size}.png\`;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        function downloadAll() {
+            generatedCanvases.forEach(({canvas, size}) => {
+                setTimeout(() => downloadIcon(canvas, size), 100 * iconSizes.indexOf(size));
+            });
+        }
+
+        // 显示SVG预览
+        document.getElementById('svg-container').innerHTML = svgContent;
+    </script>
+</body>
+</html>

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>离线模式 - CharaVerse</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 48px 32px;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 24px;
+            background: #f1f5f9;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon svg {
+            width: 32px;
+            height: 32px;
+            color: #64748b;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 12px;
+        }
+
+        p {
+            font-size: 16px;
+            color: #64748b;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        .retry-button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-right: 12px;
+        }
+
+        .retry-button:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .secondary-button {
+            background: transparent;
+            color: #64748b;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .secondary-button:hover {
+            border-color: #cbd5e1;
+            background: #f8fafc;
+        }
+
+        .buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        @media (min-width: 640px) {
+            .buttons {
+                flex-direction: row;
+                justify-content: center;
+            }
+        }
+
+        .logo {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo svg {
+            width: 24px;
+            height: 24px;
+            color: white;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .7; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 12C8 10.343 9.343 9 11 9H21C22.657 9 24 10.343 24 12V18C24 19.657 22.657 21 21 21H13L9 24V21H11C9.343 21 8 19.657 8 18V12Z" transform="scale(0.5) translate(8,6)"/>
+                <circle cx="12" cy="12" r="3" fill="white"/>
+                <circle cx="10.5" cy="11" r="1" fill="currentColor"/>
+                <circle cx="13.5" cy="11" r="1" fill="currentColor"/>
+            </svg>
+        </div>
+        
+        <div class="icon pulse">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z"/>
+                <polyline points="9,22 9,12 15,12 15,22"/>
+            </svg>
+        </div>
+        
+        <h1>你现在离线了</h1>
+        <p>看起来你的网络连接有问题。不用担心，一旦网络恢复，你就可以继续使用 CharaVerse 了。</p>
+        
+        <div class="buttons">
+            <button class="retry-button" onclick="window.location.reload()">
+                重试连接
+            </button>
+            <button class="secondary-button" onclick="goOffline()">
+                浏览缓存内容
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function goOffline() {
+            // 尝试返回到应用的主页面
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                window.location.href = '/';
+            }
+        }
+
+        // 检测网络状态
+        function checkOnline() {
+            if (navigator.onLine) {
+                window.location.reload();
+            }
+        }
+
+        // 监听网络状态变化
+        window.addEventListener('online', checkOnline);
+        
+        // 定期检查网络状态（作为备用）
+        setInterval(checkOnline, 5000);
+
+        // 添加一些动画和交互
+        document.addEventListener('DOMContentLoaded', function() {
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    this.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        this.style.transform = '';
+                    }, 150);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

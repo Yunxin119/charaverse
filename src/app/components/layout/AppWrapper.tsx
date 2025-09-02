@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppSelector } from '../../store/hooks'
 import { BottomNavbar } from './BottomNavbar'
+import { PWAInstallPrompt, IOSInstallPrompt } from '../pwa/PWAInstallPrompt'
 
 export function AppWrapper({ children }: { children: React.ReactNode }) {
   const { user } = useAppSelector((state) => state.auth)
@@ -33,7 +34,13 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
   const isChatPage = pathname.startsWith('/chat/') && pathname !== '/chat'
 
   if (!shouldShowLayout) {
-    return <>{children}</>
+    return (
+      <>
+        {children}
+        <PWAInstallPrompt />
+        <IOSInstallPrompt />
+      </>
+    )
   }
 
   // 全屏页面：聊天、公共角色、作者主页、"我的"页面
@@ -41,6 +48,8 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
     return (
       <div className="h-screen overflow-hidden bg-slate-50">
         {children}
+        <PWAInstallPrompt />
+        <IOSInstallPrompt />
       </div>
     )
   }
@@ -74,6 +83,10 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
 
       {/* 底部导航栏 */}
       <BottomNavbar />
+      
+      {/* PWA安装提示 */}
+      <PWAInstallPrompt />
+      <IOSInstallPrompt />
     </div>
   )
 }

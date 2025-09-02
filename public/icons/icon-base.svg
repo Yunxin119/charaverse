@@ -1,0 +1,40 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景圆形 -->
+  <circle cx="256" cy="256" r="256" fill="url(#gradient)"/>
+  
+  <!-- 主图标 - 聊天气泡和角色 -->
+  <g transform="translate(256, 256)">
+    <!-- 聊天气泡 -->
+    <path d="M-80 -40 C-80 -62.091 -62.091 -80 -40 -80 L40 -80 C62.091 -80 80 -62.091 80 -40 L80 20 C80 42.091 62.091 60 40 60 L-20 60 L-50 80 L-50 60 L-40 60 C-62.091 60 -80 42.091 -80 20 Z" fill="white"/>
+    
+    <!-- 角色头像圈 -->
+    <circle cx="0" cy="-10" r="25" fill="#3b82f6"/>
+    
+    <!-- 简化的面部特征 -->
+    <circle cx="-8" cy="-18" r="3" fill="white"/>
+    <circle cx="8" cy="-18" r="3" fill="white"/>
+    <path d="M-10 -5 Q0 5 10 -5" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+    
+    <!-- 装饰性星星 -->
+    <g transform="translate(60, -60)">
+      <path d="M0 -8 L2 -2 L8 -2 L3 2 L5 8 L0 4 L-5 8 L-3 2 L-8 -2 L-2 -2 Z" fill="#fbbf24"/>
+    </g>
+    
+    <g transform="translate(-70, 40)">
+      <path d="M0 -6 L1.5 -1.5 L6 -1.5 L2.5 1.5 L4 6 L0 3 L-4 6 L-2.5 1.5 L-6 -1.5 L-1.5 -1.5 Z" fill="#f59e0b"/>
+    </g>
+    
+    <!-- 文字/对话装饰 -->
+    <rect x="45" y="-15" width="15" height="2" rx="1" fill="#3b82f6" opacity="0.7"/>
+    <rect x="45" y="-10" width="20" height="2" rx="1" fill="#3b82f6" opacity="0.7"/>
+    <rect x="45" y="-5" width="12" height="2" rx="1" fill="#3b82f6" opacity="0.7"/>
+  </g>
+  
+  <!-- 渐变定义 -->
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea"/>
+      <stop offset="100%" style="stop-color:#764ba2"/>
+    </linearGradient>
+  </defs>
+</svg>

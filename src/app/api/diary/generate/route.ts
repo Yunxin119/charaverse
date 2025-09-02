@@ -47,7 +47,7 @@ ${characterPersonality ? `性格特征：${characterPersonality}` : ''}
 2. 不要只是复述对话，要展现内心的情感和思考
 3. 体现你的性格特征和感受
 4. 日记风格要自然，像真正的个人日记
-5. 字数控制在500-1200字之间，根据对话内容多少、剧情多少和人物性格决定。
+5. 字数控制在1000-2000字之间，根据对话内容多少、剧情多少和人物性格决定。
 6. 不要在开头写"日记"或日期等标题
 
 [最近的对话内容]
@@ -74,6 +74,15 @@ ${conversationText}
 
 // DeepSeek API 调用
 async function callDeepSeek(prompt: string, apiKey: string, model: string): Promise<string> {
+  const maxTokens = 6000
+  
+  console.log('📊 DeepSeek API Call Settings:', {
+    model,
+    inputLength: prompt.length,
+    maxTokensSet: maxTokens,
+    temperature: 0.8
+  })
+  
   const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -86,7 +95,7 @@ async function callDeepSeek(prompt: string, apiKey: string, model: string): Prom
         { role: 'user', content: prompt }
       ],
       temperature: 0.8,
-      max_tokens: 3000,
+      max_tokens: maxTokens,
     }),
   })
 
@@ -96,19 +105,47 @@ async function callDeepSeek(prompt: string, apiKey: string, model: string): Prom
   }
 
   const data = await response.json()
-  return data.choices[0].message.content
+  const content = data.choices[0].message.content
+  
+  // 详细的token使用日志
+  console.log('📊 DeepSeek API Response Usage:', {
+    promptTokens: data.usage?.prompt_tokens || 'N/A',
+    completionTokens: data.usage?.completion_tokens || 'N/A',
+    totalTokens: data.usage?.total_tokens || 'N/A',
+    finishReason: data.choices[0].finish_reason,
+    contentLength: content?.length || 0,
+    maxTokensSet: maxTokens,
+    wasTokenLimited: data.choices[0].finish_reason === 'length'
+  })
+  
+  // 检测是否被截断
+  if (data.choices[0].finish_reason === 'length') {
+    console.warn('⚠️ DeepSeek response was truncated due to length limit!')
+    console.warn(`   Set max_tokens: ${maxTokens}, Used tokens: ${data.usage?.completion_tokens || 'N/A'}`)
+  }
+  
+  return content
 }
 
 // Gemini API 调用
 async function callGemini(prompt: string, apiKey: string, model: string): Promise<string> {
+  const maxTokens = 10000
+  
+  console.log('📊 Gemini API Call Settings:', {
+    model,
+    inputLength: prompt.length,
+    maxTokensSet: maxTokens,
+    temperature: 1.2
+  })
+  
   const requestBody = {
     contents: [{
       role: 'user',
       parts: [{ text: prompt }]
     }],
     generationConfig: {
-      temperature: 0.8,
-      maxOutputTokens: 2000,
+      temperature: 1.2,
+      maxOutputTokens: maxTokens,
     }
   }
 
@@ -176,11 +213,37 @@ async function callGemini(prompt: string, apiKey: string, model: string): Promis
     throw new Error('Gemini API响应中没有文本内容')
   }
 
+  // 详细的token使用日志（Gemini格式）
+  console.log('📊 Gemini API Response Usage:', {
+    promptTokens: data.usageMetadata?.promptTokenCount || 'N/A',
+    completionTokens: data.usageMetadata?.candidatesTokenCount || 'N/A', 
+    totalTokens: data.usageMetadata?.totalTokenCount || 'N/A',
+    finishReason: candidate.finishReason,
+    contentLength: responseText.length,
+    maxTokensSet: maxTokens,
+    wasTokenLimited: candidate.finishReason === 'MAX_TOKENS'
+  })
+  
+  // 检测是否被截断
+  if (candidate.finishReason === 'MAX_TOKENS') {
+    console.warn('⚠️ Gemini response was truncated due to token limit!')
+    console.warn(`   Set max_tokens: ${maxTokens}, Used tokens: ${data.usageMetadata?.candidatesTokenCount || 'N/A'}`)
+  }
+
   return responseText
 }
 
 // OpenAI API 调用
 async function callOpenAI(prompt: string, apiKey: string, model: string): Promise<string> {
+  const maxTokens = 10000
+  
+  console.log('📊 OpenAI API Call Settings:', {
+    model,
+    inputLength: prompt.length,
+    maxTokensSet: maxTokens,
+    temperature: 0.8
+  })
+  
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -193,7 +256,7 @@ async function callOpenAI(prompt: string, apiKey: string, model: string): Promis
         { role: 'user', content: prompt }
       ],
       temperature: 0.8,
-      max_tokens: 1500,
+      max_tokens: maxTokens,
     }),
   })
 
@@ -203,18 +266,40 @@ async function callOpenAI(prompt: string, apiKey: string, model: string): Promis
   }
 
   const data = await response.json()
-  return data.choices[0].message.content
+  const content = data.choices[0].message.content
+  
+  // 详细的token使用日志
+  console.log('📊 OpenAI API Response Usage:', {
+    promptTokens: data.usage?.prompt_tokens || 'N/A',
+    completionTokens: data.usage?.completion_tokens || 'N/A',
+    totalTokens: data.usage?.total_tokens || 'N/A',
+    finishReason: data.choices[0].finish_reason,
+    contentLength: content?.length || 0,
+    maxTokensSet: maxTokens,
+    wasTokenLimited: data.choices[0].finish_reason === 'length'
+  })
+  
+  // 检测是否被截断
+  if (data.choices[0].finish_reason === 'length') {
+    console.warn('⚠️ OpenAI response was truncated due to length limit!')
+    console.warn(`   Set max_tokens: ${maxTokens}, Used tokens: ${data.usage?.completion_tokens || 'N/A'}`)
+  }
+  
+  return content
 }
 
 // 中转API调用（支持OpenAI格式的中转服务）
 async function callRelayAPI(prompt: string, apiKey: string, actualModel: string, baseUrl: string): Promise<string> {
   // 确保baseUrl以/v1结尾
   const apiUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`
+  const maxTokens = 10000
   
-  console.log('📝 Diary Relay API Call:', {
+  console.log('📊 Relay API Call Settings:', {
     apiUrl: `${apiUrl}/chat/completions`,
     actualModel,
-    promptLength: prompt.length,
+    inputLength: prompt.length,
+    maxTokensSet: maxTokens,
+    temperature: 1.2,
     apiKeyPrefix: apiKey.substring(0, 10) + '...'
   })
   
@@ -223,8 +308,8 @@ async function callRelayAPI(prompt: string, apiKey: string, actualModel: string,
     messages: [
       { role: 'user', content: prompt }
     ],
-    temperature: 0.8,
-    max_tokens: 1500,
+    temperature: 1.2,
+    max_tokens: maxTokens,
   }
 
   // 如果actualModel是Gemini 2.5系列，添加thinking配置
@@ -270,7 +355,25 @@ async function callRelayAPI(prompt: string, apiKey: string, actualModel: string,
   }
   
   const content = data.choices[0].message.content
-  console.log('📝 Diary Relay Final Content:', content?.substring(0, 200) + '...')
+  
+  // 详细的token使用日志
+  console.log('📊 Relay API Response Usage:', {
+    promptTokens: data.usage?.prompt_tokens || 'N/A',
+    completionTokens: data.usage?.completion_tokens || 'N/A',
+    totalTokens: data.usage?.total_tokens || 'N/A',
+    finishReason: data.choices[0].finish_reason,
+    contentLength: content?.length || 0,
+    maxTokensSet: maxTokens,
+    wasTokenLimited: data.choices[0].finish_reason === 'length',
+    actualModel,
+    contentPreview: content?.substring(0, 200) + '...'
+  })
+  
+  // 检测是否被截断
+  if (data.choices[0].finish_reason === 'length') {
+    console.warn('⚠️ Relay API response was truncated due to length limit!')
+    console.warn(`   Model: ${actualModel}, Set max_tokens: ${maxTokens}, Used tokens: ${data.usage?.completion_tokens || 'N/A'}`)
+  }
   
   return content
 }
@@ -397,7 +500,9 @@ export async function POST(request: NextRequest) {
 
     console.log('📝 Generated diary content:', {
       length: diaryContent?.length || 0,
-      preview: diaryContent?.substring(0, 100) + '...'
+      preview: diaryContent?.substring(0, 100) + '...',
+      lastChars: diaryContent?.slice(-50) || '',
+      fullContent: diaryContent // 临时调试：输出完整内容
     })
 
     // 7. 保存日记到数据库

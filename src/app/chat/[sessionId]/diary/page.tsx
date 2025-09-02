@@ -625,7 +625,7 @@ export default function DiaryPage() {
                         </div>
                       </CardHeader>
                       <Separator />
-                      <CardContent className="pt-6">
+                      <CardContent className="pt-6 pb-6 overflow-visible min-h-fit">
                         {editingDiaryId === diary.id ? (
                           /* 编辑模式 */
                           <div className="space-y-4">
@@ -666,17 +666,47 @@ export default function DiaryPage() {
                           </div>
                         ) : (
                           /* 正常显示模式 */
-                          <div className="prose prose-sm max-w-none text-slate-700">
-                            {isRegenerating === diary.id ? (
-                              <div className="flex items-center justify-center py-8">
-                                <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                                <span>重新生成中...</span>
+                          <div className="space-y-4">
+                            <div className="prose prose-slate max-w-none text-slate-700 break-words overflow-visible">
+                              {isRegenerating === diary.id ? (
+                                <div className="flex items-center justify-center py-8">
+                                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                                  <span>重新生成中...</span>
+                                </div>
+                              ) : (
+                                <ReactMarkdown 
+                                  remarkPlugins={[remarkGfm]}
+                                  components={{
+                                    p: ({children}) => <p className="mb-4 leading-7 whitespace-pre-wrap">{children}</p>,
+                                    br: () => <br />,
+                                    strong: ({children}) => <strong className="font-semibold text-slate-900">{children}</strong>,
+                                    em: ({children}) => <em className="italic text-slate-800">{children}</em>,
+                                    blockquote: ({children}) => <blockquote className="border-l-4 border-blue-500 pl-4 italic my-4 text-slate-600">{children}</blockquote>,
+                                    h1: ({children}) => <h1 className="text-xl font-bold text-slate-900 mb-3 mt-6 first:mt-0">{children}</h1>,
+                                    h2: ({children}) => <h2 className="text-lg font-semibold text-slate-900 mb-3 mt-5 first:mt-0">{children}</h2>,
+                                    h3: ({children}) => <h3 className="text-base font-semibold text-slate-900 mb-2 mt-4 first:mt-0">{children}</h3>,
+                                    ul: ({children}) => <ul className="list-disc list-inside mb-4 space-y-1">{children}</ul>,
+                                    ol: ({children}) => <ol className="list-decimal list-inside mb-4 space-y-1">{children}</ol>,
+                                    li: ({children}) => <li className="text-slate-700 leading-6">{children}</li>,
+                                    code: ({children}) => <code className="bg-slate-100 px-1 py-0.5 rounded text-sm font-mono text-slate-800">{children}</code>,
+                                    pre: ({children}) => <pre className="bg-slate-100 p-3 rounded overflow-x-auto mb-4">{children}</pre>
+                                  }}
+                                >
+                                  {diary.content}
+                                </ReactMarkdown>
+                              )}
+                            </div>
+                            
+                            {/* 临时调试信息 */}
+                            <details className="text-xs text-slate-500 border-t pt-2">
+                              <summary className="cursor-pointer hover:text-slate-700">调试信息</summary>
+                              <div className="mt-2 space-y-1">
+                                <div>内容长度: {diary.content?.length || 0} 字符</div>
+                                <div>内容结尾: "...{diary.content?.slice(-30)}"</div>
+                                <div>消息ID范围: {diary.source_message_id_start} - {diary.source_message_id_end}</div>
+                                <div>创建时间: {diary.created_at}</div>
                               </div>
-                            ) : (
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {diary.content}
-                              </ReactMarkdown>
-                            )}
+                            </details>
                           </div>
                         )}
                       </CardContent>
