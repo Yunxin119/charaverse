@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Search, 
@@ -12,9 +12,7 @@ import {
   User, 
   Clock,
   Tag,
-  ArrowLeft,
-  Save,
-  X
+  Save
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,13 +21,12 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import {
   DropdownMenu,
@@ -70,12 +67,12 @@ export default function TemplatesPage() {
     name: '',
     template_type: '用户角色设定',
     description: '',
-    content: {} as Record<string, any>,
+    content: {} as Record<string, string>,
     is_public: false
   })
 
   // 加载模板列表
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     try {
       setIsLoading(true)
       const data = viewMode === 'my' 
@@ -87,11 +84,11 @@ export default function TemplatesPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [viewMode, selectedType])
 
   useEffect(() => {
     loadTemplates()
-  }, [viewMode, selectedType])
+  }, [loadTemplates])
 
   // 重置表单
   const resetForm = () => {

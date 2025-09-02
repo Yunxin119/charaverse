@@ -1,13 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { 
   ArrowLeft,
   User,
   MessageCircle,
-  Star,
   Globe,
   Calendar,
   Heart,
@@ -32,7 +31,15 @@ interface Character {
   id: number
   name: string
   avatar_url?: string
-  prompt_template: any
+  prompt_template: {
+    basic_info?: {
+      keywords?: string[]
+      introduction?: string
+      description?: string
+      [key: string]: unknown
+    }
+    [key: string]: unknown
+  }
   likes_count: number
   created_at: string
   is_public: boolean
@@ -47,14 +54,7 @@ export default function UserProfilePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [charactersLoading, setCharactersLoading] = useState(false)
 
-  useEffect(() => {
-    if (id) {
-      loadUserProfile()
-      loadUserCharacters()
-    }
-  }, [id])
-
-  const loadUserProfile = async () => {
+  const loadUserProfile = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -70,9 +70,9 @@ export default function UserProfilePage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [id, router])
 
-  const loadUserCharacters = async () => {
+  const loadUserCharacters = useCallback(async () => {
     setCharactersLoading(true)
     try {
       const { data, error } = await supabase
@@ -89,7 +89,14 @@ export default function UserProfilePage() {
     } finally {
       setCharactersLoading(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    if (id) {
+      loadUserProfile()
+      loadUserCharacters()
+    }
+  }, [id, loadUserProfile, loadUserCharacters])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('zh-CN', {

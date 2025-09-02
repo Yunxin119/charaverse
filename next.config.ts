@@ -149,4 +149,4 @@ export default withPWA({
       }
     }
   ]
-})(nextConfig);
+})(nextConfig as any);
