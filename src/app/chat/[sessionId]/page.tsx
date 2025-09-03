@@ -30,13 +30,15 @@ import { useAppSelector, useAppDispatch } from '../../store/hooks'
 import { 
   fetchCharacter, 
   fetchChatSession, 
-  fetchMessages, 
+  fetchMessages,
+  fetchMoreMessages,
   createChatSession,
   sendMessage,
   regenerateLastMessage,
   editMessage,
   deleteMessage,
   sendNewMessageFrom,
+  resendUserMessage,
   setSelectedModel,
   setSessionTitle,
   clearError
@@ -74,6 +76,9 @@ export default function ChatSessionPage() {
     messages, 
     isLoading, 
     isGenerating, 
+    isLoadingMessages,
+    isLoadingMoreMessages,
+    hasMoreMessages,
     error, 
     selectedModel,
     sessionTitle 
@@ -104,6 +109,7 @@ export default function ChatSessionPage() {
   const [useEnhancedContext, setUseEnhancedContext] = useState(true) // 默认开启智能模式以节省tokens
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const sessionId = params.sessionId as string
   
   // 加载保存的上下文配置
@@ -165,9 +171,41 @@ export default function ChatSessionPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  // 滚动到底部
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    // 只在新消息添加时滚动到底部，不是在加载更多历史消息时
+    if (!isLoadingMoreMessages) {
+      scrollToBottom()
+    }
+  }, [messages, isLoadingMoreMessages])
+
+  // 懒加载：监听滚动事件
+  useEffect(() => {
+    const container = messagesContainerRef.current
+    if (!container || !hasStarted) return
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container
+      
+      // 当滚动到顶部附近时加载更多消息
+      if (scrollTop < 100 && hasMoreMessages && !isLoadingMoreMessages) {
+        const currentScrollHeight = scrollHeight
+        
+        dispatch(fetchMoreMessages({
+          sessionId,
+          offset: messages.length
+        })).then(() => {
+          // 加载完成后，保持滚动位置（防止跳到顶部）
+          const newScrollHeight = container.scrollHeight
+          const scrollDiff = newScrollHeight - currentScrollHeight
+          container.scrollTop = scrollTop + scrollDiff
+        })
+      }
+    }
+
+    container.addEventListener('scroll', handleScroll)
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [sessionId, messages.length, hasMoreMessages, isLoadingMoreMessages, hasStarted, dispatch])
 
   // 加载API配置
   useEffect(() => {
@@ -767,7 +805,7 @@ export default function ChatSessionPage() {
     }
   }
 
-  // 重新发送用户消息（生成AI回复）
+  // 重新发送用户消息（刷新AI回复）
   const handleResendMessage = async (messageId: number) => {
     if (!currentSession || !currentSelectedModel || isGenerating) return
 
@@ -781,33 +819,18 @@ export default function ChatSessionPage() {
     if (!modelConfig.apiKey || !systemPrompt) return
 
     try {
-      if (useEnhancedContext) {
-        await dispatch(sendMessageWithContext({
-          sessionId: currentSession.id,
-          userMessage: userMessage.content,
-          systemPrompt,
-          apiKey: modelConfig.apiKey,
-          model: currentSelectedModel,
-          messages: messages.filter(msg => msg.id !== messageId), // 排除当前消息
-          thinkingBudget: getThinkingBudget(currentSelectedModel),
-          contextConfig,
-          characterName: currentCharacter?.name || '角色',
-          baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
-          actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
-        }))
-      } else {
-        await dispatch(sendMessage({
-          sessionId: currentSession.id,
-          userMessage: userMessage.content,
-          systemPrompt,
-          apiKey: modelConfig.apiKey,
-          model: currentSelectedModel,
-          messages: messages.filter(msg => msg.id !== messageId), // 排除当前消息
-          thinkingBudget: getThinkingBudget(currentSelectedModel),
-          baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
-          actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
-        }))
-      }
+      await dispatch(resendUserMessage({
+        sessionId: currentSession.id,
+        userMessageId: messageId,
+        userContent: userMessage.content,
+        systemPrompt,
+        apiKey: modelConfig.apiKey,
+        model: currentSelectedModel,
+        messages,
+        thinkingBudget: getThinkingBudget(currentSelectedModel),
+        baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
+        actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
+      }))
       
       setSelectedMessageId(null)
     } catch (error) {
@@ -976,6 +999,7 @@ export default function ChatSessionPage() {
         ) : (
           // 消息列表区域
           <div 
+            ref={messagesContainerRef}
             className="h-full overflow-y-auto px-4 py-4 space-y-4"
             onClick={(e) => {
               if (e.target === e.currentTarget) {
@@ -984,6 +1008,23 @@ export default function ChatSessionPage() {
               }
             }}
           >
+            {/* 加载更多历史消息的指示器 */}
+            {isLoadingMoreMessages && (
+              <div className="flex justify-center py-4">
+                <div className="flex items-center space-x-2 text-slate-500">
+                  <div className="w-4 h-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+                  <span className="text-sm">加载历史消息...</span>
+                </div>
+              </div>
+            )}
+            
+            {/* 没有更多消息的提示 */}
+            {!hasMoreMessages && messages.length > 0 && (
+              <div className="flex justify-center py-4">
+                <span className="text-xs text-slate-400">已显示全部消息</span>
+              </div>
+            )}
+            
             <AnimatePresence>
               {messages.map((message, index) => (
                 <motion.div
@@ -1032,7 +1073,10 @@ export default function ChatSessionPage() {
                             <Textarea
                               value={editingContent}
                               onChange={(e) => setEditingContent(e.target.value)}
-                              className="min-h-[100px] resize-none text-sm"
+                              className="min-h-[100px] resize-none text-base"
+                              style={{
+                                fontSize: '16px' // 强制设置16px字体大小防止iOS缩放
+                              }}
                               autoFocus
                               onClick={(e) => e.stopPropagation()} // 双重保护：阻止Textarea的点击事件冒泡
                             />
@@ -1235,8 +1279,13 @@ export default function ChatSessionPage() {
                   ? "输入消息... (Ctrl+Enter发送)"
                   : "输入消息... (Enter发送，Shift+Enter换行)"
               }
-              className="flex-1 resize-none text-sm sm:text-base bg-transparent border-none focus:ring-0 focus:outline-none min-h-[24px] max-h-[120px] px-3 py-1.5"
+              className="flex-1 resize-none text-base bg-transparent border-none focus:ring-0 focus:outline-none min-h-[24px] max-h-[120px] px-3 py-1.5"
               rows={1}
+              style={{
+                fontSize: '16px', // 强制设置16px字体大小防止iOS缩放
+                height: 'auto',
+                minHeight: '24px'
+              }}
               onKeyDown={(e) => {
                 // 检测是否为移动设备
                 const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768
@@ -1257,10 +1306,6 @@ export default function ChatSessionPage() {
                     }
                   }
                 }
-              }}
-              style={{
-                height: 'auto',
-                minHeight: '24px'
               }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement

@@ -144,7 +144,7 @@ export const fetchChatSession = createAsyncThunk(
   }
 )
 
-// 获取聊天消息
+// 获取聊天消息（最新的10条）
 export const fetchMessages = createAsyncThunk(
   'chat/fetchMessages',
   async (sessionId: string) => {
@@ -152,17 +152,18 @@ export const fetchMessages = createAsyncThunk(
       .from('chat_messages')
       .select('*')
       .eq('session_id', sessionId)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false }) // 倒序获取最新的消息
+      .limit(10) // 只获取最新的10条消息
 
     if (error) throw error
-    return data || []
+    return data ? data.reverse() : [] // 翻转顺序以保持时间顺序
   }
 )
 
 // 获取更多历史消息（分页加载）
 export const fetchMoreMessages = createAsyncThunk(
   'chat/fetchMoreMessages',
-  async ({ sessionId, offset, limit = 50 }: { sessionId: string; offset: number; limit?: number }) => {
+  async ({ sessionId, offset, limit = 10 }: { sessionId: string; offset: number; limit?: number }) => {
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
@@ -416,6 +417,115 @@ export const deleteMessage = createAsyncThunk(
     if (error) throw error
 
     return messageId
+  }
+)
+
+// 重新发送用户消息并替换对应的AI回复
+export const resendUserMessage = createAsyncThunk(
+  'chat/resendUserMessage',
+  async ({
+    sessionId,
+    userMessageId,
+    userContent,
+    systemPrompt,
+    apiKey,
+    model,
+    messages,
+    thinkingBudget,
+    baseUrl,
+    actualModel
+  }: {
+    sessionId: string
+    userMessageId: number
+    userContent: string
+    systemPrompt: string
+    apiKey: string
+    model: string
+    messages: ChatMessage[]
+    thinkingBudget?: number
+    baseUrl?: string
+    actualModel?: string
+  }) => {
+    // 构建消息历史（排除当前用户消息及其之后的所有消息）
+    const userMessageIndex = messages.findIndex(msg => msg.id === userMessageId)
+    const messageHistory = messages
+      .slice(0, userMessageIndex) // 只包含用户消息之前的消息
+      .map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+
+    // 添加当前用户消息
+    messageHistory.push({
+      role: 'user',
+      content: userContent
+    })
+
+    // 调用后端API获取AI回复
+    const requestBody: any = {
+      messages: messageHistory,
+      systemPrompt,
+      apiKey,
+      model
+    }
+
+    if (model.includes('gemini-2.5') && thinkingBudget !== undefined) {
+      requestBody.thinkingBudget = thinkingBudget
+    }
+
+    // 添加中转API参数
+    if (baseUrl) {
+      requestBody.baseUrl = baseUrl
+    }
+    if (actualModel) {
+      requestBody.actualModel = actualModel
+    }
+
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to resend user message')
+    }
+
+    const aiResponse = await response.json()
+
+    // 查找该用户消息对应的AI回复
+    const nextAiMessage = messages.find((msg, index) => 
+      index > userMessageIndex && msg.role === 'assistant'
+    )
+
+    if (nextAiMessage) {
+      // 更新现有的AI消息
+      const { data: updatedMsg, error: updateError } = await supabase
+        .from('chat_messages')
+        .update({ content: aiResponse.content })
+        .eq('id', nextAiMessage.id)
+        .select()
+        .single()
+
+      if (updateError) throw updateError
+      return updatedMsg
+    } else {
+      // 如果没有对应的AI回复，创建新的AI消息
+      const { data: newAiMsg, error: newAiMsgError } = await supabase
+        .from('chat_messages')
+        .insert({
+          session_id: sessionId,
+          role: 'assistant',
+          content: aiResponse.content
+        })
+        .select()
+        .single()
+
+      if (newAiMsgError) throw newAiMsgError
+      return newAiMsg
+    }
   }
 )
 
@@ -680,7 +790,7 @@ const chatSlice = createSlice({
       .addCase(fetchMessages.fulfilled, (state, action) => {
         state.isLoadingMessages = false
         state.messages = action.payload
-        state.hasMoreMessages = action.payload.length >= 50 // 如果返回50条或更多，可能还有更多消息
+        state.hasMoreMessages = action.payload.length >= 10 // 如果返回10条，可能还有更多消息
       })
       .addCase(fetchMessages.rejected, (state, action) => {
         state.isLoadingMessages = false
@@ -696,7 +806,7 @@ const chatSlice = createSlice({
         state.isLoadingMoreMessages = false
         // 在消息列表前面添加更早的消息
         state.messages = [...action.payload, ...state.messages]
-        state.hasMoreMessages = action.payload.length >= 50 // 如果返回的消息少于50条，说明没有更多了
+        state.hasMoreMessages = action.payload.length >= 10 // 如果返回的消息少于10条，说明没有更多了
       })
       .addCase(fetchMoreMessages.rejected, (state, action) => {
         state.isLoadingMoreMessages = false
@@ -835,6 +945,28 @@ const chatSlice = createSlice({
       })
       .addCase(deleteMessage.rejected, (state, action) => {
         state.error = action.error.message || 'Failed to delete message'
+      })
+
+      // Resend User Message
+      .addCase(resendUserMessage.pending, (state) => {
+        state.isGenerating = true
+        state.error = null
+      })
+      .addCase(resendUserMessage.fulfilled, (state, action) => {
+        state.isGenerating = false
+        // 更新或添加AI回复消息
+        const existingIndex = state.messages.findIndex(msg => msg.id === action.payload.id)
+        if (existingIndex !== -1) {
+          // 更新现有消息
+          state.messages[existingIndex] = action.payload
+        } else {
+          // 添加新的AI消息
+          state.messages.push(action.payload)
+        }
+      })
+      .addCase(resendUserMessage.rejected, (state, action) => {
+        state.isGenerating = false
+        state.error = action.error.message || 'Failed to resend user message'
       })
 
       // Send New Message From
