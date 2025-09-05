@@ -794,6 +794,11 @@ export default function ChatSessionPage() {
 
   // 处理消息点击
   const handleMessageClick = (messageId: number) => {
+    // 如果当前消息正在编辑，不处理点击事件
+    if (editingMessageId === messageId) {
+      return
+    }
+    
     if (selectedMessageId === messageId) {
       setSelectedMessageId(null)
     } else {
@@ -1235,6 +1240,8 @@ export default function ChatSessionPage() {
                               }}
                               autoFocus
                               onClick={(e) => e.stopPropagation()} // 双重保护：阻止Textarea的点击事件冒泡
+                              onFocus={(e) => e.stopPropagation()} // 防止focus事件冒泡
+                              onMouseDown={(e) => e.stopPropagation()} // 防止mousedown事件冒泡
                             />
                             <div className="flex justify-end space-x-2">
                               <Button 
@@ -1341,7 +1348,7 @@ export default function ChatSessionPage() {
                                     disabled={isGenerating || isGettingInspiration}
                                     className="h-7 px-2 text-xs bg-white border border-slate-200 hover:bg-yellow-50 hover:border-yellow-200 hover:text-yellow-600"
                                   >
-                                    <Lightbulb className={`w-3 h-3 mr-1 ${isGettingInspiration ? 'animate-pulse' : ''}`} />
+                                    <Lightbulb className="w-3 h-3 mr-1" />
                                     灵感
                                   </Button>
                                   <Button
@@ -1440,10 +1447,12 @@ export default function ChatSessionPage() {
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               placeholder={
-                // 检测是否为移动设备
-                /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768
-                  ? "输入消息... (Ctrl+Enter发送)"
-                  : "输入消息... (Enter发送，Shift+Enter换行)"
+                isGettingInspiration 
+                  ? "正在为你生成灵感..." 
+                  : // 检测是否为移动设备
+                    /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768
+                      ? "输入消息... (Ctrl+Enter发送)"
+                      : "输入消息... (Enter发送，Shift+Enter换行)"
               }
               className="flex-1 resize-none text-base bg-transparent border-none focus:ring-0 focus:outline-none min-h-[24px] max-h-[120px] px-3 py-1.5"
               rows={1}
@@ -1479,9 +1488,15 @@ export default function ChatSessionPage() {
                 target.style.height = Math.min(target.scrollHeight, 120) + 'px'
               }}
             />
+            {/* 灵感加载指示器 */}
+            {isGettingInspiration && (
+              <div className="self-end flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 flex-shrink-0">
+                <div className="w-4 h-4 animate-spin rounded-full border-2 border-yellow-500 border-t-transparent" />
+              </div>
+            )}
             <Button
               onClick={handleSendMessage}
-              disabled={!userInput.trim() || isGenerating}
+              disabled={!userInput.trim() || isGenerating || isGettingInspiration}
               className="self-end rounded-full w-8 h-8 sm:w-9 sm:h-9 p-0 flex-shrink-0 bg-blue-500 hover:bg-blue-600 text-white"
             >
               <Send className="w-4 h-4" />
