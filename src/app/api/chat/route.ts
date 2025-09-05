@@ -13,6 +13,7 @@ interface ChatRequest {
   thinkingBudget?: number // 新增thinking budget参数
   baseUrl?: string // 中转API的base URL
   actualModel?: string // 中转API的实际模型名称
+  customUserMessage?: string // 自定义用户消息，用于灵感功能等特殊场景
 }
 
 // DeepSeek API 调用
@@ -43,7 +44,7 @@ async function callDeepSeek(messages: ChatMessage[], systemPrompt: string, apiKe
 }
 
 // Gemini API 调用 - 使用正确的REST API格式，带重试机制
-async function callGemini(messages: ChatMessage[], systemPrompt: string, apiKey: string, model: string, thinkingBudget = 0, retryCount = 0) {
+async function callGemini(messages: ChatMessage[], systemPrompt: string, apiKey: string, model: string, thinkingBudget = 0, retryCount = 0, customUserMessage?: string) {
   const maxRetries = 2
   // 构建Gemini格式的contents数组
   const contents = []
@@ -95,12 +96,14 @@ async function callGemini(messages: ChatMessage[], systemPrompt: string, apiKey:
     throw new Error('No content to send to Gemini API')
   }
   
-  // 检查最后一条消息是否为用户消息，如果不是，添加一个空的用户消息
+  // 检查最后一条消息是否为用户消息，如果不是，添加一个用户消息
   const lastContent = contents[contents.length - 1]
   if (lastContent.role !== 'user') {
+    // 使用自定义用户消息（如灵感功能）或默认的"请继续"
+    const userMessage = customUserMessage || '【请继续。】'
     contents.push({
       role: 'user',
-      parts: [{ text: '【请继续。】' }]
+      parts: [{ text: userMessage }]
     })
   }
 
@@ -345,17 +348,25 @@ async function callOpenAI(messages: ChatMessage[], systemPrompt: string, apiKey:
 }
 
 // 中转API调用（支持OpenAI格式的中转服务）
-async function callRelayAPI(messages: ChatMessage[], systemPrompt: string, apiKey: string, actualModel: string, baseUrl: string, thinkingBudget?: number) {
+async function callRelayAPI(messages: ChatMessage[], systemPrompt: string, apiKey: string, actualModel: string, baseUrl: string, thinkingBudget?: number, customUserMessage?: string) {
   // 确保baseUrl以/v1结尾
   const apiUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`
   
+  // 构建消息数组
+  let apiMessages = [
+    { role: 'system', content: systemPrompt },
+    ...messages
+  ]
+  
+  // 如果有自定义用户消息（如灵感功能），添加到最后
+  if (customUserMessage) {
+    apiMessages.push({ role: 'user', content: customUserMessage })
+  }
+
   // 构建请求体
   const requestBody: Record<string, unknown> = {
     model: actualModel,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      ...messages
-    ],
+    messages: apiMessages,
     temperature: 0.7,
     max_tokens: 4000,
   }
@@ -417,6 +428,7 @@ export async function POST(request: NextRequest) {
     const thinkingBudget = parsedBody.thinkingBudget || 0
     const baseUrl = parsedBody.baseUrl
     const actualModel = parsedBody.actualModel
+    const customUserMessage = parsedBody.customUserMessage
 
     // 添加详细的调试信息
     console.log('API Request Body:', {
@@ -455,11 +467,11 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
-      content = await callRelayAPI(messages, systemPrompt, apiKey, actualModel, baseUrl, thinkingBudget)
+      content = await callRelayAPI(messages, systemPrompt, apiKey, actualModel, baseUrl, thinkingBudget, customUserMessage)
     } else if (model.startsWith('deepseek')) {
       content = await callDeepSeek(messages, systemPrompt, apiKey, model)
     } else if (model.startsWith('gemini')) {
-      content = await callGemini(messages, systemPrompt, apiKey, model, thinkingBudget)
+      content = await callGemini(messages, systemPrompt, apiKey, model, thinkingBudget, 0, customUserMessage)
     } else if (model.startsWith('gpt')) {
       content = await callOpenAI(messages, systemPrompt, apiKey, model)
     } else {

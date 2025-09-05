@@ -19,7 +19,8 @@ import {
   ArrowLeft,
   ChevronRight,
   BookOpen,
-  Trash2
+  Trash2,
+  Lightbulb
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -97,6 +98,7 @@ export default function ChatSessionPage() {
   const [editingContent, setEditingContent] = useState('')
   const [isStartingStory, setIsStartingStory] = useState(false)
   const [chatBackground, setChatBackground] = useState<string | null>(null)
+  const [isGettingInspiration, setIsGettingInspiration] = useState(false)
   
   // 从localStorage加载上下文配置
   const [contextConfig, setContextConfig] = useState({
@@ -922,6 +924,88 @@ export default function ChatSessionPage() {
     }
   }
 
+  // 获取回复灵感
+  const handleGetInspiration = async () => {
+    if (!currentSession || !currentSelectedModel || isGettingInspiration) return
+
+    const systemPrompt = buildSystemPrompt()
+    const modelConfig = getModelConfig(currentSelectedModel)
+    
+    if (!modelConfig.apiKey || !systemPrompt) return
+
+    setIsGettingInspiration(true)
+
+    try {
+      // 获取完整的消息历史
+      const completeMessages = useEnhancedContext 
+        ? messages 
+        : await getCompleteMessageHistory(currentSession.id)
+
+      // 构建灵感提示词
+      const inspirationPrompt = systemPrompt + `\n\n现在，请你跳出${currentCharacter?.name}的角色，如果现在你是用户的角色，你会如何回复？请直接回复，避免任何开场白。`
+
+      // 构建消息历史
+      const messageHistory = completeMessages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+
+      console.log('🔧 获取灵感，使用消息历史:', messageHistory.length, '条消息')
+
+      // 调用API获取灵感
+      const requestBody: any = {
+        messages: messageHistory,
+        systemPrompt: inspirationPrompt,
+        apiKey: modelConfig.apiKey,
+        model: currentSelectedModel,
+        customUserMessage: `现在，请你跳出${currentCharacter?.name}的角色，如果现在你是用户的角色，你会如何回复？请直接回复，避免任何开场白。`
+      }
+
+      // 只有Gemini 2.5系列模型才添加thinkingBudget
+      if (currentSelectedModel.includes('gemini-2.5')) {
+        const thinkingBudget = getThinkingBudget(currentSelectedModel)
+        if (thinkingBudget !== undefined) {
+          requestBody.thinkingBudget = thinkingBudget
+        }
+      }
+
+      // 添加中转API参数
+      if (modelConfig.isRelay) {
+        requestBody.baseUrl = modelConfig.baseUrl
+        requestBody.actualModel = modelConfig.modelName
+      }
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      })
+
+      if (!response.ok) {
+        throw new Error(`获取灵感失败: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      
+      // 将灵感内容设置到输入框
+      if (result.content) {
+        setUserInput(result.content.trim())
+        console.log('✅ 灵感获取成功:', result.content.substring(0, 50) + '...')
+      } else {
+        throw new Error('未获得有效的灵感内容')
+      }
+
+      setSelectedMessageId(null)
+    } catch (error) {
+      console.error('获取灵感失败:', error)
+      alert(`获取灵感失败: ${error}`)
+    } finally {
+      setIsGettingInspiration(false)
+    }
+  }
+
 
   // 检查是否有任何可用的API配置
   const hasAnyApiConfig = () => {
@@ -1249,6 +1333,16 @@ export default function ChatSessionPage() {
                                   >
                                     <MessageSquarePlus className="w-3 h-3 mr-1" />
                                     续写
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleGetInspiration()}
+                                    disabled={isGenerating || isGettingInspiration}
+                                    className="h-7 px-2 text-xs bg-white border border-slate-200 hover:bg-yellow-50 hover:border-yellow-200 hover:text-yellow-600"
+                                  >
+                                    <Lightbulb className={`w-3 h-3 mr-1 ${isGettingInspiration ? 'animate-pulse' : ''}`} />
+                                    灵感
                                   </Button>
                                   <Button
                                     size="sm"
