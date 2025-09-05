@@ -31,6 +31,7 @@ import {
   fetchCharacter, 
   fetchChatSession, 
   fetchMessages,
+  fetchAllMessagesForAPI,
   fetchMoreMessages,
   createChatSession,
   sendMessage,
@@ -38,7 +39,6 @@ import {
   editMessage,
   deleteMessage,
   sendNewMessageFrom,
-  resendUserMessage,
   setSelectedModel,
   setSessionTitle,
   clearError
@@ -171,6 +171,33 @@ export default function ChatSessionPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  // 预处理文本，添加特殊格式高亮
+  const preprocessMessageContent = (content: string): string => {
+    let processedContent = content
+    
+    // 处理各种括号格式 - 深灰色
+    // 处理 () 括号
+    processedContent = processedContent.replace(/\(([^)]+)\)/g, '<span class="text-slate-600 font-medium">($1)</span>')
+    
+    // 处理 （） 中文括号
+    processedContent = processedContent.replace(/（([^）]+)）/g, '<span class="text-slate-600 font-medium">（$1）</span>')
+    
+    // 处理 [] 方括号
+    processedContent = processedContent.replace(/\[([^\]]+)\]/g, '<span class="text-slate-600 font-medium">[$1]</span>')
+    
+    // 处理 【】 中文方括号
+    processedContent = processedContent.replace(/【([^】]+)】/g, '<span class="text-slate-600 font-medium">【$1】</span>')
+    
+    // 处理引号格式 - 深蓝色
+    // 处理 "" 英文双引号
+    processedContent = processedContent.replace(/"([^"]+)"/g, '<span class="text-blue-700 font-semibold">"$1"</span>')
+    
+    // 处理 "" 中文双引号
+    processedContent = processedContent.replace(/"([^"]+)"/g, '<span class="text-blue-700 font-semibold">"$1"</span>')
+    
+    return processedContent
+  }
+
   // 滚动到底部
   useEffect(() => {
     // 只在新消息添加时滚动到底部，不是在加载更多历史消息时
@@ -191,9 +218,13 @@ export default function ChatSessionPage() {
       if (scrollTop < 100 && hasMoreMessages && !isLoadingMoreMessages) {
         const currentScrollHeight = scrollHeight
         
+        // 获取最早消息的时间戳
+        const earliestMessage = messages[0]
+        const beforeTimestamp = earliestMessage?.created_at
+        
         dispatch(fetchMoreMessages({
           sessionId,
-          offset: messages.length
+          beforeTimestamp
         })).then(() => {
           // 加载完成后，保持滚动位置（防止跳到顶部）
           const newScrollHeight = container.scrollHeight
@@ -274,6 +305,8 @@ export default function ChatSessionPage() {
         }
       } else {
         const session = await dispatch(fetchChatSession(sessionId)).unwrap()
+        
+        // UI层面始终使用lazy loading（只显示10条），避免性能问题
         dispatch(fetchMessages(sessionId))
         
         if (session.character_id) {
@@ -333,6 +366,19 @@ export default function ChatSessionPage() {
       window.removeEventListener('chatBackgroundChanged', handleCustomBackgroundChange as EventListener)
     }
   }, [sessionId])
+
+  // 获取完整的消息历史用于API调用（非智能模式下使用）
+  const getCompleteMessageHistory = async (sessionId: string) => {
+    try {
+      const result = await dispatch(fetchAllMessagesForAPI(sessionId)).unwrap()
+      console.log('🔧 获取完整消息历史:', result.length, '条消息')
+      return result
+    } catch (error) {
+      console.error('获取完整消息历史失败:', error)
+      // 如果获取失败，退回到使用当前UI显示的消息
+      return messages
+    }
+  }
 
   // 构建系统提示
   const buildSystemPrompt = () => {
@@ -600,13 +646,16 @@ export default function ChatSessionPage() {
           actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
         }))
       } else {
+        // 非智能模式：获取并使用完整的消息历史
+        const completeMessages = await getCompleteMessageHistory(currentSession.id)
+        console.log('🔧 非智能模式发送消息，使用完整历史:', completeMessages.length, '条消息')
         await dispatch(sendMessage({
           sessionId: currentSession.id,
           userMessage: messageToSend,
           systemPrompt,
           apiKey: modelConfig.apiKey,
           model: currentSelectedModel,
-          messages,
+          messages: completeMessages, // 使用完整的消息历史
           thinkingBudget: getThinkingBudget(currentSelectedModel),
           baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
           actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
@@ -646,13 +695,15 @@ export default function ChatSessionPage() {
           actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
         }))
       } else {
-        // 使用原有的重新生成方式
+        // 非智能模式：获取并使用完整的消息历史
+        const completeMessages = await getCompleteMessageHistory(currentSession.id)
+        console.log('🔧 非智能模式重新生成，使用完整历史:', completeMessages.length, '条消息')
         await dispatch(regenerateLastMessage({
           sessionId: currentSession.id,
           systemPrompt,
           apiKey: modelConfig.apiKey,
           model: currentSelectedModel,
-          messages,
+          messages: completeMessages, // 使用完整的消息历史
           lastMessageId: messageId,
           thinkingBudget: getThinkingBudget(currentSelectedModel),
           baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
@@ -805,7 +856,7 @@ export default function ChatSessionPage() {
     }
   }
 
-  // 重新发送用户消息（刷新AI回复）
+  // 重新发送用户消息（使用原有的sendMessage逻辑）
   const handleResendMessage = async (messageId: number) => {
     if (!currentSession || !currentSelectedModel || isGenerating) return
 
@@ -819,18 +870,39 @@ export default function ChatSessionPage() {
     if (!modelConfig.apiKey || !systemPrompt) return
 
     try {
-      await dispatch(resendUserMessage({
-        sessionId: currentSession.id,
-        userMessageId: messageId,
-        userContent: userMessage.content,
-        systemPrompt,
-        apiKey: modelConfig.apiKey,
-        model: currentSelectedModel,
-        messages,
-        thinkingBudget: getThinkingBudget(currentSelectedModel),
-        baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
-        actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
-      }))
+      if (useEnhancedContext) {
+        await dispatch(sendMessageWithContext({
+          sessionId: currentSession.id,
+          userMessage: userMessage.content,
+          systemPrompt,
+          apiKey: modelConfig.apiKey,
+          model: currentSelectedModel,
+          messages: messages.filter(msg => msg.id !== messageId), // 排除当前消息
+          thinkingBudget: getThinkingBudget(currentSelectedModel),
+          contextConfig,
+          characterName: currentCharacter?.name || '角色',
+          baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
+          actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
+        }))
+      } else {
+        // 非智能模式：获取完整历史，然后找到当前消息位置，使用其之前的消息
+        const completeMessages = await getCompleteMessageHistory(currentSession.id)
+        const messageIndex = completeMessages.findIndex(msg => msg.id === messageId)
+        const historyMessages = messageIndex > 0 ? completeMessages.slice(0, messageIndex) : []
+        
+        console.log('🔧 非智能模式重新发送，使用完整历史中的前', historyMessages.length, '条消息')
+        await dispatch(sendMessage({
+          sessionId: currentSession.id,
+          userMessage: userMessage.content,
+          systemPrompt,
+          apiKey: modelConfig.apiKey,
+          model: currentSelectedModel,
+          messages: historyMessages, // 使用完整历史中当前消息之前的部分
+          thinkingBudget: getThinkingBudget(currentSelectedModel),
+          baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
+          actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
+        }))
+      }
       
       setSelectedMessageId(null)
     } catch (error) {
@@ -1112,8 +1184,8 @@ export default function ChatSessionPage() {
                             <ReactMarkdown
                               remarkPlugins={[remarkGfm]}
                               components={{
-                                p: ({children}) => <p className="mb-2 last:mb-0 whitespace-pre-wrap text-sm sm:text-base leading-relaxed">{children}</p>,
-                                br: () => <br />,
+                                p: ({children}) => <p className="mb-1 last:mb-0 whitespace-pre-wrap text-sm sm:text-base leading-normal">{children}</p>,
+                                br: () => <br className="leading-tight" />,
                                 code: ({children, className}) => {
                                   const isInline = !className
                                   return isInline ? (
@@ -1129,7 +1201,7 @@ export default function ChatSessionPage() {
                               }}
                               skipHtml={false}
                             >
-                              {message.content.replace(/\n/g, '  \n')}
+                              {message.content}
                             </ReactMarkdown>
                           </div>
                         )}

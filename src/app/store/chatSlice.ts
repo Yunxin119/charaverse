@@ -144,7 +144,7 @@ export const fetchChatSession = createAsyncThunk(
   }
 )
 
-// 获取聊天消息（最新的10条）
+// 获取聊天消息（用于UI显示，固定10条进行lazy loading）
 export const fetchMessages = createAsyncThunk(
   'chat/fetchMessages',
   async (sessionId: string) => {
@@ -153,23 +153,53 @@ export const fetchMessages = createAsyncThunk(
       .select('*')
       .eq('session_id', sessionId)
       .order('created_at', { ascending: false }) // 倒序获取最新的消息
-      .limit(10) // 只获取最新的10条消息
+      .limit(10) // 只获取最新的10条消息用于UI显示
 
     if (error) throw error
     return data ? data.reverse() : [] // 翻转顺序以保持时间顺序
   }
 )
 
-// 获取更多历史消息（分页加载）
-export const fetchMoreMessages = createAsyncThunk(
-  'chat/fetchMoreMessages',
-  async ({ sessionId, offset, limit = 10 }: { sessionId: string; offset: number; limit?: number }) => {
+// 获取完整的消息历史（用于API调用，不限制数量）
+export const fetchAllMessagesForAPI = createAsyncThunk(
+  'chat/fetchAllMessagesForAPI',
+  async (sessionId: string) => {
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
       .eq('session_id', sessionId)
+      .order('created_at', { ascending: true }) // 正序获取完整历史
+
+    if (error) throw error
+    return data || []
+  }
+)
+
+// 获取更多历史消息（分页加载）
+export const fetchMoreMessages = createAsyncThunk(
+  'chat/fetchMoreMessages',
+  async ({ 
+    sessionId, 
+    beforeTimestamp, 
+    limit = 10 
+  }: { 
+    sessionId: string; 
+    beforeTimestamp?: string;
+    limit?: number;
+  }) => {
+    let query = supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('session_id', sessionId)
       .order('created_at', { ascending: false }) // 倒序获取更早的消息
-      .range(offset, offset + limit - 1)
+      .limit(limit)
+
+    // 如果提供了时间戳，则获取该时间戳之前的消息
+    if (beforeTimestamp) {
+      query = query.lt('created_at', beforeTimestamp)
+    }
+
+    const { data, error } = await query
 
     if (error) throw error
     return data ? data.reverse() : [] // 翻转顺序以保持时间顺序
@@ -790,11 +820,20 @@ const chatSlice = createSlice({
       .addCase(fetchMessages.fulfilled, (state, action) => {
         state.isLoadingMessages = false
         state.messages = action.payload
-        state.hasMoreMessages = action.payload.length >= 10 // 如果返回10条，可能还有更多消息
+        state.hasMoreMessages = action.payload.length === 10 // 如果返回等于10条，可能还有更多消息
       })
       .addCase(fetchMessages.rejected, (state, action) => {
         state.isLoadingMessages = false
         state.error = action.error.message || 'Failed to fetch messages'
+      })
+
+      // Fetch All Messages For API (不更新UI状态，只用于获取完整历史)
+      .addCase(fetchAllMessagesForAPI.fulfilled, (state, action) => {
+        // 这个action不需要更新UI状态，只是为了获取完整的消息历史
+        // 实际使用时会在组件中直接使用返回的数据
+      })
+      .addCase(fetchAllMessagesForAPI.rejected, (state, action) => {
+        console.error('Failed to fetch all messages for API:', action.error.message)
       })
 
       // Fetch More Messages
@@ -806,7 +845,7 @@ const chatSlice = createSlice({
         state.isLoadingMoreMessages = false
         // 在消息列表前面添加更早的消息
         state.messages = [...action.payload, ...state.messages]
-        state.hasMoreMessages = action.payload.length >= 10 // 如果返回的消息少于10条，说明没有更多了
+        state.hasMoreMessages = action.payload.length === 10 // 如果返回的消息等于10条，可能还有更多
       })
       .addCase(fetchMoreMessages.rejected, (state, action) => {
         state.isLoadingMoreMessages = false

@@ -19,7 +19,8 @@ import {
   Save,
   RefreshCw,
   Trash2,
-  X
+  X,
+  LogOut
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -30,7 +31,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useAppSelector } from '../store/hooks'
+import { useAppSelector, useAppDispatch } from '../store/hooks'
+import { signOut } from '../store/authSlice'
 import { supabase } from '../lib/supabase'
 import UserBanner from '../components/UserBanner'
 import { BottomNavbar } from '../components/layout/BottomNavbar'
@@ -77,6 +79,7 @@ interface NamedRelayConfig {
 
 export default function MyPage() {
   const { user } = useAppSelector((state) => state.auth)
+  const dispatch = useAppDispatch()
   const router = useRouter()
   
   const [profile, setProfile] = useState<UserProfile>({
@@ -484,6 +487,19 @@ export default function MyPage() {
     }))
   }
 
+  // 退出登录处理函数
+  const handleSignOut = async () => {
+    if (confirm('确定要退出登录吗？')) {
+      try {
+        await dispatch(signOut()).unwrap()
+        router.push('/login')
+      } catch (error) {
+        console.error('退出登录失败:', error)
+        alert('退出登录失败，请重试')
+      }
+    }
+  }
+
   const toggleShowKey = (provider: string) => {
     setShowKeys(prev => ({
       ...prev,
@@ -705,6 +721,33 @@ export default function MyPage() {
                         </Button>
                       </div>
                     )}
+                  </CardContent>
+                </Card>
+
+                {/* 账户管理 */}
+                <Card className="shadow-lg border-slate-200 border-red-100 bg-gradient-to-r from-red-50/50 to-orange-50/50">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg flex items-center space-x-2 text-red-700">
+                      <Shield className="w-5 h-5" />
+                      <span>账户安全</span>
+                    </CardTitle>
+                    <p className="text-sm text-red-600">管理你的账户安全设置</p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-white rounded-lg border border-red-200">
+                      <div className="mb-4 sm:mb-0">
+                        <h4 className="font-medium text-slate-900 mb-1">退出登录</h4>
+                        <p className="text-sm text-slate-600">安全退出当前账户</p>
+                      </div>
+                      <Button
+                        onClick={handleSignOut}
+                        variant="outline"
+                        className="w-full sm:w-auto border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        退出登录
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
