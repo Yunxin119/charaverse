@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { Info } from 'lucide-react'
 import { 
   User, 
   Lock, 
@@ -20,7 +21,10 @@ import {
   RefreshCw,
   Trash2,
   X,
-  LogOut
+  LogOut,
+  Sun,
+  Moon,
+  Monitor
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -39,6 +43,7 @@ import { BottomNavbar } from '../components/layout/BottomNavbar'
 import { AvatarUpload } from '../components/AvatarUpload'
 import { uploadUserAvatar } from '../lib/avatarUpload'
 import { useRouter } from 'next/navigation'
+import { useTheme } from '../contexts/ThemeContext'
 
 interface UserProfile {
   username: string
@@ -81,6 +86,7 @@ export default function MyPage() {
   const { user } = useAppSelector((state) => state.auth)
   const dispatch = useAppDispatch()
   const router = useRouter()
+  const { theme, setTheme } = useTheme()
   
   const [profile, setProfile] = useState<UserProfile>({
     username: '',
@@ -545,11 +551,11 @@ export default function MyPage() {
 
   if (isLoading) {
     return (
-      <div className="h-screen bg-slate-50 flex flex-col">
+      <div className="h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-4">
-            <Loader2 className="w-8 h-8 mx-auto animate-spin text-slate-900" />
-            <p className="text-slate-600">加载中...</p>
+            <Loader2 className="w-8 h-8 mx-auto animate-spin text-slate-900 dark:text-white" />
+            <p className="text-slate-600 dark:text-slate-300">加载中...</p>
           </div>
         </div>
         <BottomNavbar />
@@ -558,9 +564,9 @@ export default function MyPage() {
   }
 
   return (
-    <div className="h-screen bg-slate-50 flex flex-col">
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-4 py-6 pb-28 space-y-6">
+    <div className="h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
+      <main className="flex-1 overflow-y-auto bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+        <div className="max-w-5xl mx-auto px-4 py-8 pb-32 space-y-8">
           {/* 用户Banner */}
           <UserBanner
             username={profile.username || user?.email?.split('@')[0] || '用户'}
@@ -573,41 +579,47 @@ export default function MyPage() {
           />
 
           {/* Tab导航 */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.3 }}
-          >
+          <div className="w-full">
             <Tabs defaultValue="profile" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3 bg-white shadow-sm rounded-xl p-1">
-                <TabsTrigger 
-                  value="profile" 
-                  className="flex items-center space-x-2 rounded-lg font-medium"
-                >
-                  <User className="w-4 h-4" />
-                  <span className="hidden sm:inline">个人资料</span>
-                  <span className="sm:hidden">资料</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="characters" 
-                  className="flex items-center space-x-2 rounded-lg font-medium"
-                >
-                  <Globe className="w-4 h-4" />
-                  <span className="hidden sm:inline">公开角色</span>
-                  <span className="sm:hidden">角色</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="api" 
-                  className="flex items-center space-x-2 rounded-lg font-medium"
-                >
-                  <Lock className="w-4 h-4" />
-                  <span className="hidden sm:inline">API密钥</span>
-                  <span className="sm:hidden">API</span>
-                </TabsTrigger>
+              <div className="w-full overflow-x-auto">
+                <TabsList className="inline-flex h-12 items-center justify-center rounded-xl bg-white/90 dark:bg-slate-800/90 p-1 text-slate-500 dark:text-slate-400 shadow-lg border border-slate-200 dark:border-slate-700 w-full min-w-max">
+                  <TabsTrigger 
+                    value="profile" 
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-slate-900 data-[state=active]:text-slate-50 dark:data-[state=active]:bg-slate-50 dark:data-[state=active]:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700 flex-1 min-w-0"
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    <span className="hidden sm:inline">个人资料</span>
+                    <span className="sm:hidden">资料</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="characters"
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-slate-900 data-[state=active]:text-slate-50 dark:data-[state=active]:bg-slate-50 dark:data-[state=active]:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700 flex-1 min-w-0"
+                  >
+                    <Globe className="w-4 h-4 mr-2" />
+                    <span className="hidden sm:inline">公开角色</span>
+                    <span className="sm:hidden">角色</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="api"
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-slate-900 data-[state=active]:text-slate-50 dark:data-[state=active]:bg-slate-50 dark:data-[state=active]:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700 flex-1 min-w-0"
+                  >
+                    <Lock className="w-4 h-4 mr-2" />
+                    <span className="hidden sm:inline">API密钥</span>
+                    <span className="sm:hidden">API</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="appearance"
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-slate-900 data-[state=active]:text-slate-50 dark:data-[state=active]:bg-slate-50 dark:data-[state=active]:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700 flex-1 min-w-0"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    <span className="hidden sm:inline">外观设置</span>
+                    <span className="sm:hidden">外观</span>
+                  </TabsTrigger>
               </TabsList>
+              </div>
 
               {/* 个人资料Tab */}
-              <TabsContent value="profile" className="space-y-4">
+              <TabsContent value="profile" className="space-y-6">
                 <Card className="shadow-lg border-slate-200">
                   <CardHeader className="pb-4">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
@@ -753,7 +765,7 @@ export default function MyPage() {
               </TabsContent>
 
               {/* 公开角色Tab */}
-              <TabsContent value="characters" className="space-y-4">
+              <TabsContent value="characters" className="space-y-6">
                 {charactersLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="w-6 h-6 animate-spin text-slate-600" />
@@ -784,7 +796,7 @@ export default function MyPage() {
                         transition={{ duration: 0.3 }}
                         whileHover={{ y: -2 }}
                       >
-                        <Card className="hover:shadow-lg transition-all duration-200">
+                        <Card className="hover:shadow-lg transition-all duration-200 dark:bg-slate-800 dark:border-slate-700">
                           <CardContent className="p-4">
                             <div className="flex items-start space-x-3 mb-4">
                               <Avatar className="w-12 h-12">
@@ -794,10 +806,10 @@ export default function MyPage() {
                                 </AvatarFallback>
                               </Avatar>
                               <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-slate-900 truncate">
+                                <h3 className="font-semibold text-slate-900 dark:text-white truncate">
                                   {character.name}
                                 </h3>
-                                <div className="flex items-center space-x-2 text-xs text-slate-500">
+                                <div className="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400">
                                   <Calendar className="w-3 h-3" />
                                   <span>{formatDate(character.created_at)}</span>
                                 </div>
@@ -806,7 +818,7 @@ export default function MyPage() {
 
                             {/* 角色介绍 */}
                             <div className="mb-3">
-                              <p className="text-sm text-slate-600 line-clamp-2">
+                              <p className="text-sm text-slate-600 dark:text-slate-300 line-clamp-2">
                                 {character.prompt_template?.basic_info?.introduction || 
                                  character.prompt_template?.basic_info?.description || 
                                  '这个角色还没有添加介绍...'}
@@ -826,7 +838,7 @@ export default function MyPage() {
                                     </span>
                                   ))}
                                   {getCharacterKeywords(character).length > 3 && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
                                       +{getCharacterKeywords(character).length - 3}
                                     </span>
                                   )}
@@ -835,7 +847,7 @@ export default function MyPage() {
                             )}
 
                             {/* 统计信息 */}
-                            <div className="flex items-center justify-between text-sm text-slate-500">
+                            <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
                               <div className="flex items-center space-x-3">
                                 <div className="flex items-center space-x-1">
                                   <Heart className="w-3 h-3" />
@@ -913,12 +925,12 @@ export default function MyPage() {
                       <div className="space-y-3">
                         <h4 className="text-sm font-medium text-slate-700">已配置的中转服务</h4>
                         {namedRelayConfigs.map((config) => (
-                          <div key={config.id} className="bg-white border border-slate-200 rounded-lg p-4">
+                          <div key={config.id} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4">
                             {editingRelayId === config.id ? (
                               // 编辑表单
                               <div className="space-y-4">
                                 <div className="flex items-center justify-between">
-                                  <h4 className="text-sm font-medium text-slate-700">编辑配置</h4>
+                                  <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">编辑配置</h4>
                                   <Button
                                     onClick={handleCancelEditRelay}
                                     variant="ghost"
@@ -1064,9 +1076,9 @@ export default function MyPage() {
                               <>
                                 <div className="flex items-center justify-between mb-2">
                                   <div>
-                                    <h5 className="font-medium text-slate-900">{config.name}</h5>
+                                    <h5 className="font-medium text-slate-900 dark:text-white">{config.name}</h5>
                                     {config.description && (
-                                      <p className="text-sm text-slate-600">{config.description}</p>
+                                      <p className="text-sm text-slate-600 dark:text-slate-300">{config.description}</p>
                                     )}
                                   </div>
                                   <div className="flex space-x-2">
@@ -1090,16 +1102,16 @@ export default function MyPage() {
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
                                   <div>
-                                    <span className="text-slate-500">URL:</span>
-                                    <span className="ml-1 font-mono text-xs">{config.baseUrl}</span>
+                                    <span className="text-slate-500 dark:text-slate-400">URL:</span>
+                                    <span className="ml-1 font-mono text-xs dark:text-slate-300">{config.baseUrl}</span>
                                   </div>
                                   <div>
-                                    <span className="text-slate-500">模型:</span>
-                                    <span className="ml-1">{config.modelName}</span>
+                                    <span className="text-slate-500 dark:text-slate-400">模型:</span>
+                                    <span className="ml-1 dark:text-slate-300">{config.modelName}</span>
                                   </div>
                                   <div>
-                                    <span className="text-slate-500">密钥:</span>
-                                    <span className="ml-1 font-mono text-xs">{config.apiKey.substring(0, 8)}...</span>
+                                    <span className="text-slate-500 dark:text-slate-400">密钥:</span>
+                                    <span className="ml-1 font-mono text-xs dark:text-slate-300">{config.apiKey.substring(0, 8)}...</span>
                                   </div>
                                 </div>
                                 {config.supportsThinking && (
@@ -1107,7 +1119,7 @@ export default function MyPage() {
                                     <div className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs flex items-center">
                                       🧠 Thinking
                                     </div>
-                                    <div className="text-xs text-slate-600">
+                                    <div className="text-xs text-slate-600 dark:text-slate-400">
                                       {config.thinkingBudgetMode === 'manual' 
                                         ? `手动: ${config.thinkingBudget || 0} tokens`
                                         : '自动模式'
@@ -1363,8 +1375,75 @@ export default function MyPage() {
                   ))}
                 </div>
               </TabsContent>
+
+              {/* 外观设置Tab */}
+              <TabsContent value="appearance" className="space-y-6">
+                <Card className="shadow-lg border-slate-200 dark:border-slate-700">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                        <Settings className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg text-slate-900 dark:text-white">
+                          外观设置
+                        </CardTitle>
+                        <p className="text-slate-600 dark:text-slate-400 text-sm">自定义您的应用外观和主题</p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-6">
+                    <div className="space-y-6">
+                      <div className="text-center">
+                        <Label className="text-lg font-semibold text-slate-900 dark:text-white">主题模式</Label>
+                        <p className="text-slate-600 dark:text-slate-400 text-sm mt-2">选择您偏好的主题外观</p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        {[
+                          { value: 'light', icon: Sun, label: '浅色' },
+                          { value: 'dark', icon: Moon, label: '深色' },
+                          { value: 'system', icon: Monitor, label: '跟随系统' }
+                        ].map((option) => {
+                          const Icon = option.icon
+                          const isSelected = theme === option.value
+                          return (
+                            <Button
+                              key={option.value}
+                              variant={isSelected ? "default" : "outline"}
+                              className={`h-16 flex flex-col items-center justify-center space-y-2 transition-all duration-200 rounded-lg ${
+                                isSelected 
+                                  ? 'bg-slate-900 text-white dark:bg-slate-50 dark:text-slate-900' 
+                                  : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                              }`}
+                              onClick={() => setTheme(option.value as any)}
+                            >
+                              <Icon className="w-5 h-5" />
+                              <span className="text-sm font-medium">{option.label}</span>
+                            </Button>
+                          )
+                        })}
+                      </div>
+                      <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                        <div className="flex items-start space-x-3">
+                          <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-700">
+                            <Info className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-slate-900 dark:text-white">主题设置说明</p>
+                            <div className="text-sm text-slate-700 dark:text-slate-300 space-y-1">
+                              <p><strong>浅色模式：</strong>适合光线充足的环境，经典的白色界面</p>
+                              <p><strong>深色模式：</strong>适合光线较暗的环境，护眼且省电</p>
+                              <p><strong>跟随系统：</strong>根据设备系统设置自动切换，智能适配</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
             </Tabs>
-          </motion.div>
+          </div>
         </div>
       </main>
 

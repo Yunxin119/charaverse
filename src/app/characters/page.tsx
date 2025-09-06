@@ -310,7 +310,7 @@ export default function CharactersPage() {
               variants={itemVariants}
               custom={index}
             >
-              <Card className="hover:shadow-lg transition-all duration-200 group border-slate-200/60">
+              <Card className="hover:shadow-lg transition-all duration-200 group border-slate-200/60 dark:border-slate-700 dark:bg-slate-800">
                 <CardContent className="p-4 sm:p-6">
                   {/* Character Header */}
                   <div className="flex items-start justify-between mb-4">
@@ -322,10 +322,10 @@ export default function CharactersPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-slate-900 truncate text-base sm:text-lg">
+                        <h3 className="font-semibold text-slate-900 dark:text-white truncate text-base sm:text-lg">
                           {character.name}
                         </h3>
-                        <div className="flex items-center space-x-2 text-xs text-slate-500 mt-1">
+                        <div className="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400 mt-1">
                           <Calendar className="w-3 h-3" />
                           <span>{formatDate(character.created_at)}</span>
                         </div>
@@ -374,7 +374,7 @@ export default function CharactersPage() {
                   <div className="mb-4 space-y-3">
                     {/* 角色说明 */}
                     <div>
-                      <p className="text-sm text-slate-700 line-clamp-3 leading-relaxed">
+                      <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-3 leading-relaxed">
                         {character.prompt_template?.basic_info?.introduction || 
                          character.prompt_template?.basic_info?.description || 
                          '这个角色还没有添加说明...'}
@@ -387,13 +387,13 @@ export default function CharactersPage() {
                         {getCharacterKeywords(character).slice(0, 4).map((keyword: string, idx: number) => (
                           <span
                             key={idx}
-                            className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100"
+                            className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800"
                           >
                             {keyword}
                           </span>
                         ))}
                         {getCharacterKeywords(character).length > 4 && (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600">
                             +{getCharacterKeywords(character).length - 4}
                           </span>
                         )}
@@ -402,15 +402,15 @@ export default function CharactersPage() {
                   </div>
 
                   {/* Status and Actions */}
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-700">
                     <div className="flex items-center space-x-2">
                       {character.is_public ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
                           <Globe className="w-3 h-3 mr-1" />
                           公开
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-50 text-slate-600 border border-slate-200">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
                           <Lock className="w-3 h-3 mr-1" />
                           私人
                         </span>

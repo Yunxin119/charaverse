@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { signIn, signUp, clearError } from '../store/authSlice'
-import { Loader2, Mail, Lock, User, Sparkles } from 'lucide-react'
+import { Loader2, Mail, Lock, User, Sparkles, Eye, EyeOff } from 'lucide-react'
 
 export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false)
@@ -17,6 +17,8 @@ export default function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   
   const dispatch = useAppDispatch()
   const { user, loading, error } = useAppSelector((state) => state.auth)
@@ -88,7 +90,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center p-4">
       <motion.div
         variants={containerVariants}
         initial="hidden"
@@ -100,21 +102,21 @@ export default function LoginPage() {
           variants={logoVariants}
           className="text-center mb-8"
         >
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 mb-4 shadow-lg">
-            <Sparkles className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 dark:from-slate-100 dark:to-slate-300 mb-4 shadow-lg">
+            <Sparkles className="w-8 h-8 text-white dark:text-slate-900" />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">CharaVerse</h1>
-          <p className="text-slate-600">进入你的 AI 角色扮演宇宙</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">CharaVerse</h1>
+          <p className="text-slate-600 dark:text-slate-400">进入你的 AI 角色扮演宇宙</p>
         </motion.div>
 
         <motion.div variants={itemVariants}>
-          <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
+          <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
             <CardHeader className="space-y-4 pb-6">
               <div className="text-center">
-                <CardTitle className="text-2xl font-semibold text-slate-900">
+                <CardTitle className="text-2xl font-semibold text-slate-900 dark:text-white">
                   {isSignUp ? '创建账户' : '欢迎回来'}
                 </CardTitle>
-                <CardDescription className="text-slate-600 mt-2">
+                <CardDescription className="text-slate-600 dark:text-slate-400 mt-2">
                   {isSignUp 
                     ? '开始你在 AI 宇宙中的旅程' 
                     : '登录以继续你的冒险'
@@ -126,17 +128,17 @@ export default function LoginPage() {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-5">
                 <motion.div variants={itemVariants} className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-slate-700">
+                  <Label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     邮箱地址
                   </Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
                     <Input
                       id="email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10 h-12 border-slate-200 focus:border-slate-400 focus:ring-slate-400 bg-white/50"
+                      className="pl-10 h-12 border-slate-200 dark:border-slate-600 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-slate-400 dark:focus:ring-slate-500 bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                       placeholder="your@email.com"
                       required
                     />
@@ -150,17 +152,17 @@ export default function LoginPage() {
                     animate="visible"
                     className="space-y-2"
                   >
-                    <Label htmlFor="username" className="text-sm font-medium text-slate-700">
+                    <Label htmlFor="username" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                       用户名
                     </Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
                       <Input
                         id="username"
                         type="text"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
-                        className="pl-10 h-12 border-slate-200 focus:border-slate-400 focus:ring-slate-400 bg-white/50"
+                        className="pl-10 h-12 border-slate-200 dark:border-slate-600 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-slate-400 dark:focus:ring-slate-500 bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                         placeholder="设置你的用户名"
                         required={isSignUp}
                       />
@@ -169,20 +171,33 @@ export default function LoginPage() {
                 )}
 
                 <motion.div variants={itemVariants} className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium text-slate-700">
+                  <Label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     密码
                   </Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
                     <Input
                       id="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 h-12 border-slate-200 focus:border-slate-400 focus:ring-slate-400 bg-white/50"
+                      className="pl-10 pr-10 h-12 border-slate-200 dark:border-slate-600 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-slate-400 dark:focus:ring-slate-500 bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                       placeholder="输入您的密码"
                       required
                     />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1/2 transform -translate-y-1/2 h-10 w-10 p-0 hover:bg-slate-100 dark:hover:bg-slate-600"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                      ) : (
+                        <Eye className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                      )}
+                    </Button>
                   </div>
                 </motion.div>
 
@@ -193,23 +208,36 @@ export default function LoginPage() {
                     animate="visible"
                     className="space-y-2"
                   >
-                    <Label htmlFor="confirmPassword" className="text-sm font-medium text-slate-700">
+                    <Label htmlFor="confirmPassword" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                       确认密码
                     </Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
                       <Input
                         id="confirmPassword"
-                        type="password"
+                        type={showConfirmPassword ? "text" : "password"}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="pl-10 h-12 border-slate-200 focus:border-slate-400 focus:ring-slate-400 bg-white/50"
+                        className="pl-10 pr-10 h-12 border-slate-200 dark:border-slate-600 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-slate-400 dark:focus:ring-slate-500 bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                         placeholder="确认您的密码"
                         required
                       />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-10 w-10 p-0 hover:bg-slate-100 dark:hover:bg-slate-600"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      >
+                        {showConfirmPassword ? (
+                          <EyeOff className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                        ) : (
+                          <Eye className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                        )}
+                      </Button>
                     </div>
                     {isSignUp && password !== confirmPassword && confirmPassword && (
-                      <p className="text-sm text-red-500">密码不匹配</p>
+                      <p className="text-sm text-red-500 dark:text-red-400">密码不匹配</p>
                     )}
                   </motion.div>
                 )}
@@ -218,9 +246,9 @@ export default function LoginPage() {
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
-                    className="bg-red-50 border border-red-200 rounded-lg p-3"
+                    className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3"
                   >
-                    <p className="text-sm text-red-600">{error}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
                   </motion.div>
                 )}
 
@@ -228,7 +256,7 @@ export default function LoginPage() {
                   <Button
                     type="submit"
                     disabled={loading || (isSignUp && password !== confirmPassword)}
-                    className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-lg transition-all duration-200 disabled:opacity-50"
+                    className="w-full h-12 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-medium rounded-lg transition-all duration-200 disabled:opacity-50"
                   >
                     {loading ? (
                       <>
@@ -251,8 +279,10 @@ export default function LoginPage() {
                         dispatch(clearError())
                         setConfirmPassword('')
                         setUsername('')
+                        setShowPassword(false)
+                        setShowConfirmPassword(false)
                       }}
-                      className="text-sm text-slate-600 hover:text-slate-900 transition-colors duration-200"
+                      className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors duration-200"
                     >
                       {isSignUp 
                         ? '已有账户？立即登录' 
@@ -268,7 +298,7 @@ export default function LoginPage() {
 
         <motion.div 
           variants={itemVariants}
-          className="mt-8 text-center text-sm text-slate-500"
+          className="mt-8 text-center text-sm text-slate-500 dark:text-slate-400"
         >
           <p>继续使用即表示您同意我们的服务条款</p>
         </motion.div>

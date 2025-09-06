@@ -219,19 +219,19 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 -mx-4 -my-6 sm:-mx-6 sm:-my-8">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 -mx-4 -my-6 sm:-mx-6 sm:-my-8">
       {/* 顶部标题栏 - 微信风格 */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="sticky top-0 bg-white/95 backdrop-blur-lg border-b border-slate-200/60 px-4 py-3 z-10"
+        className="sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-b border-slate-200/60 dark:border-slate-700/60 px-4 py-3 z-10"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <h1 className="text-xl font-semibold text-slate-900">聊天</h1>
+            <h1 className="text-xl font-semibold text-slate-900 dark:text-white">聊天</h1>
             {sessions.length > 0 && (
-              <span className="text-sm text-slate-500">({sessions.length})</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400">({sessions.length})</span>
             )}
           </div>
           
@@ -272,7 +272,7 @@ export default function ChatPage() {
                   placeholder="搜索对话..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-slate-100 border-none rounded-full h-9"
+                  className="pl-10 bg-slate-100 dark:bg-slate-800 dark:text-white border-none rounded-full h-9"
                   autoFocus
                 />
               </div>
@@ -293,10 +293,10 @@ export default function ChatPage() {
             <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center mb-4">
               <MessageCircle className="w-10 h-10 text-slate-400" />
             </div>
-            <h3 className="text-lg font-medium text-slate-900 mb-2">
+            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
               {searchQuery ? '没有找到匹配的对话' : '还没有聊天记录'}
             </h3>
-            <p className="text-slate-500 text-center mb-6">
+            <p className="text-slate-500 dark:text-slate-400 text-center mb-6">
               {searchQuery 
                 ? '试试其他关键词'
                 : '选择一个角色开始你的第一次对话'
@@ -344,16 +344,16 @@ export default function ChatPage() {
                       {/* 内容区域 */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
-                          <h3 className="font-medium text-slate-900 truncate">
+                          <h3 className="font-medium text-slate-900 dark:text-white truncate">
                             {session.title || session.character.name}
                           </h3>
-                          <span className="text-xs text-slate-500 ml-2 flex-shrink-0">
+                          <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 flex-shrink-0">
                             {formatTime(session.last_message_at || session.created_at)}
                           </span>
                         </div>
                         
                         <div className="flex items-center justify-between">
-                          <p className="text-sm text-slate-500 truncate">
+                          <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
                             {getLastMessagePreview(session)}
                           </p>
                           

@@ -46,7 +46,7 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
   // 全屏页面：聊天、公共角色、作者主页、"我的"页面
   if (isFullScreenPage || isChatPage) {
     return (
-      <div className="h-screen overflow-hidden bg-slate-50">
+      <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
         {children}
         <PWAInstallPrompt />
         <IOSInstallPrompt />
@@ -56,7 +56,7 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
 
   // 普通页面布局 - 移动优先设计（有padding和底部导航）
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 pb-24">
       {/* 主要内容 */}
       <motion.main
         initial={{ opacity: 0, y: 10 }}

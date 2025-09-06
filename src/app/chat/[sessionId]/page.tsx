@@ -1032,7 +1032,7 @@ export default function ChatSessionPage() {
   // 如果没有任何API配置
   if (!hasAnyApiConfig()) {
     return (
-      <div className="h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4">
         <Card className="w-full max-w-sm">
           <CardContent className="pt-6 text-center space-y-4">
             <AlertCircle className="w-12 h-12 mx-auto text-amber-500" />
@@ -1052,7 +1052,7 @@ export default function ChatSessionPage() {
 
   if (isLoading) {
     return (
-      <div className="h-screen bg-slate-50 flex items-center justify-center">
+      <div className="h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-8 h-8 mx-auto animate-spin rounded-full border-2 border-slate-900 border-t-transparent" />
           <p className="text-slate-600">加载中...</p>
@@ -1063,7 +1063,7 @@ export default function ChatSessionPage() {
 
   return (
     <div 
-      className="h-screen bg-slate-50 flex flex-col transition-all duration-300"
+      className="h-screen bg-slate-50 dark:bg-slate-900 flex flex-col transition-all duration-300"
       style={{
         backgroundImage: chatBackground ? `url(${chatBackground})` : 'none',
         backgroundSize: 'cover',
@@ -1071,7 +1071,7 @@ export default function ChatSessionPage() {
       }}
     >
       {/* 固定头部 */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200 px-4 py-3 flex-shrink-0">
+      <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Button
@@ -1217,7 +1217,7 @@ export default function ChatSessionPage() {
                         className={`p-3 sm:p-4 rounded-2xl break-words transition-all duration-200 ${
                           message.role === 'user' 
                             ? 'bg-blue-500 text-white rounded-br-md' 
-                            : 'bg-white text-slate-900 border border-slate-200 rounded-bl-md hover:bg-slate-50'
+                            : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-md hover:bg-slate-50 dark:hover:bg-slate-700'
                         } ${
                           selectedMessageId === message.id ? 'ring-2 ring-blue-500' : ''
                         } ${
@@ -1280,13 +1280,13 @@ export default function ChatSessionPage() {
                                 code: ({children, className}) => {
                                   const isInline = !className
                                   return isInline ? (
-                                    <code className="bg-slate-200 px-1 py-0.5 rounded text-xs sm:text-sm">{children}</code>
+                                    <code className="bg-slate-200 dark:bg-slate-700 dark:text-slate-300 px-1 py-0.5 rounded text-xs sm:text-sm">{children}</code>
                                   ) : (
-                                    <code className="block bg-slate-200 p-2 rounded text-xs sm:text-sm overflow-x-auto">{children}</code>
+                                    <code className="block bg-slate-200 dark:bg-slate-700 dark:text-slate-300 p-2 rounded text-xs sm:text-sm overflow-x-auto">{children}</code>
                                   )
                                 },
-                                pre: ({children}) => <pre className="bg-slate-200 p-2 rounded overflow-x-auto">{children}</pre>,
-                                blockquote: ({children}) => <blockquote className="border-l-4 border-slate-300 pl-4 italic">{children}</blockquote>,
+                                pre: ({children}) => <pre className="bg-slate-200 dark:bg-slate-700 dark:text-slate-300 p-2 rounded overflow-x-auto">{children}</pre>,
+                                blockquote: ({children}) => <blockquote className="border-l-4 border-slate-300 dark:border-slate-600 pl-4 italic">{children}</blockquote>,
                                 strong: ({children}) => <strong className="font-semibold">{children}</strong>,
                                 em: ({children}) => <em className="italic">{children}</em>,
                               }}
@@ -1315,7 +1315,7 @@ export default function ChatSessionPage() {
                                       variant="ghost"
                                       onClick={() => handleRegenerateMessage(message.id)}
                                       disabled={isGenerating}
-                                      className="h-7 px-2 text-xs bg-white border border-slate-200"
+                                      className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600"
                                     >
                                       <RefreshCw className={`w-3 h-3 mr-1 ${isGenerating ? 'animate-spin' : ''}`} />
                                       重新生成
@@ -1325,7 +1325,7 @@ export default function ChatSessionPage() {
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => handleEditMessage(message.id, message.content)}
-                                    className="h-7 px-2 text-xs bg-white border border-slate-200"
+                                    className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600"
                                   >
                                     <Edit2 className="w-3 h-3 mr-1" />
                                     编辑
@@ -1336,7 +1336,7 @@ export default function ChatSessionPage() {
                                     variant="ghost"
                                     onClick={() => handleSendNewMessageFrom(message.id)}
                                     disabled={isGenerating}
-                                    className="h-7 px-2 text-xs bg-white border border-slate-200"
+                                    className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600"
                                   >
                                     <MessageSquarePlus className="w-3 h-3 mr-1" />
                                     续写
@@ -1355,7 +1355,7 @@ export default function ChatSessionPage() {
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => handleDeleteMessage(message.id)}
-                                    className="h-7 px-2 text-xs bg-white border border-slate-200 hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+                                    className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-200 dark:hover:border-red-800 hover:text-red-600 dark:hover:text-red-400"
                                   >
                                     <Trash2 className="w-3 h-3 mr-1" />
                                     删除
@@ -1373,7 +1373,7 @@ export default function ChatSessionPage() {
                                       variant="ghost"
                                       onClick={() => handleResendMessage(message.id)}
                                       disabled={isGenerating}
-                                      className="h-7 px-2 text-xs bg-white border border-slate-200"
+                                      className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600"
                                     >
                                       <RefreshCw className={`w-3 h-3 mr-1 ${isGenerating ? 'animate-spin' : ''}`} />
                                       重新发送
@@ -1383,7 +1383,7 @@ export default function ChatSessionPage() {
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => handleEditMessage(message.id, message.content)}
-                                    className="h-7 px-2 text-xs bg-white border border-slate-200"
+                                    className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600"
                                   >
                                     <Edit2 className="w-3 h-3 mr-1" />
                                     编辑
@@ -1392,7 +1392,7 @@ export default function ChatSessionPage() {
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => handleDeleteMessage(message.id)}
-                                    className="h-7 px-2 text-xs bg-white border border-slate-200 hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+                                    className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-200 dark:hover:border-red-800 hover:text-red-600 dark:hover:text-red-400"
                                   >
                                     <Trash2 className="w-3 h-3 mr-1" />
                                     删除
@@ -1441,8 +1441,8 @@ export default function ChatSessionPage() {
 
       {/* 固定底部输入框 */}
       {hasStarted && (
-        <div className="bg-white/80 backdrop-blur-sm border-t border-slate-200 p-3 sm:p-4 flex-shrink-0">
-          <div className="flex items-center space-x-2 sm:space-x-3 bg-slate-100/80 rounded-full p-1">
+        <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-t border-slate-200 dark:border-slate-700 p-3 sm:p-4 flex-shrink-0">
+          <div className="flex items-center space-x-2 sm:space-x-3 bg-slate-100/80 dark:bg-slate-700/80 rounded-full p-1">
             <Textarea
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}

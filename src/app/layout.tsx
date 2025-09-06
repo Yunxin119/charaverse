@@ -4,6 +4,7 @@ import "./globals.css";
 import { ReduxProvider } from "./components/providers/ReduxProvider";
 import { AuthCheck } from "./components/auth/AuthCheck";
 import { AppWrapper } from "./components/layout/AppWrapper";
+import { ThemeProvider } from "./contexts/ThemeContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -90,13 +91,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ReduxProvider>
-          <AuthCheck>
-            <AppWrapper>
-              {children}
-            </AppWrapper>
-          </AuthCheck>
-        </ReduxProvider>
+        <ThemeProvider>
+          <ReduxProvider>
+            <AuthCheck>
+              <AppWrapper>
+                {children}
+              </AppWrapper>
+            </AuthCheck>
+          </ReduxProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

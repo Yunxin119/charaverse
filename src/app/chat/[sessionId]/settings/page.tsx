@@ -368,10 +368,10 @@ export default function ChatSettingsPage() {
         exit="out"
         variants={pageVariants}
         transition={pageTransition}
-        className="absolute top-0 left-0 w-full h-full bg-slate-50 z-10 flex flex-col"
+        className="absolute top-0 left-0 w-full h-full bg-slate-50 dark:bg-slate-900 z-10 flex flex-col"
       >
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200 px-4 py-3 flex-shrink-0">
+      <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex-shrink-0">
         <div className="flex items-center">
           <Button
             variant="ghost"
@@ -381,7 +381,7 @@ export default function ChatSettingsPage() {
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <h2 className="text-lg font-semibold mx-auto">
+          <h2 className="text-lg font-semibold mx-auto dark:text-white">
             聊天设置
           </h2>
         </div>
@@ -392,7 +392,7 @@ export default function ChatSettingsPage() {
         {/* Character Info */}
         {currentCharacter && (
           <div 
-            className="bg-white p-4 rounded-lg border border-slate-200 flex items-center space-x-4 cursor-pointer hover:bg-slate-50"
+            className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center space-x-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700"
             onClick={() => router.push(`/characters/${currentCharacter.id}/edit`)}
           >
             <Avatar className="w-12 h-12">
@@ -400,16 +400,16 @@ export default function ChatSettingsPage() {
               <AvatarFallback>{currentCharacter.name?.[0]}</AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <h3 className="font-semibold">{currentCharacter.name}</h3>
-              <p className="text-sm text-slate-500">编辑角色</p>
+              <h3 className="font-semibold dark:text-white">{currentCharacter.name}</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">编辑角色</p>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400" />
+            <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
           </div>
         )}
 
         {/* Chat Title */}
-        <div className="bg-white p-4 rounded-lg border border-slate-200">
-          <Label className="text-sm font-medium text-slate-600">聊天标题</Label>
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+          <Label className="text-sm font-medium text-slate-600 dark:text-slate-300">聊天标题</Label>
           {isEditingTitle ? (
             <div className="flex items-center space-x-2 mt-2">
               <Input
@@ -427,21 +427,21 @@ export default function ChatSettingsPage() {
             </div>
           ) : (
             <div 
-              className="flex items-center justify-between mt-2 cursor-pointer p-2 rounded-md hover:bg-slate-50"
+              className="flex items-center justify-between mt-2 cursor-pointer p-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700"
               onClick={() => setIsEditingTitle(true)}
             >
-              <span className="text-base text-slate-900">{sessionTitle || currentTitle}</span>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
+              <span className="text-base text-slate-900 dark:text-white">{sessionTitle || currentTitle}</span>
+              <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
             </div>
           )}
         </div>
 
         {/* Chat Background */}
-        <div className="bg-white p-4 rounded-lg border border-slate-200">
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
           <Label htmlFor="background-upload" className="flex items-center justify-between cursor-pointer">
             <div className="space-y-1">
-              <h4 className="text-sm font-medium text-slate-600">聊天背景</h4>
-              <p className="text-xs text-slate-500">选择一张图片作为背景</p>
+              <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300">聊天背景</h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400">选择一张图片作为背景</p>
             </div>
             <div className="flex items-center space-x-2">
               {chatBackground && (
@@ -450,7 +450,7 @@ export default function ChatSettingsPage() {
                   style={{ backgroundImage: `url(${chatBackground})` }}
                 />
               )}
-              <ChevronRight className="w-4 h-4 text-slate-400" />
+              <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
             </div>
           </Label>
           <Input 
@@ -464,21 +464,21 @@ export default function ChatSettingsPage() {
 
         {/* Danger Zone */}
         <div 
-          className="bg-white p-4 rounded-lg border border-red-200 cursor-pointer hover:bg-red-50"
+          className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-50 dark:hover:bg-red-950/20"
           onClick={handleClearChat}
         >
-          <div className="flex items-center justify-between text-red-600">
+          <div className="flex items-center justify-between text-red-600 dark:text-red-400">
             <div className="space-y-1">
               <h4 className="text-sm font-medium">清空聊天记录</h4>
-              <p className="text-xs text-red-500">此操作无法撤销</p>
+              <p className="text-xs text-red-500 dark:text-red-400">此操作无法撤销</p>
             </div>
             <Trash2 className="w-4 h-4" />
           </div>
         </div>
 
         {/* Model Selection */}
-        <div className="bg-white p-4 rounded-lg border border-slate-200">
-          <Label className="text-sm font-medium text-slate-600">AI模型选择</Label>
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+          <Label className="text-sm font-medium text-slate-600 dark:text-slate-300">AI模型选择</Label>
           <div className="mt-2">
             <Select value={currentSelectedModel || selectedModel || ''} onValueChange={handleModelChange}>
               <SelectTrigger className="w-full">
@@ -496,13 +496,13 @@ export default function ChatSettingsPage() {
         </div>
 
         {/* Context Management */}
-        <div className="bg-white p-4 rounded-lg border border-slate-200">
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center">
                   <Brain className="w-4 h-4 mr-2" />
-                  <h4 className="text-sm font-medium text-slate-600">智能上下文管理</h4>
+                  <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300">智能上下文管理</h4>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -542,7 +542,7 @@ export default function ChatSettingsPage() {
                     </TooltipContent>
                   </Tooltip>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">智能截断和摘要记忆 (推荐开启)</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">智能截断和摘要记忆 (推荐开启)</p>
               </div>
               <Switch
                 checked={useEnhancedContext}
@@ -551,9 +551,9 @@ export default function ChatSettingsPage() {
             </div>
 
             {useEnhancedContext && (
-              <div className="space-y-3 pt-2 border-t border-slate-100">
+              <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-700">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-slate-700">高级配置</span>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">高级配置</span>
                   <Button
                     size="sm"
                     variant="ghost"
@@ -565,12 +565,12 @@ export default function ChatSettingsPage() {
                 </div>
 
                 {showContextHelp && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-                    <h5 className="text-xs font-semibold text-blue-800 mb-2 flex items-center">
+                  <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-3">
+                    <h5 className="text-xs font-semibold text-blue-800 dark:text-blue-200 mb-2 flex items-center">
                       <Info className="w-3 h-3 mr-1" />
                       配置说明
                     </h5>
-                    <div className="space-y-2 text-xs text-blue-700">
+                    <div className="space-y-2 text-xs text-blue-700 dark:text-blue-300">
                       <div>
                         <strong>最大上下文:</strong> 发送给AI的最大token数量，数值越大AI记忆越多，但消耗越高
                       </div>
@@ -584,8 +584,8 @@ export default function ChatSettingsPage() {
                         <strong>保留最近消息:</strong> 无论如何都会保留的最新消息数量，确保对话连贯性
                       </div>
                     </div>
-                    <div className="mt-2 pt-2 border-t border-blue-200">
-                      <p className="text-xs text-blue-600">
+                    <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
+                      <p className="text-xs text-blue-600 dark:text-blue-300">
                         💡 建议：首次使用可点击"应用模型推荐配置"获得最佳设置
                       </p>
                     </div>
@@ -595,7 +595,7 @@ export default function ChatSettingsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <div className="flex items-center space-x-2 mb-1">
-                      <Label className="text-xs text-slate-600">最大上下文 (tokens)</Label>
+                      <Label className="text-xs text-slate-600 dark:text-slate-300">最大上下文 (tokens)</Label>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -632,7 +632,7 @@ export default function ChatSettingsPage() {
                   </div>
                   <div>
                     <div className="flex items-center space-x-2 mb-1">
-                      <Label className="text-xs text-slate-600">预留生成空间</Label>
+                      <Label className="text-xs text-slate-600 dark:text-slate-300">预留生成空间</Label>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -669,7 +669,7 @@ export default function ChatSettingsPage() {
                   </div>
                   <div>
                     <div className="flex items-center space-x-2 mb-1">
-                      <Label className="text-xs text-slate-600">摘要阈值</Label>
+                      <Label className="text-xs text-slate-600 dark:text-slate-300">摘要阈值</Label>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -707,7 +707,7 @@ export default function ChatSettingsPage() {
                   </div>
                   <div>
                     <div className="flex items-center space-x-2 mb-1">
-                      <Label className="text-xs text-slate-600">保留最近消息</Label>
+                      <Label className="text-xs text-slate-600 dark:text-slate-300">保留最近消息</Label>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -761,27 +761,27 @@ export default function ChatSettingsPage() {
 
                 {/* 上下文统计信息 */}
                 {contextStats && (
-                  <div className="bg-slate-50 rounded p-3 text-xs border">
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded p-3 text-xs border dark:border-slate-700 dark:text-slate-300">
                     <div className="flex items-center mb-2">
                       <Info className="w-3 h-3 mr-1" />
                       <span className="font-medium">当前上下文统计</span>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       <div className="text-center">
-                        <div className="text-blue-600 font-medium">{contextStats.totalTokens}</div>
-                        <div className="text-slate-600">总Token</div>
+                        <div className="text-blue-600 dark:text-blue-400 font-medium">{contextStats.totalTokens}</div>
+                        <div className="text-slate-600 dark:text-slate-400">总Token</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-green-600 font-medium">{contextStats.messageTokens}</div>
-                        <div className="text-slate-600">消息Token</div>
+                        <div className="text-green-600 dark:text-green-400 font-medium">{contextStats.messageTokens}</div>
+                        <div className="text-slate-600 dark:text-slate-400">消息Token</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-orange-600 font-medium">{contextStats.truncatedMessages}</div>
-                        <div className="text-slate-600">截断消息</div>
+                        <div className="text-orange-600 dark:text-orange-400 font-medium">{contextStats.truncatedMessages}</div>
+                        <div className="text-slate-600 dark:text-slate-400">截断消息</div>
                       </div>
                     </div>
                     {contextStats.hasSummary && (
-                      <div className="mt-2 flex items-center justify-center text-purple-600">
+                      <div className="mt-2 flex items-center justify-center text-purple-600 dark:text-purple-400">
                         <Zap className="w-3 h-3 mr-1" />
                         <span>已启用智能摘要</span>
                       </div>

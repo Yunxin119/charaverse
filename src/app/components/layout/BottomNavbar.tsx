@@ -15,7 +15,6 @@ import {
 import { cn } from '@/lib/utils'
 
 const navigation = [
-  { name: '首页', href: '/', icon: Home },
   { name: '角色', href: '/characters', icon: Users },
   { name: '探索', href: '/explore', icon: Globe },
   { name: '聊天', href: '/chat', icon: MessageSquare },
@@ -31,7 +30,7 @@ export function BottomNavbar() {
       initial={{ y: 100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200/60 px-4 py-3 z-50 safe-area-pb"
+      className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-700/60 px-4 py-3 z-50 safe-area-pb"
       style={{
         boxShadow: '0 -1px 20px rgba(0, 0, 0, 0.08)',
       }}
@@ -49,14 +48,14 @@ export function BottomNavbar() {
                 className={cn(
                   "flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 relative min-w-0",
                   isActive
-                    ? "text-blue-600"
-                    : "text-slate-500"
+                    ? "text-blue-600 dark:text-blue-400"
+                    : "text-slate-500 dark:text-slate-400"
                 )}
               >
                 <div className="relative">
                   <Icon className={cn(
                     "w-6 h-6 mb-1 transition-all duration-200",
-                    isActive ? "text-blue-600 scale-110" : "text-slate-500"
+                    isActive ? "text-blue-600 dark:text-blue-400 scale-110" : "text-slate-500 dark:text-slate-400"
                   )} />
                   
                   {/* iOS风格的活跃指示器 */}
@@ -71,7 +70,7 @@ export function BottomNavbar() {
                 
                 <span className={cn(
                   "text-xs font-medium transition-all duration-200 truncate",
-                  isActive ? "text-blue-600" : "text-slate-500"
+                  isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"
                 )}>
                   {item.name}
                 </span>

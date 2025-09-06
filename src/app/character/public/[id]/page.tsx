@@ -327,8 +327,8 @@ export default function PublicCharacterPage() {
 
   if (isLoading) {
     return (
-      <div className="h-screen bg-slate-50 flex flex-col">
-        <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200 px-4 py-3 flex-shrink-0">
+      <div className="h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
+        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             <Button
               variant="ghost"
@@ -338,14 +338,14 @@ export default function PublicCharacterPage() {
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <h1 className="text-base font-semibold text-slate-900">角色详情</h1>
+            <h1 className="text-base font-semibold text-slate-900 dark:text-white">角色详情</h1>
             <div className="w-8 h-8"></div>
           </div>
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-slate-600">加载中...</p>
+            <p className="text-slate-600 dark:text-slate-300">加载中...</p>
           </div>
         </div>
       </div>
@@ -354,8 +354,8 @@ export default function PublicCharacterPage() {
 
   if (!character) {
     return (
-      <div className="h-screen bg-slate-50 flex flex-col">
-        <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200 px-4 py-3 flex-shrink-0">
+      <div className="h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
+        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             <Button
               variant="ghost"
@@ -365,13 +365,13 @@ export default function PublicCharacterPage() {
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <h1 className="text-base font-semibold text-slate-900">角色详情</h1>
+            <h1 className="text-base font-semibold text-slate-900 dark:text-white">角色详情</h1>
             <div className="w-8 h-8"></div>
           </div>
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center p-4">
-            <p className="text-slate-600 mb-4">角色不存在或未公开</p>
+            <p className="text-slate-600 dark:text-slate-300 mb-4">角色不存在或未公开</p>
             <Button onClick={() => router.push('/explore')}>
               返回探索页面
             </Button>
@@ -382,7 +382,7 @@ export default function PublicCharacterPage() {
   }
 
   return (
-    <div className="h-screen bg-slate-50 flex flex-col">
+    <div className="h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex flex-col">
       {/* 内容区域 - 占据剩余空间 */}
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
@@ -424,15 +424,15 @@ export default function PublicCharacterPage() {
                 </>
               ) : (
                 <>
-                  <div className="absolute inset-0 bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200">
-                    <div className="absolute inset-0 opacity-40">
+                  <div className="absolute inset-0 bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-700 dark:to-slate-600">
+                    <div className="absolute inset-0 opacity-40 dark:opacity-60">
                       <div className="absolute top-0 left-1/4 w-40 h-40 bg-blue-400 rounded-full blur-3xl"></div>
                       <div className="absolute bottom-0 right-1/4 w-48 h-48 bg-purple-400 rounded-full blur-3xl"></div>
                       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-indigo-300 rounded-full blur-2xl"></div>
                       <div className="absolute top-1/4 right-1/3 w-24 h-24 bg-pink-300 rounded-full blur-2xl"></div>
                     </div>
                   </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent dark:from-black/80 dark:via-black/40"></div>
                 </>
               )}
               
@@ -502,16 +502,16 @@ export default function PublicCharacterPage() {
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.4, delay: 0.2 }}
           >
-            <Card>
+            <Card className="dark:bg-slate-800/50 dark:border-slate-700 backdrop-blur-sm">
               <CardContent className="p-6">
                 {/* Introduction */}
                 {character.prompt_template?.basic_info?.introduction && (
                   <div className="mb-6">
-                    <h3 className="font-semibold text-slate-900 mb-3 flex items-center">
+                    <h3 className="font-semibold text-slate-900 dark:text-white mb-3 flex items-center">
                       <MessageCircle className="w-5 h-5 mr-2" />
                       角色介绍
                     </h3>
-                    <p className="text-slate-700 leading-relaxed text-base">
+                    <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-base">
                       {character.prompt_template.basic_info.introduction}
                     </p>
                   </div>
@@ -520,7 +520,7 @@ export default function PublicCharacterPage() {
                 {/* Keywords */}
                 {character.prompt_template?.basic_info?.keywords && character.prompt_template.basic_info.keywords.length > 0 && (
                   <div className="mb-6">
-                    <h3 className="font-semibold text-slate-900 mb-3 flex items-center">
+                    <h3 className="font-semibold text-slate-900 dark:text-white mb-3 flex items-center">
                       <Star className="w-5 h-5 mr-2" />
                       关键词
                     </h3>
@@ -528,7 +528,7 @@ export default function PublicCharacterPage() {
                       {character.prompt_template.basic_info.keywords.map((keyword: string, index: number) => (
                         <span
                           key={index}
-                          className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-50 text-blue-700 border border-blue-100"
+                          className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800"
                         >
                           {keyword}
                         </span>
@@ -543,16 +543,16 @@ export default function PublicCharacterPage() {
                   <div className="mb-6">
                     <button
                       onClick={() => setIsSettingsExpanded(!isSettingsExpanded)}
-                      className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors"
+                      className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                     >
-                      <h3 className="font-semibold text-slate-900 flex items-center">
+                      <h3 className="font-semibold text-slate-900 dark:text-white flex items-center">
                         <Settings className="w-5 h-5 mr-2" />
                         角色设定
                       </h3>
                       {isSettingsExpanded ? (
-                        <ChevronUp className="w-5 h-5 text-slate-600" />
+                        <ChevronUp className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                       ) : (
-                        <ChevronDown className="w-5 h-5 text-slate-600" />
+                        <ChevronDown className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                       )}
                     </button>
 
@@ -566,12 +566,12 @@ export default function PublicCharacterPage() {
                       >
                         {/* Basic Info Description */}
                         {character.prompt_template?.basic_info?.description && (
-                          <div className="border border-slate-200 rounded-lg p-4">
-                            <h4 className="font-medium text-slate-900 mb-2 flex items-center">
+                          <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 dark:bg-slate-800/30">
+                            <h4 className="font-medium text-slate-900 dark:text-white mb-2 flex items-center">
                               <User className="w-4 h-4 mr-2" />
                               基本设定
                             </h4>
-                            <p className="text-slate-700 leading-relaxed text-sm">
+                            <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-sm">
                               {character.prompt_template.basic_info.description}
                             </p>
                           </div>
@@ -581,10 +581,10 @@ export default function PublicCharacterPage() {
                         {character.prompt_template?.modules && character.prompt_template.modules.length > 0 && (
                           <>
                             {character.prompt_template.modules.map((module: any, index: number) => (
-                              <div key={index} className="border border-slate-200 rounded-lg p-4">
-                                <h4 className="font-medium text-slate-900 mb-2">{module.type}</h4>
+                              <div key={index} className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 dark:bg-slate-800/30">
+                                <h4 className="font-medium text-slate-900 dark:text-white mb-2">{module.type}</h4>
                                 {module.type === '用户角色设定' ? (
-                                  <div className="space-y-2 text-sm text-slate-600">
+                                  <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
                                     {module.userRoleName && <p><strong>姓名:</strong> {module.userRoleName}</p>}
                                     {module.userRoleAge && <p><strong>年龄:</strong> {module.userRoleAge}</p>}
                                     {module.userRoleGender && <p><strong>性别:</strong> {
@@ -595,12 +595,12 @@ export default function PublicCharacterPage() {
                                     {module.userRoleDetails && <p><strong>详情:</strong> {module.userRoleDetails}</p>}
                                   </div>
                                 ) : module.type === '自定义模块' && module.name ? (
-                                  <div className="text-sm text-slate-600">
+                                  <div className="text-sm text-slate-600 dark:text-slate-400">
                                     <p className="font-medium mb-1">{module.name}</p>
                                     <p>{module.content}</p>
                                   </div>
                                 ) : module.content ? (
-                                  <p className="text-sm text-slate-600 whitespace-pre-wrap">{module.content}</p>
+                                  <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{module.content}</p>
                                 ) : null}
                               </div>
                             ))}
@@ -612,7 +612,7 @@ export default function PublicCharacterPage() {
                 )}
 
                 {/* Stats */}
-                <div className="flex items-center justify-between mb-6 text-sm text-slate-500">
+                <div className="flex items-center justify-between mb-6 text-sm text-slate-500 dark:text-slate-400">
                   <div className="flex items-center space-x-1">
                     <Heart className="w-4 h-4" />
                     <span>{character.likes_count} 点赞</span>
@@ -648,7 +648,7 @@ export default function PublicCharacterPage() {
                   onClick={handleLike}
                   disabled={isLiking}
                   variant="ghost"
-                  className="w-full h-12 text-red-500 hover:text-red-600 hover:bg-red-50"
+                  className="w-full h-12 text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/20"
                 >
                   <Heart className="w-4 h-4 mr-2" />
                   {isLiking ? '点赞中...' : `点赞 (${character.likes_count})`}
@@ -663,9 +663,9 @@ export default function PublicCharacterPage() {
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.4, delay: 0.2 }}
         >
-          <Card>
+          <Card className="dark:bg-slate-800/50 dark:border-slate-700 backdrop-blur-sm">
             <CardHeader>
-              <h3 className="font-semibold text-slate-900">评论 ({comments.length})</h3>
+              <h3 className="font-semibold text-slate-900 dark:text-white">评论 ({comments.length})</h3>
             </CardHeader>
             <CardContent>
               {/* Add Comment */}
@@ -674,7 +674,7 @@ export default function PublicCharacterPage() {
                   placeholder="分享你对这个角色的看法..."
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
-                  className="min-h-[100px] mb-3 resize-none"
+                  className="min-h-[100px] mb-3 resize-none dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                 />
                 
                 {/* Image Upload */}
@@ -699,8 +699,8 @@ export default function PublicCharacterPage() {
               {/* Comments List */}
               <div className="space-y-4">
                 {comments.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500">
-                    <MessageCircle className="w-12 h-12 mx-auto mb-2 text-slate-300" />
+                  <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                    <MessageCircle className="w-12 h-12 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
                     <p>还没有评论，来发表第一条评论吧！</p>
                   </div>
                 ) : (
@@ -712,20 +712,20 @@ export default function PublicCharacterPage() {
                       : comment.content
 
                     return (
-                      <div key={comment.id} className="border-b border-slate-100 pb-4 last:border-b-0">
+                      <div key={comment.id} className="border-b border-slate-100 dark:border-slate-700 pb-4 last:border-b-0">
                         <div className="flex items-start space-x-3">
                           <Avatar className="w-8 h-8">
-                            <AvatarFallback className="bg-slate-200 text-slate-600 text-sm">
+                            <AvatarFallback className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm">
                               {comment.profiles?.username?.charAt(0) || 'U'}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center space-x-2">
-                                <span className="font-medium text-slate-900 text-sm">
+                                <span className="font-medium text-slate-900 dark:text-white text-sm">
                                   {comment.profiles?.username || '匿名用户'}
                                 </span>
-                                <span className="text-xs text-slate-500">
+                                <span className="text-xs text-slate-500 dark:text-slate-400">
                                   {new Date(comment.created_at).toLocaleDateString()}
                                 </span>
                               </div>
@@ -744,7 +744,7 @@ export default function PublicCharacterPage() {
                             {/* 评论文本 */}
                             {comment.content && (
                               <div className="mb-2">
-                                <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
+                                <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
                                   {displayContent}
                                 </p>
                                 {shouldShowExpansion && (
@@ -766,7 +766,7 @@ export default function PublicCharacterPage() {
                                     <button
                                       key={index}
                                       onClick={() => openImageViewer(comment.images!, index)}
-                                      className="aspect-square rounded-lg overflow-hidden border border-slate-200 hover:border-slate-300 transition-colors"
+                                      className="aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
                                     >
                                       <img
                                         src={image}

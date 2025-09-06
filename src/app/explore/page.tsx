@@ -217,27 +217,27 @@ export default function ExplorePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 pb-20">
       {/* Header */}
       <motion.div
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
-        className="bg-white/95 backdrop-blur-lg border-b border-slate-200/80 px-4 py-4 sticky top-0 z-30 shadow-sm"
+        className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-b border-slate-200/80 dark:border-slate-700/80 px-4 py-4 sticky top-0 z-30 shadow-sm"
       >
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900 mb-1">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">
                 探索社区
               </h1>
-              <p className="text-slate-600 text-sm">
+              <p className="text-slate-600 dark:text-slate-400 text-sm">
                 发现其他创作者分享的精彩角色
               </p>
             </div>
             
             <div className="flex items-center space-x-2">
-              <div className="flex items-center space-x-2 text-sm text-slate-500">
+              <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400">
                 <Globe className="w-4 h-4" />
                 <span>{characters.length} 个公开角色</span>
               </div>
@@ -258,28 +258,28 @@ export default function ExplorePage() {
             <div className="flex flex-col sm:flex-row gap-4">
               {/* Search */}
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
                 <Input
                   placeholder="搜索角色名称或创作者..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-white border-slate-200 focus:border-slate-300"
+                  className="pl-10 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-slate-300 dark:focus:border-slate-600 dark:text-white"
                 />
               </div>
 
               {/* Sort */}
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-full sm:w-48 bg-white border-slate-200">
+                <SelectTrigger className="w-full sm:w-48 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="likes_count">
+                <SelectContent className="dark:bg-slate-800 dark:border-slate-700">
+                  <SelectItem value="likes_count" className="dark:text-white dark:hover:bg-slate-700">
                     <div className="flex items-center space-x-2">
                       <TrendingUp className="w-4 h-4" />
                       <span>按热度排序</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="created_at">
+                  <SelectItem value="created_at" className="dark:text-white dark:hover:bg-slate-700">
                     <div className="flex items-center space-x-2">
                       <Clock className="w-4 h-4" />
                       <span>按时间排序</span>
@@ -290,13 +290,13 @@ export default function ExplorePage() {
 
               {/* Filter */}
               <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-full sm:w-48 bg-white border-slate-200">
+                <SelectTrigger className="w-full sm:w-48 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部角色</SelectItem>
-                  <SelectItem value="trending">热门角色</SelectItem>
-                  <SelectItem value="recent">最新角色</SelectItem>
+                <SelectContent className="dark:bg-slate-800 dark:border-slate-700">
+                  <SelectItem value="all" className="dark:text-white dark:hover:bg-slate-700">全部角色</SelectItem>
+                  <SelectItem value="trending" className="dark:text-white dark:hover:bg-slate-700">热门角色</SelectItem>
+                  <SelectItem value="recent" className="dark:text-white dark:hover:bg-slate-700">最新角色</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -306,21 +306,21 @@ export default function ExplorePage() {
           {isLoading ? (
             <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {[...Array(8)].map((_, i) => (
-                <Card key={i} className="animate-pulse">
+                <Card key={i} className="animate-pulse dark:bg-slate-800 dark:border-slate-700">
                   <CardHeader className="pb-3">
                     <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-slate-200 rounded-full"></div>
+                      <div className="w-12 h-12 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
                       <div className="flex-1">
-                        <div className="h-4 bg-slate-200 rounded w-3/4 mb-2"></div>
-                        <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+                        <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4 mb-2"></div>
+                        <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2"></div>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-20 bg-slate-200 rounded mb-4"></div>
+                    <div className="h-20 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
                     <div className="flex justify-between">
-                      <div className="h-8 bg-slate-200 rounded w-20"></div>
-                      <div className="h-8 bg-slate-200 rounded w-16"></div>
+                      <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-20"></div>
+                      <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-16"></div>
                     </div>
                   </CardContent>
                 </Card>
@@ -328,13 +328,13 @@ export default function ExplorePage() {
             </motion.div>
           ) : filteredCharacters.length === 0 ? (
             <motion.div variants={itemVariants} className="text-center py-12">
-              <div className="w-24 h-24 mx-auto mb-4 bg-slate-100 rounded-full flex items-center justify-center">
-                <Search className="w-12 h-12 text-slate-400" />
+              <div className="w-24 h-24 mx-auto mb-4 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
+                <Search className="w-12 h-12 text-slate-400 dark:text-slate-500" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
                 {searchQuery ? '没有找到匹配的角色' : '暂无公开角色'}
               </h3>
-              <p className="text-slate-600">
+              <p className="text-slate-600 dark:text-slate-400">
                 {searchQuery ? '尝试调整搜索条件' : '成为第一个分享角色的创作者吧！'}
               </p>
             </motion.div>
@@ -347,23 +347,23 @@ export default function ExplorePage() {
                   whileHover={{ y: -4 }}
                   transition={{ duration: 0.2 }}
                 >
-                                     <Card className="h-full hover:shadow-lg transition-all duration-200 border-slate-200/80 hover:border-slate-300/80">
+                                     <Card className="h-full hover:shadow-lg transition-all duration-200 border-slate-200/80 hover:border-slate-300/80 dark:bg-slate-800/50 dark:border-slate-700/60 dark:hover:border-slate-600/60 backdrop-blur-sm">
                      <CardHeader 
                        className="pb-3 cursor-pointer"
                        onClick={() => router.push(`/character/public/${character.id}`)}
                      >
                        <div className="flex items-center space-x-3">
-                         <Avatar className="w-12 h-12 ring-2 ring-slate-200/50">
+                         <Avatar className="w-12 h-12 ring-2 ring-slate-200/50 dark:ring-slate-700/50 shadow-lg">
                            <AvatarImage src={character.avatar_url} alt={character.name} />
                            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
                              {character.name.charAt(0)}
                            </AvatarFallback>
                          </Avatar>
                          <div className="flex-1 min-w-0">
-                           <h3 className="font-semibold text-slate-900 truncate">
+                           <h3 className="font-semibold text-slate-900 dark:text-white truncate">
                              {character.name}
                            </h3>
-                           <p className="text-sm text-slate-500 truncate">
+                           <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
                              由 {character.profiles?.username || '匿名用户'} 创建
                            </p>
                          </div>
@@ -373,7 +373,7 @@ export default function ExplorePage() {
                     <CardContent className="pt-0">
                       {/* Character Introduction */}
                       <div className="mb-4">
-                        <p className="text-sm text-slate-700 line-clamp-3 leading-relaxed">
+                        <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-3 leading-relaxed">
                           {character.prompt_template?.basic_info?.introduction || 
                            character.prompt_template?.basic_info?.description || 
                            '一个有趣的AI角色，快来开始对话吧！'}
@@ -387,13 +387,13 @@ export default function ExplorePage() {
                             {character.prompt_template.basic_info.keywords.slice(0, 3).map((keyword: string, idx: number) => (
                               <span
                                 key={idx}
-                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100"
+                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800"
                               >
                                 {keyword}
                               </span>
                             ))}
                             {character.prompt_template.basic_info.keywords.length > 3 && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600">
                                 +{character.prompt_template.basic_info.keywords.length - 3}
                               </span>
                             )}
@@ -402,7 +402,7 @@ export default function ExplorePage() {
                       )}
 
                       {/* Stats */}
-                      <div className="flex items-center justify-between mb-4 text-sm text-slate-500">
+                      <div className="flex items-center justify-between mb-4 text-sm text-slate-500 dark:text-slate-400">
                         <div className="flex items-center space-x-1">
                           <Heart className="w-4 h-4" />
                           <span>{character.likes_count}</span>
@@ -418,7 +418,7 @@ export default function ExplorePage() {
                         <Button 
                           size="sm" 
                           variant="outline"
-                          className="flex-1 h-9"
+                          className="flex-1 h-9 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
                           onClick={() => handleCopyCharacter(character)}
                         >
                           <Star className="w-3 h-3 mr-1.5" />
@@ -426,7 +426,7 @@ export default function ExplorePage() {
                         </Button>
                         <Button 
                           size="sm" 
-                          className="flex-1 h-9 bg-blue-600 hover:bg-blue-700"
+                          className="flex-1 h-9 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
                           onClick={() => handleChatClick(character.id)}
                         >
                           <MessageCircle className="w-3 h-3 mr-1.5" />
@@ -438,7 +438,7 @@ export default function ExplorePage() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="w-full mt-2 h-8 text-slate-500 hover:text-red-500 hover:bg-red-50"
+                        className="w-full mt-2 h-8 text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20"
                         onClick={() => handleLike(character.id, character.likes_count)}
                       >
                         <Heart className="w-4 h-4 mr-1.5" />

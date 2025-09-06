@@ -443,10 +443,10 @@ export default function DiaryPage() {
 
   if (!user) {
     return (
-      <div className="h-screen bg-slate-50 flex items-center justify-center">
+      <div className="h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <p className="text-lg">请先登录</p>
+          <p className="text-lg dark:text-white">请先登录</p>
         </div>
       </div>
     )
@@ -454,10 +454,10 @@ export default function DiaryPage() {
 
   if (data.loading) {
     return (
-      <div className="h-screen bg-slate-50 flex items-center justify-center">
+      <div className="h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p>加载中...</p>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 dark:text-white" />
+          <p className="dark:text-white">加载中...</p>
         </div>
       </div>
     )
@@ -465,10 +465,10 @@ export default function DiaryPage() {
 
   if (data.error) {
     return (
-      <div className="h-screen bg-slate-50 flex items-center justify-center">
+      <div className="h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <p className="text-lg mb-4">{data.error}</p>
+          <p className="text-lg mb-4 dark:text-white">{data.error}</p>
           <Button onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             返回
@@ -479,9 +479,9 @@ export default function DiaryPage() {
   }
 
   return (
-    <div className="h-screen bg-slate-50 flex flex-col">
+    <div className="h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
       {/* 固定头部 */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200 px-4 py-3 flex-shrink-0">
+      <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Button
@@ -500,7 +500,7 @@ export default function DiaryPage() {
                     {data.character.name.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
-                <h2 className="text-base font-semibold truncate">
+                <h2 className="text-base font-semibold truncate dark:text-white">
                   {data.character.name} 的日记本
                 </h2>
               </div>
@@ -537,13 +537,13 @@ export default function DiaryPage() {
           {/* 日记列表 */}
           <div className="space-y-4">
             {data.diaries.length === 0 ? (
-              <Card className="shadow-lg border-slate-200">
+              <Card className="shadow-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800">
                 <CardContent className="p-12 text-center">
-                  <BookOpen className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-slate-900 mb-2">
+                  <BookOpen className="h-16 w-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
                     还没有日记
                   </h3>
-                  <p className="text-slate-600 mb-6">
+                  <p className="text-slate-600 dark:text-slate-300 mb-6">
                     开始与 {data.character?.name} 对话，然后生成第一篇日记吧！
                   </p>
                   <Button 
@@ -574,17 +574,17 @@ export default function DiaryPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
                   >
-                    <Card className="shadow-lg border-slate-200 hover:shadow-xl transition-shadow duration-300">
+                    <Card className="shadow-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 hover:shadow-xl transition-shadow duration-300">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
                             <Calendar className="h-5 w-5 text-blue-600" />
-                            <CardTitle className="text-lg text-slate-900">
+                            <CardTitle className="text-lg text-slate-900 dark:text-white">
                               {formatDate(diary.created_at)}
                             </CardTitle>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <div className="flex items-center space-x-2 text-sm text-slate-500 mr-3">
+                            <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400 mr-3">
                               <User className="h-4 w-4" />
                               <span>{data.character?.name}</span>
                             </div>
@@ -596,10 +596,11 @@ export default function DiaryPage() {
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
+                              <DropdownMenuContent align="end" className="dark:bg-slate-800 dark:border-slate-700">
                                 <DropdownMenuItem
                                   onClick={() => handleEditDiary(diary)}
                                   disabled={editingDiaryId === diary.id}
+                                  className="dark:text-white dark:hover:bg-slate-700"
                                 >
                                   <Edit2 className="h-4 w-4 mr-2" />
                                   编辑
@@ -607,6 +608,7 @@ export default function DiaryPage() {
                                 <DropdownMenuItem
                                   onClick={() => handleRegenerateDiary(diary.id)}
                                   disabled={isRegenerating === diary.id}
+                                  className="dark:text-white dark:hover:bg-slate-700"
                                 >
                                   <RotateCcw className="h-4 w-4 mr-2" />
                                   {isRegenerating === diary.id ? '重新生成中...' : '重新生成'}
@@ -614,7 +616,7 @@ export default function DiaryPage() {
                                 <DropdownMenuItem
                                   onClick={() => handleDeleteDiary(diary.id)}
                                   disabled={isDeleting === diary.id}
-                                  className="text-red-600 focus:text-red-600"
+                                  className="text-red-600 focus:text-red-600 dark:hover:bg-slate-700"
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   {isDeleting === diary.id ? '删除中...' : '删除'}
@@ -632,7 +634,7 @@ export default function DiaryPage() {
                             <Textarea
                               value={editingContent}
                               onChange={(e) => setEditingContent(e.target.value)}
-                              className="min-h-[200px] resize-none"
+                              className="min-h-[200px] resize-none dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                               placeholder="编辑日记内容..."
                             />
                             <div className="flex justify-end space-x-2">
@@ -667,29 +669,29 @@ export default function DiaryPage() {
                         ) : (
                           /* 正常显示模式 */
                           <div className="space-y-4">
-                            <div className="prose prose-slate max-w-none text-slate-700 break-words overflow-visible">
+                            <div className="prose prose-slate max-w-none text-slate-700 dark:text-slate-300 break-words overflow-visible">
                               {isRegenerating === diary.id ? (
                                 <div className="flex items-center justify-center py-8">
-                                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                                  <span>重新生成中...</span>
+                                  <Loader2 className="h-6 w-6 animate-spin mr-2 dark:text-white" />
+                                  <span className="dark:text-white">重新生成中...</span>
                                 </div>
                               ) : (
                                 <ReactMarkdown 
                                   remarkPlugins={[remarkGfm]}
                                   components={{
-                                    p: ({children}) => <p className="mb-4 leading-7 whitespace-pre-wrap">{children}</p>,
+                                    p: ({children}) => <p className="mb-4 leading-7 whitespace-pre-wrap dark:text-slate-300">{children}</p>,
                                     br: () => <br />,
-                                    strong: ({children}) => <strong className="font-semibold text-slate-900">{children}</strong>,
-                                    em: ({children}) => <em className="italic text-slate-800">{children}</em>,
-                                    blockquote: ({children}) => <blockquote className="border-l-4 border-blue-500 pl-4 italic my-4 text-slate-600">{children}</blockquote>,
-                                    h1: ({children}) => <h1 className="text-xl font-bold text-slate-900 mb-3 mt-6 first:mt-0">{children}</h1>,
-                                    h2: ({children}) => <h2 className="text-lg font-semibold text-slate-900 mb-3 mt-5 first:mt-0">{children}</h2>,
-                                    h3: ({children}) => <h3 className="text-base font-semibold text-slate-900 mb-2 mt-4 first:mt-0">{children}</h3>,
+                                    strong: ({children}) => <strong className="font-semibold text-slate-900 dark:text-white">{children}</strong>,
+                                    em: ({children}) => <em className="italic text-slate-800 dark:text-slate-200">{children}</em>,
+                                    blockquote: ({children}) => <blockquote className="border-l-4 border-blue-500 pl-4 italic my-4 text-slate-600 dark:text-slate-400">{children}</blockquote>,
+                                    h1: ({children}) => <h1 className="text-xl font-bold text-slate-900 dark:text-white mb-3 mt-6 first:mt-0">{children}</h1>,
+                                    h2: ({children}) => <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-3 mt-5 first:mt-0">{children}</h2>,
+                                    h3: ({children}) => <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-2 mt-4 first:mt-0">{children}</h3>,
                                     ul: ({children}) => <ul className="list-disc list-inside mb-4 space-y-1">{children}</ul>,
                                     ol: ({children}) => <ol className="list-decimal list-inside mb-4 space-y-1">{children}</ol>,
-                                    li: ({children}) => <li className="text-slate-700 leading-6">{children}</li>,
-                                    code: ({children}) => <code className="bg-slate-100 px-1 py-0.5 rounded text-sm font-mono text-slate-800">{children}</code>,
-                                    pre: ({children}) => <pre className="bg-slate-100 p-3 rounded overflow-x-auto mb-4">{children}</pre>
+                                    li: ({children}) => <li className="text-slate-700 dark:text-slate-300 leading-6">{children}</li>,
+                                    code: ({children}) => <code className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded text-sm font-mono text-slate-800 dark:text-slate-200">{children}</code>,
+                                    pre: ({children}) => <pre className="bg-slate-100 dark:bg-slate-700 p-3 rounded overflow-x-auto mb-4">{children}</pre>
                                   }}
                                 >
                                   {diary.content}
@@ -698,8 +700,8 @@ export default function DiaryPage() {
                             </div>
                             
                             {/* 临时调试信息 */}
-                            <details className="text-xs text-slate-500 border-t pt-2">
-                              <summary className="cursor-pointer hover:text-slate-700">调试信息</summary>
+                            <details className="text-xs text-slate-500 dark:text-slate-400 border-t dark:border-slate-700 pt-2">
+                              <summary className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-300">调试信息</summary>
                               <div className="mt-2 space-y-1">
                                 <div>内容长度: {diary.content?.length || 0} 字符</div>
                                 <div>内容结尾: "...{diary.content?.slice(-30)}"</div>
@@ -723,7 +725,7 @@ export default function DiaryPage() {
               variant="outline" 
               onClick={fetchData}
               disabled={data.loading}
-              className="bg-white border-slate-200"
+              className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-white"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
               刷新
