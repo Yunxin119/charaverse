@@ -87,6 +87,7 @@ export default function ChatSessionPage() {
 
   const [userInput, setUserInput] = useState('')
   const [lastFailedInput, setLastFailedInput] = useState('') // 用于恢复失败的消息
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const [apiConfig, setApiConfig] = useState<APIConfig>({})
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [hasStarted, setHasStarted] = useState(false)
@@ -169,8 +170,25 @@ export default function ChatSessionPage() {
   }, [sessionId])
 
   // 滚动到底部
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  const scrollToBottom = (behavior: 'smooth' | 'instant' = 'smooth') => {
+    try {
+      console.log('🔄 尝试滚动到底部, behavior:', behavior, 'messages:', messages.length)
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior })
+        console.log('✅ 使用 messagesEndRef 滚动')
+      } else {
+        // 备用方案：直接滚动容器到底部
+        if (messagesContainerRef.current) {
+          const container = messagesContainerRef.current
+          container.scrollTop = container.scrollHeight
+          console.log('✅ 使用容器直接滚动')
+        } else {
+          console.warn('⚠️ 没有找到滚动目标元素')
+        }
+      }
+    } catch (error) {
+      console.warn('滚动到底部失败:', error)
+    }
   }
 
   // 预处理文本，添加特殊格式高亮
@@ -203,10 +221,35 @@ export default function ChatSessionPage() {
   // 滚动到底部
   useEffect(() => {
     // 只在新消息添加时滚动到底部，不是在加载更多历史消息时
-    if (!isLoadingMoreMessages) {
-      scrollToBottom()
+    console.log('📜 消息变化触发滚动检查:', {
+      isLoadingMoreMessages,
+      hasStarted, 
+      messagesLength: messages.length
+    })
+    
+    if (!isLoadingMoreMessages && hasStarted && messages.length > 0) {
+      // 添加一个小延迟确保DOM已经渲染完成
+      setTimeout(() => {
+        scrollToBottom()
+      }, 100)
     }
-  }, [messages, isLoadingMoreMessages])
+  }, [messages, isLoadingMoreMessages, hasStarted])
+
+  // 页面初始化完成后自动滚动到底部
+  useEffect(() => {
+    console.log('🎯 初始化滚动检查:', {
+      hasStarted,
+      messagesLength: messages.length,
+      isLoadingMessages
+    })
+    
+    if (hasStarted && messages.length > 0 && !isLoadingMessages) {
+      // 页面初始化完成，立即滚动到底部
+      setTimeout(() => {
+        scrollToBottom('instant')
+      }, 200)
+    }
+  }, [hasStarted, isLoadingMessages, messages.length])
 
   // 懒加载：监听滚动事件
   useEffect(() => {
@@ -628,9 +671,15 @@ export default function ChatSessionPage() {
       return
     }
 
-    // 立即清空输入框
+    // 立即清空输入框并重置高度
     setUserInput('')
     setLastFailedInput('')
+    
+    // 重置输入框高度
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto'
+      inputRef.current.style.height = '24px' // 重置到最小高度
+    }
 
     try {
       if (useEnhancedContext) {
@@ -863,7 +912,7 @@ export default function ChatSessionPage() {
     }
   }
 
-  // 重新发送用户消息（使用原有的sendMessage逻辑）
+  // 重新发送用户消息（更新模式：先删除后续消息，再重新发送）
   const handleResendMessage = async (messageId: number) => {
     if (!currentSession || !currentSelectedModel || isGenerating) return
 
@@ -871,12 +920,45 @@ export default function ChatSessionPage() {
     const userMessage = messages.find(msg => msg.id === messageId)
     if (!userMessage || userMessage.role !== 'user') return
 
+    if (!window.confirm('重新发送将删除此消息及之后的所有消息，确定继续吗？')) {
+      return
+    }
+
     const systemPrompt = buildSystemPrompt()
     const modelConfig = getModelConfig(currentSelectedModel)
     
     if (!modelConfig.apiKey || !systemPrompt) return
 
     try {
+      // 1. 找到要重新发送的消息在列表中的位置
+      const messageIndex = messages.findIndex(msg => msg.id === messageId)
+      if (messageIndex === -1) return
+
+      // 2. 获取从该消息开始的所有后续消息ID（包括该消息本身）
+      const messagesToDelete = messages.slice(messageIndex)
+      const messageIdsToDelete = messagesToDelete.map(msg => msg.id)
+
+      console.log('🗑️ 准备删除消息:', messageIdsToDelete.length, '条')
+
+      // 3. 删除从该消息开始的所有后续消息
+      const { error: deleteError } = await supabase
+        .from('chat_messages')
+        .delete()
+        .in('id', messageIdsToDelete)
+
+      if (deleteError) {
+        throw new Error(`删除消息失败: ${deleteError.message}`)
+      }
+
+      console.log('✅ 消息删除成功')
+
+      // 4. 计算剩余消息
+      const remainingMessages = messages.slice(0, messageIndex)
+      
+      // 给数据库一点时间完成删除操作
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // 5. 重新发送消息
       if (useEnhancedContext) {
         await dispatch(sendMessageWithContext({
           sessionId: currentSession.id,
@@ -884,7 +966,7 @@ export default function ChatSessionPage() {
           systemPrompt,
           apiKey: modelConfig.apiKey,
           model: currentSelectedModel,
-          messages: messages.filter(msg => msg.id !== messageId), // 排除当前消息
+          messages: remainingMessages,
           thinkingBudget: getThinkingBudget(currentSelectedModel),
           contextConfig,
           characterName: currentCharacter?.name || '角色',
@@ -892,28 +974,29 @@ export default function ChatSessionPage() {
           actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
         }))
       } else {
-        // 非智能模式：获取完整历史，然后找到当前消息位置，使用其之前的消息
-        const completeMessages = await getCompleteMessageHistory(currentSession.id)
-        const messageIndex = completeMessages.findIndex(msg => msg.id === messageId)
-        const historyMessages = messageIndex > 0 ? completeMessages.slice(0, messageIndex) : []
-        
-        console.log('🔧 非智能模式重新发送，使用完整历史中的前', historyMessages.length, '条消息')
+        // 非智能模式：由于我们已经删除了消息，直接使用剩余的消息历史
+        console.log('🔧 非智能模式重新发送，使用剩余历史:', remainingMessages.length, '条消息')
         await dispatch(sendMessage({
           sessionId: currentSession.id,
           userMessage: userMessage.content,
           systemPrompt,
           apiKey: modelConfig.apiKey,
           model: currentSelectedModel,
-          messages: historyMessages, // 使用完整历史中当前消息之前的部分
+          messages: remainingMessages, // 直接使用已经计算好的剩余消息
           thinkingBudget: getThinkingBudget(currentSelectedModel),
           baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
           actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
         }))
       }
       
+      console.log('✅ 重新发送完成')
       setSelectedMessageId(null)
     } catch (error) {
       console.error('重新发送消息失败:', error)
+      alert(`重新发送失败: ${error}`)
+      
+      // 发生错误时重新加载消息列表
+      dispatch(fetchMessages(currentSession.id))
     }
   }
 
@@ -1346,7 +1429,7 @@ export default function ChatSessionPage() {
                                     variant="ghost"
                                     onClick={() => handleGetInspiration()}
                                     disabled={isGenerating || isGettingInspiration}
-                                    className="h-7 px-2 text-xs bg-white border border-slate-200 hover:bg-yellow-50 hover:border-yellow-200 hover:text-yellow-600"
+                                    className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 hover:border-yellow-200 dark:hover:border-yellow-800 hover:text-yellow-600 dark:hover:text-yellow-400"
                                   >
                                     <Lightbulb className="w-3 h-3 mr-1" />
                                     灵感
@@ -1374,6 +1457,7 @@ export default function ChatSessionPage() {
                                       onClick={() => handleResendMessage(message.id)}
                                       disabled={isGenerating}
                                       className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600"
+                                      title="重新发送此消息（将删除此消息及之后的所有消息）"
                                     >
                                       <RefreshCw className={`w-3 h-3 mr-1 ${isGenerating ? 'animate-spin' : ''}`} />
                                       重新发送
@@ -1441,40 +1525,35 @@ export default function ChatSessionPage() {
 
       {/* 固定底部输入框 */}
       {hasStarted && (
-        <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-t border-slate-200 dark:border-slate-700 p-3 sm:p-4 flex-shrink-0">
-          <div className="flex items-center space-x-2 sm:space-x-3 bg-slate-100/80 dark:bg-slate-700/80 rounded-full p-1">
+        <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 p-4 flex-shrink-0 shadow-lg">
+          <div className="flex items-end space-x-3 bg-slate-50/80 dark:bg-slate-700/80 rounded-2xl p-2 shadow-inner border border-slate-200/50 dark:border-slate-600/50">
             <Textarea
+              ref={inputRef}
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               placeholder={
                 isGettingInspiration 
                   ? "正在为你生成灵感..." 
-                  : // 检测是否为移动设备
-                    /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768
-                      ? "输入消息... (Ctrl+Enter发送)"
-                      : "输入消息... (Enter发送，Shift+Enter换行)"
+                  : "输入消息..."
               }
-              className="flex-1 resize-none text-base bg-transparent border-none focus:ring-0 focus:outline-none min-h-[24px] max-h-[120px] px-3 py-1.5"
+              className="flex-1 resize-none text-base bg-transparent border-none focus:ring-0 focus:outline-none min-h-[40px] max-h-[120px] px-3 py-2 placeholder:text-slate-400 dark:placeholder:text-slate-500"
               rows={1}
               style={{
-                fontSize: '16px', // 强制设置16px字体大小防止iOS缩放
+                fontSize: '16px',
                 height: 'auto',
-                minHeight: '24px'
+                minHeight: '40px',
+                lineHeight: '1.5'
               }}
               onKeyDown={(e) => {
-                // 检测是否为移动设备
                 const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768
                 
                 if (e.key === 'Enter') {
                   if (isMobile) {
-                    // 移动端：需要 Ctrl+Enter 或 Cmd+Enter 才发送消息
                     if (e.ctrlKey || e.metaKey) {
                       e.preventDefault()
                       handleSendMessage()
                     }
-                    // 普通 Enter 键不做任何处理，允许换行
                   } else {
-                    // 桌面端：Enter 发送，Shift+Enter 换行
                     if (!e.shiftKey) {
                       e.preventDefault()
                       handleSendMessage()
@@ -1485,29 +1564,32 @@ export default function ChatSessionPage() {
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement
                 target.style.height = 'auto'
-                target.style.height = Math.min(target.scrollHeight, 120) + 'px'
+                target.style.height = Math.min(Math.max(target.scrollHeight, 40), 120) + 'px'
               }}
             />
-            {/* 灵感加载指示器 */}
-            {isGettingInspiration && (
-              <div className="self-end flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 flex-shrink-0">
-                <div className="w-4 h-4 animate-spin rounded-full border-2 border-yellow-500 border-t-transparent" />
-              </div>
-            )}
-            <Button
-              onClick={handleSendMessage}
-              disabled={!userInput.trim() || isGenerating || isGettingInspiration}
-              className="self-end rounded-full w-8 h-8 sm:w-9 sm:h-9 p-0 flex-shrink-0 bg-blue-500 hover:bg-blue-600 text-white"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
+            {/* 发送按钮区域 */}
+            <div className="flex items-center space-x-2">
+              {/* 灵感加载指示器 */}
+              {isGettingInspiration && (
+                <div className="flex items-center justify-center w-10 h-10 flex-shrink-0">
+                  <div className="w-5 h-5 animate-spin rounded-full border-2 border-yellow-500 border-t-transparent" />
+                </div>
+              )}
+              <Button
+                onClick={handleSendMessage}
+                disabled={!userInput.trim() || isGenerating || isGettingInspiration}
+                className="rounded-full w-10 h-10 p-0 flex-shrink-0 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
           
           {/* 错误提示 */}
           {error && (
-            <div className="mt-2 text-sm text-red-600 bg-red-50 p-2 rounded-lg flex items-center justify-between">
+            <div className="mt-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 p-3 rounded-xl border border-red-200 dark:border-red-800 flex items-center justify-between">
               <span className="flex-1">{error}</span>
-              <Button size="sm" variant="ghost" onClick={() => dispatch(clearError())} className="p-1 h-6 w-6">
+              <Button size="sm" variant="ghost" onClick={() => dispatch(clearError())} className="p-1 h-6 w-6 hover:bg-red-100 dark:hover:bg-red-800/30">
                 <X className="w-3 h-3" />
               </Button>
             </div>

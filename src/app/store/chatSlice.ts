@@ -164,14 +164,25 @@ export const fetchMessages = createAsyncThunk(
 export const fetchAllMessagesForAPI = createAsyncThunk(
   'chat/fetchAllMessagesForAPI',
   async (sessionId: string) => {
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('created_at', { ascending: true }) // 正序获取完整历史
+    try {
+      console.log('📡 开始获取完整消息历史，sessionId:', sessionId)
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true }) // 正序获取完整历史
 
-    if (error) throw error
-    return data || []
+      if (error) {
+        console.error('💥 Supabase查询失败:', error)
+        throw error
+      }
+      
+      console.log('✅ 成功获取消息:', data?.length || 0, '条')
+      return data || []
+    } catch (error) {
+      console.error('💥 fetchAllMessagesForAPI失败:', error)
+      throw error
+    }
   }
 )
 

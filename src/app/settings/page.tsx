@@ -942,7 +942,7 @@ export default function MyPage() {
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <div className="space-y-2">
-                                    <Label className="text-sm font-medium">配置名称 *</Label>
+                                    <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">配置名称 *</Label>
                                     <Input
                                       type="text"
                                       placeholder="例如: Gemini 2.5 Pro 中转"
@@ -952,7 +952,7 @@ export default function MyPage() {
                                     />
                                   </div>
                                   <div className="space-y-2">
-                                    <Label className="text-sm font-medium">模型名称 *</Label>
+                                    <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">模型名称 *</Label>
                                     <Input
                                       type="text"
                                       placeholder="gemini-2.0-flash-exp"
@@ -964,7 +964,7 @@ export default function MyPage() {
                                 </div>
 
                                 <div className="space-y-2">
-                                  <Label className="text-sm font-medium">Base URL *</Label>
+                                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Base URL *</Label>
                                   <Input
                                     type="text"
                                     placeholder="https://www.chataiapi.com/v1"
@@ -975,7 +975,7 @@ export default function MyPage() {
                                 </div>
 
                                 <div className="space-y-2">
-                                  <Label className="text-sm font-medium">API 密钥 *</Label>
+                                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">API 密钥 *</Label>
                                   <Input
                                     type="password"
                                     placeholder="sk-xxxx这里输入你的令牌"
@@ -986,7 +986,7 @@ export default function MyPage() {
                                 </div>
 
                                 <div className="space-y-2">
-                                  <Label className="text-sm font-medium">描述 (可选)</Label>
+                                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">描述 (可选)</Label>
                                   <Input
                                     type="text"
                                     placeholder="简短描述这个配置..."
@@ -997,11 +997,11 @@ export default function MyPage() {
                                 </div>
 
                                 {/* Thinking Budget 配置 */}
-                                <div className="space-y-3 border-t border-slate-200 pt-4">
+                                <div className="space-y-3 border-t border-slate-200 dark:border-slate-600 pt-4">
                                   <div className="flex items-center justify-between">
                                     <div>
-                                      <Label className="text-sm font-medium">支持 Thinking 功能</Label>
-                                      <p className="text-xs text-slate-500 mt-1">适用于 Gemini 2.5 系列等支持思考过程的模型</p>
+                                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">支持 Thinking 功能</Label>
+                                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">适用于 Gemini 2.5 系列等支持思考过程的模型</p>
                                     </div>
                                     <Switch
                                       checked={editRelayConfig.supportsThinking || false}
@@ -1010,9 +1010,9 @@ export default function MyPage() {
                                   </div>
 
                                   {editRelayConfig.supportsThinking && (
-                                    <div className="space-y-3 bg-slate-50 p-3 rounded-lg">
+                                    <div className="space-y-3 bg-slate-50 dark:bg-slate-600 p-3 rounded-lg">
                                       <div className="space-y-2">
-                                        <Label className="text-sm font-medium">Thinking Budget 模式</Label>
+                                        <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Thinking Budget 模式</Label>
                                         <Select 
                                           value={editRelayConfig.thinkingBudgetMode || 'auto'}
                                           onValueChange={(value) => handleEditRelayConfigChange('thinkingBudgetMode', value)}
@@ -1029,7 +1029,7 @@ export default function MyPage() {
 
                                       {editRelayConfig.thinkingBudgetMode === 'manual' && (
                                         <div className="space-y-2">
-                                          <Label className="text-sm font-medium">Thinking Budget 值</Label>
+                                          <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Thinking Budget 值</Label>
                                           <Input
                                             type="number"
                                             placeholder="例如: 20000"
@@ -1039,14 +1039,14 @@ export default function MyPage() {
                                             min="0"
                                             max="100000"
                                           />
-                                          <p className="text-xs text-slate-500">
+                                          <p className="text-xs text-slate-500 dark:text-slate-400">
                                             设置思考过程的 token 预算，0 表示无限制
                                           </p>
                                         </div>
                                       )}
 
-                                      <div className="bg-blue-50 border border-blue-200 rounded p-2">
-                                        <p className="text-xs text-blue-700">
+                                      <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded p-2">
+                                        <p className="text-xs text-blue-700 dark:text-blue-300">
                                           💡 <strong>提示:</strong> Thinking 功能让模型在回答前进行思考，提高回答质量。自动模式由模型决定思考深度，手动模式可限制思考的 token 消耗。
                                         </p>
                                       </div>
@@ -1136,9 +1136,9 @@ export default function MyPage() {
 
                     {/* 添加新配置表单 */}
                     {isAddingRelay && (
-                      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-4">
+                      <div className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4 space-y-4">
                         <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-medium text-slate-700">添加新的中转配置</h4>
+                          <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">添加新的中转配置</h4>
                           <Button
                             onClick={() => setIsAddingRelay(false)}
                             variant="ghost"
@@ -1150,7 +1150,7 @@ export default function MyPage() {
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label className="text-sm font-medium">配置名称 *</Label>
+                            <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">配置名称 *</Label>
                             <Input
                               type="text"
                               placeholder="例如: Gemini 2.5 Pro 中转"
@@ -1160,7 +1160,7 @@ export default function MyPage() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label className="text-sm font-medium">模型名称 *</Label>
+                            <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">模型名称 *</Label>
                             <Input
                               type="text"
                               placeholder="gemini-2.0-flash-exp"
@@ -1172,7 +1172,7 @@ export default function MyPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium">Base URL *</Label>
+                          <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Base URL *</Label>
                           <Input
                             type="text"
                             placeholder="https://www.chataiapi.com/v1"
@@ -1183,7 +1183,7 @@ export default function MyPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium">API 密钥 *</Label>
+                          <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">API 密钥 *</Label>
                           <Input
                             type="password"
                             placeholder="sk-xxxx这里输入你的令牌"
@@ -1194,7 +1194,7 @@ export default function MyPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium">描述 (可选)</Label>
+                          <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">描述 (可选)</Label>
                           <Input
                             type="text"
                             placeholder="简短描述这个配置..."
@@ -1205,11 +1205,11 @@ export default function MyPage() {
                         </div>
 
                         {/* Thinking Budget 配置 */}
-                        <div className="space-y-3 border-t border-slate-200 pt-4">
+                        <div className="space-y-3 border-t border-slate-200 dark:border-slate-600 pt-4">
                           <div className="flex items-center justify-between">
                             <div>
-                              <Label className="text-sm font-medium">支持 Thinking 功能</Label>
-                              <p className="text-xs text-slate-500 mt-1">适用于 Gemini 2.5 系列等支持思考过程的模型</p>
+                              <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">支持 Thinking 功能</Label>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">适用于 Gemini 2.5 系列等支持思考过程的模型</p>
                             </div>
                             <Switch
                               checked={newRelayConfig.supportsThinking || false}
@@ -1218,9 +1218,9 @@ export default function MyPage() {
                           </div>
 
                           {newRelayConfig.supportsThinking && (
-                            <div className="space-y-3 bg-slate-50 p-3 rounded-lg">
+                            <div className="space-y-3 bg-slate-50 dark:bg-slate-600 p-3 rounded-lg">
                               <div className="space-y-2">
-                                <Label className="text-sm font-medium">Thinking Budget 模式</Label>
+                                <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Thinking Budget 模式</Label>
                                 <Select 
                                   value={newRelayConfig.thinkingBudgetMode || 'auto'}
                                   onValueChange={(value) => handleNewRelayConfigChange('thinkingBudgetMode', value)}
@@ -1237,7 +1237,7 @@ export default function MyPage() {
 
                               {newRelayConfig.thinkingBudgetMode === 'manual' && (
                                 <div className="space-y-2">
-                                  <Label className="text-sm font-medium">Thinking Budget 值</Label>
+                                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Thinking Budget 值</Label>
                                   <Input
                                     type="number"
                                     placeholder="例如: 20000"
@@ -1247,14 +1247,14 @@ export default function MyPage() {
                                     min="0"
                                     max="100000"
                                   />
-                                  <p className="text-xs text-slate-500">
+                                  <p className="text-xs text-slate-500 dark:text-slate-400">
                                     设置思考过程的 token 预算，0 表示无限制
                                   </p>
                                 </div>
                               )}
 
-                              <div className="bg-blue-50 border border-blue-200 rounded p-2">
-                                <p className="text-xs text-blue-700">
+                              <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded p-2">
+                                <p className="text-xs text-blue-700 dark:text-blue-300">
                                   💡 <strong>提示:</strong> Thinking 功能让模型在回答前进行思考，提高回答质量。自动模式由模型决定思考深度，手动模式可限制思考的 token 消耗。
                                 </p>
                               </div>
