@@ -348,7 +348,7 @@ export default function NewCharacterPage() {
           {/* Character Avatar - 右下角位置 */}
           <div className="absolute bottom-6 right-6">
             <motion.div 
-              className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-2xl bg-white cursor-pointer group"
+              className="w-32 h-32 rounded-full overflow-hidden border-4 border-white dark:border-slate-600 shadow-2xl bg-white dark:bg-slate-700 cursor-pointer group"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -521,7 +521,7 @@ export default function NewCharacterPage() {
                           onKeyDown={handleKeywordKeyDown}
                           className="w-full"
                         />
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                           输入关键词后按逗号、回车键来添加标签。按退格键删除最后一个标签。
                         </p>
                       </div>
@@ -538,7 +538,7 @@ export default function NewCharacterPage() {
                       onChange={(e) => handleBasicInfoChange('description', e.target.value)}
                       className="min-h-[120px] resize-none"
                     />
-                    <p className="text-xs text-slate-500">此信息用于AI对话，不会公开显示</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">此信息用于AI对话，不会公开显示</p>
                   </div>
 
                   {/* Character Introduction */}
@@ -551,7 +551,7 @@ export default function NewCharacterPage() {
                       onChange={(e) => handleBasicInfoChange('introduction', e.target.value)}
                       className="min-h-[100px] resize-none"
                     />
-                    <p className="text-xs text-slate-500">此说明会在角色列表中显示，帮助其他用户了解角色</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">此说明会在角色列表中显示，帮助其他用户了解角色</p>
                   </div>
 
                   {/* Initial Message */}
@@ -567,7 +567,7 @@ export default function NewCharacterPage() {
                       onChange={(e) => handleBasicInfoChange('initialMessage', e.target.value)}
                       className="min-h-[80px] resize-none"
                     />
-                    <p className="text-xs text-slate-500">每位用户进入聊天时都会看到这句话，让角色体验更一致</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">每位用户进入聊天时都会看到这句话，让角色体验更一致</p>
                   </div>
 
                   {/* Public Setting */}
@@ -582,7 +582,7 @@ export default function NewCharacterPage() {
                     <Label htmlFor="is_public" className="flex-1">
                       <div>
                         <p className="font-medium">公开角色</p>
-                        <p className="text-sm text-slate-500">允许其他用户发现和使用你的角色</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">允许其他用户发现和使用你的角色</p>
                       </div>
                     </Label>
                   </div>
@@ -618,7 +618,7 @@ export default function NewCharacterPage() {
                 </CardHeader>
                 <CardContent>
                   {modules.length === 0 ? (
-                    <div className="text-center py-12 text-slate-500">
+                    <div className="text-center py-12 text-slate-500 dark:text-slate-400">
                       <BookOpen className="w-16 h-16 mx-auto mb-4 opacity-50" />
                       <p className="text-lg font-medium">还没有设定模块</p>
                       <p className="text-sm">点击上方下拉菜单添加你的第一个设定模块</p>
@@ -631,7 +631,7 @@ export default function NewCharacterPage() {
                           <motion.div
                             key={module.id}
                             variants={itemVariants}
-                            className="border border-slate-200 rounded-lg p-4 sm:p-6 space-y-4 bg-white"
+                            className="border border-slate-200 dark:border-slate-600 rounded-lg p-4 sm:p-6 space-y-4 bg-white dark:bg-slate-800"
                           >
                             {/* Module Header - 移动端优化 */}
                             <div className="space-y-3">
@@ -639,13 +639,13 @@ export default function NewCharacterPage() {
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-2 min-w-0 flex-1">
                                   <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                    <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-600" />
+                                    <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-600 dark:text-slate-300 dark:text-slate-400" />
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <h3 className="font-medium text-slate-900 text-sm sm:text-base truncate">{module.type}</h3>
-                                    <p className="text-xs text-slate-500 sm:hidden">模块 #{index + 1}</p>
+                                    <h3 className="font-medium text-slate-900 dark:text-white text-sm sm:text-base truncate">{module.type}</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 sm:hidden">模块 #{index + 1}</p>
                                   </div>
-                                  <span className="text-sm text-slate-500 hidden sm:inline">#{index + 1}</span>
+                                  <span className="text-sm text-slate-500 dark:text-slate-400 hidden sm:inline">#{index + 1}</span>
                                 </div>
                                 {modules.length > 1 && (
                                   <Button
@@ -713,7 +713,7 @@ export default function NewCharacterPage() {
                                 {/* 移动端采用单列布局，桌面端保持三列 */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                                   <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-slate-600">姓名</Label>
+                                    <Label className="text-sm font-medium text-slate-600 dark:text-slate-300">姓名</Label>
                                     <Input
                                       placeholder="用户角色姓名"
                                       value={module.userRoleName || ''}
@@ -722,7 +722,7 @@ export default function NewCharacterPage() {
                                     />
                                   </div>
                                   <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-slate-600">年龄</Label>
+                                    <Label className="text-sm font-medium text-slate-600 dark:text-slate-300">年龄</Label>
                                     <Input
                                       placeholder="用户角色年龄"
                                       value={module.userRoleAge || ''}
@@ -731,7 +731,7 @@ export default function NewCharacterPage() {
                                     />
                                   </div>
                                   <div className="space-y-2 sm:col-span-2 lg:col-span-1">
-                                    <Label className="text-sm font-medium text-slate-600">性别</Label>
+                                    <Label className="text-sm font-medium text-slate-600 dark:text-slate-300">性别</Label>
                                     <Select 
                                       value={module.userRoleGender || ''} 
                                       onValueChange={(value) => updateModule(module.id, 'userRoleGender', value)}
@@ -750,7 +750,7 @@ export default function NewCharacterPage() {
                                   </div>
                                 </div>
                                 <div className="space-y-2">
-                                  <Label className="text-sm font-medium text-slate-600">详细设定</Label>
+                                  <Label className="text-sm font-medium text-slate-600 dark:text-slate-300">详细设定</Label>
                                   <Textarea
                                     placeholder="详细描述用户角色的背景、性格、经历等..."
                                     value={module.userRoleDetails || ''}
@@ -764,7 +764,7 @@ export default function NewCharacterPage() {
                             {/* 自定义模块的名称字段 */}
                             {module.type === '自定义模块' && (
                               <div className="space-y-2">
-                                <Label className="text-sm font-medium text-slate-600">模块名称</Label>
+                                <Label className="text-sm font-medium text-slate-600 dark:text-slate-300">模块名称</Label>
                                 <Input
                                   placeholder="自定义模块名称"
                                   value={module.name || ''}
@@ -777,7 +777,7 @@ export default function NewCharacterPage() {
                             {/* 通用内容字段（非用户角色设定） */}
                             {module.type !== '用户角色设定' && (
                               <div className="space-y-2">
-                                <Label className="text-sm font-medium text-slate-600">
+                                <Label className="text-sm font-medium text-slate-600 dark:text-slate-300">
                                   {module.type === '自定义模块' ? '模块内容' : '内容'}
                                 </Label>
                                 <Textarea

@@ -129,6 +129,22 @@ export const getExistingSession = createAsyncThunk(
   }
 )
 
+// 更新会话标题
+export const updateSessionTitle = createAsyncThunk(
+  'chat/updateSessionTitle',
+  async ({ sessionId, title }: { sessionId: string, title: string }) => {
+    const { data, error } = await supabase
+      .from('chat_sessions')
+      .update({ title })
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }
+)
+
 // 获取聊天会话信息
 export const fetchChatSession = createAsyncThunk(
   'chat/fetchSession',
@@ -788,7 +804,10 @@ const chatSlice = createSlice({
       .addCase(fetchCharacter.fulfilled, (state, action) => {
         state.isLoading = false
         state.currentCharacter = action.payload
-        state.sessionTitle = action.payload.name
+        // 只在没有sessionTitle时才使用角色名称作为默认值
+        if (!state.sessionTitle) {
+          state.sessionTitle = action.payload.name
+        }
       })
       .addCase(fetchCharacter.rejected, (state, action) => {
         state.isLoading = false
@@ -821,6 +840,15 @@ const chatSlice = createSlice({
       })
       .addCase(getExistingSession.rejected, (state, action) => {
         state.error = action.error.message || 'Failed to check existing session'
+      })
+      
+      // Update Session Title
+      .addCase(updateSessionTitle.fulfilled, (state, action) => {
+        state.currentSession = action.payload
+        state.sessionTitle = action.payload.title || ''
+      })
+      .addCase(updateSessionTitle.rejected, (state, action) => {
+        state.error = action.error.message || 'Failed to update session title'
       })
       
       // Fetch Messages

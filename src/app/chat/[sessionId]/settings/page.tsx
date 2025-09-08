@@ -17,6 +17,7 @@ import {
   fetchCharacter,
   fetchChatSession,
   clearChatHistory,
+  updateSessionTitle,
 } from '../../../store/chatSlice'
 import { getContextConfigSuggestions } from '../../../lib/enhancedChatSlice'
 
@@ -60,13 +61,16 @@ export default function ChatSettingsPage() {
   const sessionId = params.sessionId as string
 
   useEffect(() => {
-    dispatch(fetchChatSession(sessionId))
-    if (currentCharacter?.id) {
-      dispatch(fetchCharacter(currentCharacter.id))
+    const initializeSettings = async () => {
+      // 先获取会话信息
+      await dispatch(fetchChatSession(sessionId))
+      
+      if (currentCharacter?.id) {
+        dispatch(fetchCharacter(currentCharacter.id))
+      }
     }
-
-    setLocalSessionTitle(currentTitle || '')
-    setTempTitle(currentTitle || '')
+    
+    initializeSettings()
 
     const savedBg = localStorage.getItem(`chat_background_${sessionId}`)
     if (savedBg) {
@@ -125,7 +129,15 @@ export default function ChatSettingsPage() {
       localStorage.setItem(`chat_model_${sessionId}`, defaultModel)
     }
     
-  }, [currentTitle, sessionId, dispatch, currentCharacter?.id])
+  }, [sessionId, dispatch, currentCharacter?.id])
+
+  // 监听currentTitle变化并更新本地状态
+  useEffect(() => {
+    if (currentTitle !== undefined) {
+      setLocalSessionTitle(currentTitle || '')
+      setTempTitle(currentTitle || '')
+    }
+  }, [currentTitle])
 
   // 单独的配置加载effect，只在sessionId变化时执行
   useEffect(() => {
@@ -159,10 +171,16 @@ export default function ChatSettingsPage() {
     console.log('✅ Settings初始化完成')
   }, [sessionId])
 
-  const handleSaveTitle = () => {
-    dispatch(setSessionTitle(tempTitle))
-    setLocalSessionTitle(tempTitle)
-    setIsEditingTitle(false)
+  const handleSaveTitle = async () => {
+    try {
+      // 更新数据库中的session title
+      await dispatch(updateSessionTitle({ sessionId, title: tempTitle })).unwrap()
+      setLocalSessionTitle(tempTitle)
+      setIsEditingTitle(false)
+    } catch (error) {
+      console.error('保存标题失败:', error)
+      alert(`保存标题失败: ${error}`)
+    }
   }
 
   const handleBackgroundChange = (e: React.ChangeEvent<HTMLInputElement>) => {

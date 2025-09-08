@@ -101,6 +101,11 @@ export default function ChatSessionPage() {
   const [chatBackground, setChatBackground] = useState<string | null>(null)
   const [isGettingInspiration, setIsGettingInspiration] = useState(false)
   
+  // 批量删除相关状态
+  const [isBatchDeleteMode, setIsBatchDeleteMode] = useState(false)
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<number>>(new Set())
+  
+  
   // 从localStorage加载上下文配置
   const [contextConfig, setContextConfig] = useState({
     maxContextTokens: 4000,
@@ -364,6 +369,7 @@ export default function ChatSessionPage() {
 
     initializeChat()
   }, [sessionId, user, dispatch, router])
+
 
   // 同步模型选择状态
   useEffect(() => {
@@ -1000,15 +1006,76 @@ export default function ChatSessionPage() {
     }
   }
 
-  const handleDeleteMessage = async (messageId: number) => {
-    if (!window.confirm('确定要删除这条消息吗？此操作不可撤销。')) return
+  // 进入批量删除模式并选中指定消息
+  const handleDeleteMessage = (messageId: number) => {
+    // 进入批量删除模式并自动选中点击的消息
+    setIsBatchDeleteMode(true)
+    setSelectedMessageIds(new Set([messageId]))
+    setSelectedMessageId(null)
+    setEditingMessageId(null)
     
+    console.log('🗑️ 进入批量删除模式，选中消息:', messageId)
+  }
+
+
+  // 批量删除相关函数
+  const toggleBatchDeleteMode = () => {
+    setIsBatchDeleteMode(!isBatchDeleteMode)
+    setSelectedMessageIds(new Set())
+    setSelectedMessageId(null)
+    setEditingMessageId(null)
+  }
+
+  const toggleMessageSelection = (messageId: number) => {
+    setSelectedMessageIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(messageId)) {
+        newSet.delete(messageId)
+      } else {
+        newSet.add(messageId)
+      }
+      return newSet
+    })
+  }
+
+  const selectAllMessages = () => {
+    if (selectedMessageIds.size === messages.length) {
+      setSelectedMessageIds(new Set())
+    } else {
+      setSelectedMessageIds(new Set(messages.map(msg => msg.id)))
+    }
+  }
+
+  const handleBatchDelete = async () => {
+    if (selectedMessageIds.size === 0) {
+      alert('请先选择要删除的消息')
+      return
+    }
+
+    const confirmMessage = `确定要删除选中的 ${selectedMessageIds.size} 条消息吗？此操作不可撤销。`
+    if (!window.confirm(confirmMessage)) return
+
     try {
-      await dispatch(deleteMessage({ messageId }))
-      setSelectedMessageId(null)
-      setEditingMessageId(null)
+      // 删除选中的消息
+      const { error } = await supabase
+        .from('chat_messages')
+        .delete()
+        .in('id', Array.from(selectedMessageIds))
+
+      if (error) {
+        throw new Error(`批量删除失败: ${error.message}`)
+      }
+
+      console.log('✅ 批量删除成功')
+      
+      // 退出批量删除模式并刷新消息列表
+      setIsBatchDeleteMode(false)
+      setSelectedMessageIds(new Set())
+      dispatch(fetchMessages(currentSession!.id))
+      
     } catch (error) {
-      console.error('删除消息失败:', error)
+      console.error('批量删除失败:', error)
+      alert(`批量删除失败: ${error}`)
     }
   }
 
@@ -1268,6 +1335,54 @@ export default function ChatSessionPage() {
                 <span className="text-xs text-slate-400">已显示全部消息</span>
               </div>
             )}
+
+            {/* 批量删除工具栏 */}
+            {isBatchDeleteMode && (
+              <motion.div 
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="sticky top-0 z-10 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 p-3 mb-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Button
+                      onClick={toggleBatchDeleteMode}
+                      variant="ghost"
+                      size="sm"
+                      className="text-slate-600 dark:text-slate-300"
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      取消
+                    </Button>
+                    <span className="text-sm text-slate-600 dark:text-slate-300">
+                      {selectedMessageIds.size > 0 
+                        ? `已选择 ${selectedMessageIds.size} 条消息` 
+                        : '点击消息操作菜单中的删除按钮进入批量删除模式'
+                      }
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      onClick={selectAllMessages}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                    >
+                      {selectedMessageIds.size === messages.length ? '取消全选' : '全选'}
+                    </Button>
+                    <Button
+                      onClick={handleBatchDelete}
+                      disabled={selectedMessageIds.size === 0}
+                      variant="destructive"
+                      size="sm"
+                      className="text-xs"
+                    >
+                      删除 ({selectedMessageIds.size})
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
             
             <AnimatePresence>
               {messages.map((message, index) => (
@@ -1275,8 +1390,28 @@ export default function ChatSessionPage() {
                   key={message.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex items-start space-x-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
+                  {/* 批量删除模式下的选择框 */}
+                  {isBatchDeleteMode && (
+                    <div className={`flex-shrink-0 mt-2 ${message.role === 'user' ? 'order-last' : ''}`}>
+                      <div 
+                        className={`w-5 h-5 rounded-full border-2 cursor-pointer flex items-center justify-center transition-all ${
+                          selectedMessageIds.has(message.id) 
+                            ? 'bg-blue-500 border-blue-500' 
+                            : 'border-slate-300 dark:border-slate-600 hover:border-blue-400'
+                        }`}
+                        onClick={() => toggleMessageSelection(message.id)}
+                      >
+                        {selectedMessageIds.has(message.id) && (
+                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className={`flex max-w-[85%] sm:max-w-[80%] space-x-2 sm:space-x-3 ${
                     message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''
                   }`}>
@@ -1302,11 +1437,17 @@ export default function ChatSessionPage() {
                             ? 'bg-blue-500 text-white rounded-br-md' 
                             : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-md hover:bg-slate-50 dark:hover:bg-slate-700'
                         } ${
-                          selectedMessageId === message.id ? 'ring-2 ring-blue-500' : ''
+                          !isBatchDeleteMode && selectedMessageId === message.id ? 'ring-2 ring-blue-500' : ''
                         } ${
-                          'cursor-pointer'
+                          isBatchDeleteMode ? 'cursor-default' : 'cursor-pointer'
                         }`}
-                        onClick={() => handleMessageClick(message.id)}
+                        onClick={() => {
+                          // 在批量删除模式下不处理点击
+                          if (isBatchDeleteMode) {
+                            return
+                          }
+                          handleMessageClick(message.id)
+                        }}
                       >
                         {/* 编辑模式 */}
                         {editingMessageId === message.id ? (
@@ -1382,7 +1523,7 @@ export default function ChatSessionPage() {
                       </div>
 
                       {/* 消息操作按钮 - 移动端优化 */}
-                      {selectedMessageId === message.id && (
+                      {!isBatchDeleteMode && selectedMessageId === message.id && (
                         <div className="flex flex-wrap justify-center gap-1 mt-2">
                           {(() => {
                             const isLastMessage = index === messages.length - 1
@@ -1523,8 +1664,19 @@ export default function ChatSessionPage() {
         )}
       </div>
 
+      {/* 批量删除模式底部提示栏 */}
+      {isBatchDeleteMode && (
+        <div className="bg-amber-50 dark:bg-amber-900/30 border-t border-amber-200 dark:border-amber-800 p-4 flex-shrink-0">
+          <div className="flex items-center justify-center space-x-2 text-amber-700 dark:text-amber-300">
+            <Trash2 className="w-4 h-4" />
+            <span className="text-sm font-medium">批量删除模式</span>
+            <span className="text-xs">点击圆形复选框选择消息</span>
+          </div>
+        </div>
+      )}
+
       {/* 固定底部输入框 */}
-      {hasStarted && (
+      {hasStarted && !isBatchDeleteMode && (
         <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 p-4 flex-shrink-0 shadow-lg">
           <div className="flex items-end space-x-3 bg-slate-50/80 dark:bg-slate-700/80 rounded-2xl p-2 shadow-inner border border-slate-200/50 dark:border-slate-600/50">
             <Textarea

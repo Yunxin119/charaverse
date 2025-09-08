@@ -30,7 +30,7 @@ async function callDeepSeek(messages: ChatMessage[], systemPrompt: string, apiKe
         { role: 'system', content: systemPrompt },
         ...messages
       ],
-      temperature: 0.7,
+      temperature: 1,
       max_tokens: 5000,
     }),
   })
@@ -334,7 +334,7 @@ async function callOpenAI(messages: ChatMessage[], systemPrompt: string, apiKey:
         { role: 'system', content: systemPrompt },
         ...messages
       ],
-      temperature: 0.7,
+      temperature: 1,
       max_tokens: 2000,
     }),
   })
@@ -367,7 +367,7 @@ async function callRelayAPI(messages: ChatMessage[], systemPrompt: string, apiKe
   const requestBody: Record<string, unknown> = {
     model: actualModel,
     messages: apiMessages,
-    temperature: 0.7,
+    temperature: 1,
     max_tokens: 4000,
   }
 
