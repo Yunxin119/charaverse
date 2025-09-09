@@ -101,11 +101,18 @@ export default function ExplorePage() {
           .select('id, username')
           .in('id', userIds)
 
-        // 合并数据
-        const charactersWithProfiles = charactersData.map(character => ({
-          ...character,
-          profiles: profilesData?.find(profile => profile.id === character.user_id)
-        }))
+        // 合并数据，添加更好的username fallback逻辑
+        const charactersWithProfiles = charactersData.map(character => {
+          const profile = profilesData?.find(profile => profile.id === character.user_id)
+          return {
+            ...character,
+            profiles: {
+              ...profile,
+              // 改进fallback逻辑：如果没有username，显示友好的默认名称
+              username: profile?.username || '创作者'
+            }
+          }
+        })
 
         setCharacters(charactersWithProfiles)
       } else {
@@ -364,7 +371,7 @@ export default function ExplorePage() {
                              {character.name}
                            </h3>
                            <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
-                             由 {character.profiles?.username || '匿名用户'} 创建
+                             由 {character.profiles?.username} 创建
                            </p>
                          </div>
                        </div>

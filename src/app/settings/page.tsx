@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Info } from 'lucide-react'
+import { Info, Plus } from 'lucide-react'
 import { 
   User, 
   Lock, 
@@ -44,6 +44,7 @@ import { AvatarUpload } from '../components/AvatarUpload'
 import { uploadUserAvatar } from '../lib/avatarUpload'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '../contexts/ThemeContext'
+import { ApiPoolManager } from '../components/ApiPoolManager'
 
 interface UserProfile {
   username: string
@@ -876,56 +877,50 @@ export default function MyPage() {
               </TabsContent>
 
               {/* API密钥Tab */}
-              <TabsContent value="api" className="space-y-6">
-                {/* 私人标识 */}
-                <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50">
-                  <CardContent className="pt-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                        <Lock className="w-5 h-5 text-amber-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-amber-900">仅私人可见</h3>
-                        <p className="text-sm text-amber-700">
-                          您的API密钥仅存储在本地浏览器，我们绝不会访问或上传
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              <TabsContent value="api" className="space-y-4">
+                {/* 简化的提示 */}
+                <div className="text-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    <Lock className="w-4 h-4 inline mr-1" />
+                    API密钥仅存储在本地，不会上传
+                  </p>
+                </div>
 
-                {/* 命名中转API配置 */}
-                <Card className="border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50">
+                {/* API Pool Managers */}
+                <div className="space-y-4">
+                  <ApiPoolManager provider="deepseek" />
+                  <ApiPoolManager provider="gemini" />
+                  <ApiPoolManager provider="openai" />
+                  <ApiPoolManager provider="custom" />
+                </div>
+
+                {/* 中转API服务 (简化版) */}
+                <Card>
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                          <Globe className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-base">中转API服务</CardTitle>
-                          <p className="text-sm text-slate-500">管理多个中转API配置</p>
-                        </div>
-                      </div>
+                      <CardTitle className="text-base flex items-center space-x-2">
+                        <Globe className="w-4 h-4" />
+                        <span>中转服务</span>
+                      </CardTitle>
                       <Button
                         onClick={() => {
                           setIsAddingRelay(true)
-                          setEditingRelayId(null) // 关闭编辑表单
+                          setEditingRelayId(null)
                         }}
                         size="sm"
-                        className="bg-indigo-500 hover:bg-indigo-600"
+                        variant="outline"
                       >
-                        添加配置
+                        <Plus className="w-3 h-3 mr-1" />
+                        添加
                       </Button>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* 现有的命名配置列表 */}
+                    {/* 现有配置 */}
                     {namedRelayConfigs.length > 0 && (
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-medium text-slate-700">已配置的中转服务</h4>
+                      <div className="space-y-2">
                         {namedRelayConfigs.map((config) => (
-                          <div key={config.id} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4">
+                          <div key={config.id} className="border rounded-lg p-3">
                             {editingRelayId === config.id ? (
                               // 编辑表单
                               <div className="space-y-4">
@@ -1293,8 +1288,13 @@ export default function MyPage() {
 
 
 
-                {/* API Keys */}
-                <div className="space-y-4">
+                {/* 传统模式 (折叠) */}
+                <details className="mt-8">
+                  <summary className="text-sm text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-700 dark:hover:text-slate-300">
+                    传统API密钥 (兼容模式)
+                  </summary>
+                  <div className="space-y-3 mt-4">
+
                   {apiProviders.map((provider) => (
                     <motion.div 
                       key={provider.id}
@@ -1302,21 +1302,21 @@ export default function MyPage() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3 }}
                     >
-                      <Card className="hover:shadow-md transition-shadow">
+                      <Card className="hover:shadow-md transition-shadow opacity-75">
                         <CardHeader className="pb-3">
                           <div className="flex items-center space-x-3">
-                            <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${provider.color} flex items-center justify-center`}>
+                            <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${provider.color} flex items-center justify-center opacity-80`}>
                               <Key className="w-5 h-5 text-white" />
                             </div>
                             <div>
-                              <CardTitle className="text-base">{provider.name}</CardTitle>
-                              <p className="text-sm text-slate-500">{provider.description}</p>
+                              <CardTitle className="text-base text-slate-600 dark:text-slate-400">{provider.name} (传统)</CardTitle>
+                              <p className="text-sm text-slate-500 dark:text-slate-400">{provider.description}</p>
                             </div>
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
                           <div className="space-y-2">
-                            <Label className="text-sm font-medium">API 密钥</Label>
+                            <Label className="text-sm font-medium text-slate-600 dark:text-slate-400">API 密钥</Label>
                             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                               <div className="relative flex-1">
                                 <Input
@@ -1324,7 +1324,7 @@ export default function MyPage() {
                                   placeholder={provider.placeholder}
                                   value={apiKeys[provider.id]}
                                   onChange={(e) => handleKeyChange(provider.id, e.target.value)}
-                                  className="pr-10"
+                                  className="pr-10 bg-slate-50 dark:bg-slate-700"
                                 />
                                 <Button
                                   type="button"
@@ -1345,6 +1345,7 @@ export default function MyPage() {
                                   onClick={() => handleSaveKey(provider.id)}
                                   disabled={!apiKeys[provider.id].trim()}
                                   size="sm"
+                                  variant="outline"
                                   className="flex-1 sm:flex-none"
                                 >
                                   保存
@@ -1364,16 +1365,17 @@ export default function MyPage() {
                           </div>
                           
                           {apiKeys[provider.id] && (
-                            <div className="flex items-center space-x-2 text-sm text-green-600 bg-green-50 rounded-lg p-2">
+                            <div className="flex items-center space-x-2 text-sm text-green-600 bg-green-50 dark:bg-green-900/20 rounded-lg p-2">
                               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                              <span>已配置</span>
+                              <span>已配置 (传统模式)</span>
                             </div>
                           )}
                         </CardContent>
                       </Card>
                     </motion.div>
                   ))}
-                </div>
+                  </div>
+                </details>
               </TabsContent>
 
               {/* 外观设置Tab */}

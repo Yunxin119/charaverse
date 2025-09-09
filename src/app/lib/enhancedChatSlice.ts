@@ -494,24 +494,32 @@ export const sendMessageWithContext = createAsyncThunk(
 
     const aiResponse = await response.json()
 
+    // 日志记录使用的API信息
+    if (aiResponse.apiUsed) {
+      console.log(`✅ 消息发送成功，使用API: ${aiResponse.apiUsed}${aiResponse.fallbackUsed ? ' (故障切换)' : ''}`)
+    }
+
     // 8. 保存AI消息
     const { data: aiMsgData, error: aiMsgError } = await supabase
       .from('chat_messages')
       .insert({
         session_id: sessionId,
         role: 'assistant',
-        content: aiResponse.content
+        content: aiResponse.content || aiResponse.message || ''
       })
       .select()
       .single()
 
     if (aiMsgError) throw aiMsgError
 
-    // 9. 返回结果，包含上下文统计信息
+    // 9. 返回结果，包含上下文统计信息和API池信息
     return {
       userMessage: userMsgData,
       aiMessage: aiMsgData,
-      contextStats: context.stats
+      contextStats: context.stats,
+      apiUsed: aiResponse.apiUsed,
+      fallbackUsed: aiResponse.fallbackUsed,
+      apiId: aiResponse.apiId
     }
   }
 )
@@ -622,17 +630,28 @@ export const regenerateMessageWithContext = createAsyncThunk(
 
     const aiResponse = await response.json()
 
+    // 日志记录使用的API信息
+    if (aiResponse.apiUsed) {
+      console.log(`✅ 消息重新生成成功，使用API: ${aiResponse.apiUsed}${aiResponse.fallbackUsed ? ' (故障切换)' : ''}`)
+    }
+
     // 7. 更新数据库中的消息
     const { data: updatedMessage, error } = await supabase
       .from('chat_messages')
-      .update({ content: aiResponse.content })
+      .update({ content: aiResponse.content || aiResponse.message || '' })
       .eq('id', lastMessageId)
       .select()
       .single()
 
     if (error) throw error
 
-    return updatedMessage
+    // 返回更新的消息和API池信息
+    return {
+      ...updatedMessage,
+      apiUsed: aiResponse.apiUsed,
+      fallbackUsed: aiResponse.fallbackUsed,
+      apiId: aiResponse.apiId
+    }
   }
 )
 

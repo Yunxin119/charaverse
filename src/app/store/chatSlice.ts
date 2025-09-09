@@ -334,6 +334,11 @@ export const sendMessage = createAsyncThunk(
 
     const aiResponse = await response.json()
 
+    // 检查是否使用了API池系统
+    if (aiResponse.apiUsed) {
+      console.log(`✅ 使用了API池: ${aiResponse.apiUsed}${aiResponse.fallbackUsed ? ' (故障切换)' : ''}`)
+    }
+
     // 保存AI消息
     const { data: aiMsgData, error: aiMsgError } = await supabase
       .from('chat_messages')
@@ -349,7 +354,11 @@ export const sendMessage = createAsyncThunk(
 
     return {
       userMessage: userMsgData,
-      aiMessage: aiMsgData
+      aiMessage: aiMsgData,
+      // 传递API池信息给前端
+      ...(aiResponse.apiUsed && { apiUsed: aiResponse.apiUsed }),
+      ...(aiResponse.fallbackUsed && { fallbackUsed: aiResponse.fallbackUsed }),
+      ...(aiResponse.apiId && { apiId: aiResponse.apiId })
     }
   }
 )
@@ -421,6 +430,11 @@ export const regenerateLastMessage = createAsyncThunk(
 
     const aiResponse = await response.json()
 
+    // 检查是否使用了API池系统
+    if (aiResponse.apiUsed) {
+      console.log(`✅ 重新生成消息使用API池: ${aiResponse.apiUsed}${aiResponse.fallbackUsed ? ' (故障切换)' : ''}`)
+    }
+
     // 更新数据库中的消息内容
     const { data: updatedMsg, error: updateError } = await supabase
       .from('chat_messages')
@@ -431,7 +445,13 @@ export const regenerateLastMessage = createAsyncThunk(
 
     if (updateError) throw updateError
 
-    return updatedMsg
+    return {
+      ...updatedMsg,
+      // 传递API池信息给前端
+      ...(aiResponse.apiUsed && { apiUsed: aiResponse.apiUsed }),
+      ...(aiResponse.fallbackUsed && { fallbackUsed: aiResponse.fallbackUsed }),
+      ...(aiResponse.apiId && { apiId: aiResponse.apiId })
+    }
   }
 )
 

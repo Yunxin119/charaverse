@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { apiManager } from '../../lib/apiManager'
+import { ApiConfig } from '../../types/apiConfig'
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -347,13 +349,49 @@ async function callOpenAI(messages: ChatMessage[], systemPrompt: string, apiKey:
   return data.choices[0].message.content
 }
 
+// 通用API调用函数 - 使用ApiConfig调用对应的API
+async function callApiWithConfig(
+  apiConfig: ApiConfig, 
+  messages: ChatMessage[], 
+  systemPrompt: string, 
+  model: string, 
+  thinkingBudget?: number, 
+  customUserMessage?: string
+): Promise<string> {
+  console.log(`🔄 调用API: ${apiConfig.name} (${apiConfig.provider})`);
+
+  const { provider, apiKey, baseUrl, model: configModel } = apiConfig;
+
+  // 根据provider类型调用对应的API
+  switch (provider) {
+    case 'deepseek':
+      return callDeepSeek(messages, systemPrompt, apiKey, model);
+    
+    case 'gemini':
+      return callGemini(messages, systemPrompt, apiKey, model, thinkingBudget, 0, customUserMessage);
+    
+    case 'openai':
+      return callOpenAI(messages, systemPrompt, apiKey, model);
+    
+    case 'custom':
+      if (!baseUrl) {
+        throw new Error('Custom API configuration missing baseUrl');
+      }
+      const actualModel = configModel || model;
+      return callRelayAPI(messages, systemPrompt, apiKey, actualModel, baseUrl, thinkingBudget, customUserMessage);
+    
+    default:
+      throw new Error(`Unsupported API provider: ${provider}`);
+  }
+}
+
 // 中转API调用（支持OpenAI格式的中转服务）
 async function callRelayAPI(messages: ChatMessage[], systemPrompt: string, apiKey: string, actualModel: string, baseUrl: string, thinkingBudget?: number, customUserMessage?: string) {
   // 确保baseUrl以/v1结尾
   const apiUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`
   
   // 构建消息数组
-  let apiMessages = [
+  const apiMessages = [
     { role: 'system', content: systemPrompt },
     ...messages
   ]
@@ -417,6 +455,7 @@ async function callRelayAPI(messages: ChatMessage[], systemPrompt: string, apiKe
 export async function POST(request: NextRequest) {
   let model: string | undefined
   let messages: ChatMessage[] | undefined
+  let selectedApiId: string | undefined
   
   try {
     const body: ChatRequest = await request.json()
@@ -431,13 +470,13 @@ export async function POST(request: NextRequest) {
     const customUserMessage = parsedBody.customUserMessage
 
     // 添加详细的调试信息
-    console.log('API Request Body:', {
+    console.log('🎯 Chat API Request:', {
       messages: messages ? `${messages.length} messages` : 'undefined',
       systemPrompt: systemPrompt ? `${systemPrompt.length} chars` : 'undefined',
-      apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'undefined',
       model: model || 'undefined',
       thinkingBudget,
-      baseUrl: baseUrl || 'undefined',
+      hasLegacyApiKey: !!apiKey,
+      hasBaseUrl: !!baseUrl,
       actualModel: actualModel || 'undefined'
     })
 
@@ -445,7 +484,6 @@ export async function POST(request: NextRequest) {
     const missingParams = []
     if (!Array.isArray(messages)) missingParams.push('messages')
     if (!systemPrompt || systemPrompt.trim() === '') missingParams.push('systemPrompt')
-    if (!apiKey || apiKey.trim() === '') missingParams.push('apiKey')
     if (!model || model.trim() === '') missingParams.push('model')
 
     if (missingParams.length > 0) {
@@ -457,34 +495,155 @@ export async function POST(request: NextRequest) {
     }
 
     let content: string
+    let usedApiName: string
+    let fallbackUsed = false
 
-    // 根据模型选择对应的API
+    // 检查是否是命名中转API（向后兼容）
     if (model.startsWith('named-relay-')) {
-      // 命名中转API调用
-      if (!baseUrl || !actualModel) {
+      console.log('🔄 使用命名中转API（兼容模式）');
+      if (!baseUrl || !actualModel || !apiKey) {
         return NextResponse.json(
-          { error: 'Relay API requires baseUrl and actualModel parameters' },
+          { error: 'Named relay API requires baseUrl, actualModel, and apiKey parameters' },
           { status: 400 }
         )
       }
       content = await callRelayAPI(messages, systemPrompt, apiKey, actualModel, baseUrl, thinkingBudget, customUserMessage)
-    } else if (model.startsWith('deepseek')) {
-      content = await callDeepSeek(messages, systemPrompt, apiKey, model)
-    } else if (model.startsWith('gemini')) {
-      content = await callGemini(messages, systemPrompt, apiKey, model, thinkingBudget, 0, customUserMessage)
-    } else if (model.startsWith('gpt')) {
-      content = await callOpenAI(messages, systemPrompt, apiKey, model)
-    } else {
-      return NextResponse.json(
-        { error: 'Unsupported model' },
-        { status: 400 }
-      )
+      usedApiName = `中转API (${actualModel})`
+    }
+    // 检查是否有传统API Key（向后兼容）
+    else if (apiKey && apiKey.trim()) {
+      console.log('🔄 使用传统API Key（兼容模式）');
+      // 使用传统API调用方式（向后兼容）
+      if (model.startsWith('deepseek')) {
+        content = await callDeepSeek(messages, systemPrompt, apiKey, model)
+      } else if (model.startsWith('gemini')) {
+        content = await callGemini(messages, systemPrompt, apiKey, model, thinkingBudget, 0, customUserMessage)
+      } else if (model.startsWith('gpt')) {
+        content = await callOpenAI(messages, systemPrompt, apiKey, model)
+      } else {
+        return NextResponse.json(
+          { error: 'Unsupported model for legacy API' },
+          { status: 400 }
+        )
+      }
+      usedApiName = `传统API (${model})`
+    }
+    // 使用新的API池系统
+    else {
+      console.log('🚀 使用API池系统');
+      
+      // 解析provider
+      let provider: string
+      if (model.startsWith('deepseek')) provider = 'deepseek'
+      else if (model.startsWith('gemini')) provider = 'gemini'
+      else if (model.startsWith('gpt')) provider = 'openai'
+      else provider = 'custom'
+
+      // 从API池选择API
+      const selectedApi = apiManager.selectApi(provider)
+      
+      if (!selectedApi) {
+        return NextResponse.json(
+          { error: `没有可用的 ${provider} API，请在设置中添加API密钥` },
+          { status: 400 }
+        )
+      }
+
+      selectedApiId = selectedApi.id
+      console.log(`🎯 选中API: ${selectedApi.name} (优先级: ${selectedApi.priority})`);
+
+      try {
+        // 使用选中的API调用
+        content = await callApiWithConfig(
+          selectedApi, 
+          messages, 
+          systemPrompt, 
+          model, 
+          thinkingBudget, 
+          customUserMessage
+        )
+
+        // 标记API调用成功
+        apiManager.markApiSuccess(selectedApi.id)
+        usedApiName = selectedApi.name
+
+      } catch (apiError) {
+        console.error(`❌ API ${selectedApi.name} 调用失败:`, apiError);
+
+        // 标记API调用失败
+        apiManager.markApiError(selectedApi.id)
+
+        // 检查是否支持故障切换
+        const providerMode = apiManager.getProviderMode(provider)
+        console.log(`🔍 Provider模式: ${providerMode}`);
+        
+        if (providerMode === 'round_robin' || providerMode === 'active_only') {
+          console.log('🔄 尝试故障切换...');
+          
+          // 尝试获取另一个API
+          const fallbackApi = apiManager.selectApi(provider)
+          
+          if (fallbackApi && fallbackApi.id !== selectedApi.id) {
+            console.log(`🔄 切换到备用API: ${fallbackApi.name}`);
+            
+            try {
+              content = await callApiWithConfig(
+                fallbackApi,
+                messages,
+                systemPrompt,
+                model,
+                thinkingBudget,
+                customUserMessage
+              )
+
+              // 标记备用API成功
+              apiManager.markApiSuccess(fallbackApi.id)
+              usedApiName = fallbackApi.name
+              fallbackUsed = true
+              
+            } catch (fallbackError) {
+              console.error(`❌ 备用API ${fallbackApi.name} 也失败:`, fallbackError);
+              apiManager.markApiError(fallbackApi.id)
+              throw apiError // 抛出原始错误
+            }
+          } else {
+            console.log('❌ 没有可用的备用API');
+            throw apiError
+          }
+        } else {
+          console.log('❌ 单API模式，不进行故障切换');
+          throw apiError
+        }
+      }
     }
 
-    return NextResponse.json({ content })
+    // 构建响应
+    const response: any = { content }
+    
+    if (usedApiName) {
+      response.apiUsed = usedApiName
+    }
+    
+    if (fallbackUsed) {
+      response.fallbackUsed = true
+    }
+
+    if (selectedApiId) {
+      response.apiId = selectedApiId
+    }
+
+    console.log(`✅ API调用成功: ${usedApiName}${fallbackUsed ? ' (故障切换)' : ''}`);
+
+    return NextResponse.json(response)
 
   } catch (error) {
-    console.error('Chat API error:', error)
+    console.error('❌ Chat API error:', error)
+    
+    // 如果有选中的API ID，标记为失败
+    if (selectedApiId) {
+      apiManager.markApiError(selectedApiId)
+      console.log(`🔄 已标记API ${selectedApiId} 为失败状态`);
+    }
     
     // 提供更详细的错误信息
     let errorMessage = 'Internal server error'
@@ -496,11 +655,17 @@ export async function POST(request: NextRequest) {
       
       // 特殊处理一些常见的API错误
       if (error.message.includes('Gemini API Error')) {
-        errorMessage = 'Gemini API request failed: ' + error.message
+        errorMessage = 'Gemini API 调用失败: ' + error.message
+      } else if (error.message.includes('DeepSeek API error')) {
+        errorMessage = 'DeepSeek API 调用失败: ' + error.message
+      } else if (error.message.includes('OpenAI API error')) {
+        errorMessage = 'OpenAI API 调用失败: ' + error.message
+      } else if (error.message.includes('Relay API error')) {
+        errorMessage = '中转API 调用失败: ' + error.message
       } else if (error.message.includes('API returned empty response')) {
-        errorMessage = 'AI model returned empty response, possibly due to content filters'
+        errorMessage = 'AI模型返回空响应，可能是内容被过滤'
       } else if (error.message.includes('Malformed API response')) {
-        errorMessage = 'AI model returned malformed response, please try again'
+        errorMessage = 'AI模型响应格式错误，请重试'
       }
     }
     
@@ -509,13 +674,15 @@ export async function POST(request: NextRequest) {
       console.error('Detailed error info:', {
         message: errorMessage,
         details: errorDetails,
-        requestBody: { model, messagesCount: messages?.length }
+        requestBody: { model, messagesCount: messages?.length, selectedApiId },
+        apiPoolStatus: selectedApiId ? 'API池调用失败' : '传统模式调用失败'
       })
     }
     
     return NextResponse.json(
       { 
         error: errorMessage,
+        ...(selectedApiId && { apiId: selectedApiId }),
         ...(process.env.NODE_ENV === 'development' && { details: errorDetails })
       },
       { status: 500 }

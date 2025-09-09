@@ -46,13 +46,9 @@ import {
 } from '../../store/chatSlice'
 import { supabase } from '../../lib/supabase'
 import { sendMessageWithContext, getContextConfigSuggestions, regenerateMessageWithContext } from '../../lib/enhancedChatSlice'
+import { useApiConfig } from '../../lib/useApiConfig'
 
-interface APIConfig {
-  deepseek?: string
-  gemini?: string
-  openai?: string
-}
-
+// 保留命名中转配置接口以兼容现有功能
 interface NamedRelayConfig {
   id: string
   name: string
@@ -88,8 +84,17 @@ export default function ChatSessionPage() {
   const [userInput, setUserInput] = useState('')
   const [lastFailedInput, setLastFailedInput] = useState('') // 用于恢复失败的消息
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const [apiConfig, setApiConfig] = useState<APIConfig>({})
-  const [availableModels, setAvailableModels] = useState<string[]>([])
+  
+  // 使用新的API配置hook
+  const {
+    availableModels,
+    getModelConfig,
+    getModelDisplayName,
+    markApiResult,
+    hasAnyApiConfig,
+    getModeDisplayText,
+    getHealthStats
+  } = useApiConfig()
   const [hasStarted, setHasStarted] = useState(false)
   const [thinkingBudget, setThinkingBudget] = useState(0)
   const [thinkingBudgetMode, setThinkingBudgetMode] = useState<'auto' | 'manual'>('auto')
@@ -288,55 +293,8 @@ export default function ChatSessionPage() {
     return () => container.removeEventListener('scroll', handleScroll)
   }, [sessionId, messages.length, hasMoreMessages, isLoadingMoreMessages, hasStarted, dispatch])
 
-  // 加载API配置
-  useEffect(() => {
-    const loadApiConfig = () => {
-      const config: APIConfig = {}
-      const deepseek = localStorage.getItem('api_key_deepseek')
-      const gemini = localStorage.getItem('api_key_gemini')
-      const openai = localStorage.getItem('api_key_openai')
-      
-      if (deepseek) config.deepseek = deepseek
-      if (gemini) config.gemini = gemini
-      if (openai) config.openai = openai
-      
-      setApiConfig(config)
-      
-      // 根据可用API设置可选模型
-      const models: string[] = []
-      if (deepseek) {
-        models.push('deepseek-chat', 'deepseek-coder')
-      }
-      if (gemini) {
-        models.push('gemini-2.5-flash', 'gemini-2.5-pro')
-      }
-      if (openai) {
-        models.push('gpt-4o', 'gpt-4o-mini')
-      }
-      
-      // 加载命名的中转配置并添加到可用模型
-      const savedNamedConfigs = localStorage.getItem('named_relay_configs')
-      if (savedNamedConfigs) {
-        try {
-          const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs)
-          namedConfigs.forEach((namedConfig) => {
-            models.push(`named-relay-${namedConfig.id}`)
-          })
-        } catch (e) {
-          console.warn('Failed to parse named relay configs')
-        }
-      }
-      
-      setAvailableModels(models)
-      
-      // 如果没有任何模型可用，确保用户能看到错误提示
-      if (models.length === 0) {
-        console.warn('No models available - user needs to configure API keys')
-      }
-    }
-
-    loadApiConfig()
-  }, [])
+  // API配置在useApiConfig hook中自动处理
+  // 不再需要手动加载配置
 
   // 初始化页面数据
   useEffect(() => {
@@ -634,6 +592,9 @@ export default function ChatSessionPage() {
           baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
           actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
         }))
+        
+        // 标记API使用成功
+        markApiResult(modelConfig.apiId, true)
       }
 
       // 保存使用的模型
@@ -642,6 +603,13 @@ export default function ChatSessionPage() {
       router.replace(`/chat/${session.id}`)
     } catch (error) {
       console.error('开始故事失败:', error)
+      
+      // 标记API使用失败 (只有当是使用AI生成初始消息时)
+      const modelConfig = getModelConfig(currentSelectedModel)
+      if (modelConfig.apiId && !currentCharacter?.prompt_template?.basic_info?.initialMessage) {
+        markApiResult(modelConfig.apiId, false)
+      }
+      
       alert(`开始故事失败: ${error}`)
       setHasStarted(false) // 发生错误时回到配置界面
       setIsStartingStory(false)
@@ -718,8 +686,16 @@ export default function ChatSessionPage() {
           actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
         }))
       }
+      
+      // 标记API使用成功
+      markApiResult(modelConfig.apiId, true)
+      
     } catch (error) {
       console.error('发送消息失败:', error)
+      
+      // 标记API使用失败
+      markApiResult(modelConfig.apiId, false)
+      
       // 发送失败时恢复输入框内容
       setLastFailedInput(messageToSend)
       setUserInput(messageToSend)
@@ -767,76 +743,22 @@ export default function ChatSessionPage() {
           actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
         }))
       }
+      
+      // 标记API使用成功
+      markApiResult(modelConfig.apiId, true)
+      
     } catch (error) {
       console.error('重新生成消息失败:', error)
+      
+      // 标记API使用失败
+      markApiResult(modelConfig.apiId, false)
     }
   }
 
-  // 获取模型的完整配置
-  const getModelConfig = (model: string) => {
-    // 处理命名中转配置
-    if (model.startsWith('named-relay-')) {
-      const configId = model.replace('named-relay-', '')
-      try {
-        const savedNamedConfigs = localStorage.getItem('named_relay_configs')
-        if (savedNamedConfigs) {
-          const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs)
-          const config = namedConfigs.find(c => c.id === configId)
-          if (config) {
-            return {
-              apiKey: config.apiKey,
-              baseUrl: config.baseUrl,
-              modelName: config.modelName,
-              isRelay: true
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to parse named relay configs')
-      }
-    }
-    
-    // 处理标准模型
-    let apiKey: string | null = null
-    if (model.startsWith('deepseek')) apiKey = apiConfig.deepseek || null
-    else if (model.startsWith('gemini')) apiKey = apiConfig.gemini || null
-    else if (model.startsWith('gpt')) apiKey = apiConfig.openai || null
-    
-    return {
-      apiKey,
-      isRelay: false
-    }
-  }
+  // getModelConfig 现在由 useApiConfig hook 提供，支持轮询选择
 
 
-  // 模型显示名称
-  const getModelDisplayName = (model: string) => {
-    if (model.startsWith('named-relay-')) {
-      const configId = model.replace('named-relay-', '')
-      try {
-        const savedNamedConfigs = localStorage.getItem('named_relay_configs')
-        if (savedNamedConfigs) {
-          const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs)
-          const config = namedConfigs.find(c => c.id === configId)
-          if (config) return config.name
-        }
-      } catch (e) {
-        console.warn('Failed to parse named relay configs')
-      }
-      return `中转配置 ${configId}`
-    }
-    
-    const modelNames: Record<string, string> = {
-      'deepseek-chat': 'DeepSeek Chat',
-      'deepseek-coder': 'DeepSeek Coder',
-      'gemini-2.5-flash': 'Gemini 2.5 Flash',
-      'gemini-2.5-pro': 'Gemini 2.5 Pro',
-      'gpt-4o': 'GPT-4o',
-      'gpt-4o-mini': 'GPT-4o Mini'
-    }
-    
-    return modelNames[model] || model
-  }
+  // getModelDisplayName 现在由 useApiConfig hook 提供
 
   // 处理模型选择变化
   const handleModelChange = (model: string) => {
@@ -912,9 +834,15 @@ export default function ChatSessionPage() {
         actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
       }))
       
+      // 标记API使用成功
+      markApiResult(modelConfig.apiId, true)
+      
       setSelectedMessageId(null)
     } catch (error) {
       console.error('发送新消息失败:', error)
+      
+      // 标记API使用失败
+      markApiResult(modelConfig.apiId, false)
     }
   }
 
@@ -994,6 +922,9 @@ export default function ChatSessionPage() {
           actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
         }))
       }
+      
+      // 标记API使用成功
+      markApiResult(modelConfig.apiId, true)
       
       console.log('✅ 重新发送完成')
       setSelectedMessageId(null)
@@ -1148,6 +1079,9 @@ export default function ChatSessionPage() {
       if (result.content) {
         setUserInput(result.content.trim())
         console.log('✅ 灵感获取成功:', result.content.substring(0, 50) + '...')
+        
+        // 标记API使用成功
+        markApiResult(modelConfig.apiId, true)
       } else {
         throw new Error('未获得有效的灵感内容')
       }
@@ -1155,6 +1089,10 @@ export default function ChatSessionPage() {
       setSelectedMessageId(null)
     } catch (error) {
       console.error('获取灵感失败:', error)
+      
+      // 标记API使用失败
+      markApiResult(modelConfig.apiId, false)
+      
       alert(`获取灵感失败: ${error}`)
     } finally {
       setIsGettingInspiration(false)
@@ -1162,22 +1100,7 @@ export default function ChatSessionPage() {
   }
 
 
-  // 检查是否有任何可用的API配置
-  const hasAnyApiConfig = () => {
-    if (Object.keys(apiConfig).length > 0) return true
-    
-    try {
-      const savedNamedConfigs = localStorage.getItem('named_relay_configs')
-      if (savedNamedConfigs) {
-        const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs)
-        return namedConfigs.length > 0
-      }
-    } catch (e) {
-      console.warn('Failed to parse named relay configs')
-    }
-    
-    return false
-  }
+  // hasAnyApiConfig 现在由 useApiConfig hook 提供
 
   // 如果没有任何API配置
   if (!hasAnyApiConfig()) {
@@ -1254,6 +1177,30 @@ export default function ChatSessionPage() {
           </div>
           
           <div className="flex items-center space-x-2">
+            {/* API状态指示器 */}
+            {hasStarted && (() => {
+              const healthStats = getHealthStats();
+              const modeText = getModeDisplayText();
+              
+              return (
+                <div className="flex items-center space-x-1 text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-md">
+                  <div className={`w-2 h-2 rounded-full ${
+                    healthStats.unhealthy > 0 ? 'bg-amber-500' : 
+                    healthStats.total > 0 ? 'bg-green-500' : 'bg-gray-400'
+                  }`} />
+                  <span className="whitespace-nowrap">
+                    {healthStats.total > 0 
+                      ? `${healthStats.healthy}/${healthStats.total} API` 
+                      : '无API'
+                    }
+                  </span>
+                  {healthStats.total > 1 && (
+                    <span className="text-xs opacity-75">({modeText.replace('模式', '')})</span>
+                  )}
+                </div>
+              );
+            })()}
+            
             {hasStarted && (
               <Button
                 size="sm"

@@ -107,7 +107,11 @@ export default function PublicCharacterPage() {
 
       setCharacter({
         ...characterData,
-        profiles: profileData
+        profiles: {
+          ...profileData,
+          // 如果没有username，提供友好的fallback
+          username: profileData?.username || '创作者'
+        }
       })
     } catch (error) {
       console.error('获取角色详情失败:', error)
@@ -135,10 +139,17 @@ export default function PublicCharacterPage() {
           .select('id, username')
           .in('id', userIds)
 
-        const commentsWithProfiles = commentsData.map(comment => ({
-          ...comment,
-          profiles: profilesData?.find(profile => profile.id === comment.user_id)
-        }))
+        const commentsWithProfiles = commentsData.map(comment => {
+          const profile = profilesData?.find(profile => profile.id === comment.user_id)
+          return {
+            ...comment,
+            profiles: {
+              ...profile,
+              // 如果没有username，提供友好的fallback
+              username: profile?.username || '评论者'
+            }
+          }
+        })
 
         setComments(commentsWithProfiles)
       }
@@ -489,7 +500,7 @@ export default function PublicCharacterPage() {
                     }}
                     className="text-sm opacity-90 drop-shadow hover:opacity-100 hover:underline transition-all duration-200"
                   >
-                    {character.profiles?.username || '匿名用户'}
+                    {character.profiles?.username}
                   </button>
                 </div>
               </div>

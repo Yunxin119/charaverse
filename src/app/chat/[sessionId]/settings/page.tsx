@@ -92,7 +92,7 @@ export default function ChatSettingsPage() {
     // 根据可用API设置可选模型
     const models: string[] = []
     if (deepseek) {
-      models.push('deepseek-chat', 'deepseek-coder')
+      models.push('deepseek-chat', 'deepseek-reasoner')
     }
     if (gemini) {
       models.push('gemini-2.5-flash', 'gemini-2.5-pro')
@@ -206,7 +206,7 @@ export default function ChatSettingsPage() {
   const getModelDisplayName = (model: string) => {
     const modelNames: Record<string, string> = {
       'deepseek-chat': 'DeepSeek Chat',
-      'deepseek-coder': 'DeepSeek Coder',
+      'deepseek-reasoner': 'DeepSeek Reasoner',
       'gemini-2.5-flash': 'Gemini 2.5 Flash',
       'gemini-2.5-pro': 'Gemini 2.5 Pro',
       'gpt-4o': 'GPT-4o',
