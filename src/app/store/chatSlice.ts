@@ -810,6 +810,9 @@ const chatSlice = createSlice({
       state.messages = []
       state.error = null
     },
+    setMessages: (state, action: PayloadAction<ChatMessage[]>) => {
+      state.messages = action.payload
+    },
     clearError: (state) => {
       state.error = null
     }
@@ -933,8 +936,14 @@ const chatSlice = createSlice({
         // 如果有用户消息，需要更新临时消息的ID为真实ID
         if (action.payload.userMessage) {
           // 找到刚才添加的临时用户消息并更新ID
-          // 使用 findLastIndex 来找到最后一个用户消息的索引
-          const lastUserMsgIndex = state.messages.findLastIndex(msg => msg.role === 'user')
+          // 从后往前查找最后一个用户消息的索引
+          let lastUserMsgIndex = -1
+          for (let i = state.messages.length - 1; i >= 0; i--) {
+            if (state.messages[i].role === 'user') {
+              lastUserMsgIndex = i
+              break
+            }
+          }
           if (lastUserMsgIndex !== -1) {
             state.messages[lastUserMsgIndex] = action.payload.userMessage
           }
@@ -968,8 +977,14 @@ const chatSlice = createSlice({
         state.isGenerating = false
         // 如果有用户消息，需要更新临时消息的ID为真实ID
         if (action.payload.userMessage) {
-          // 使用 findLastIndex 来找到最后一个用户消息的索引
-          const lastUserMsgIndex = state.messages.findLastIndex(msg => msg.role === 'user')
+          // 从后往前查找最后一个用户消息的索引
+          let lastUserMsgIndex = -1
+          for (let i = state.messages.length - 1; i >= 0; i--) {
+            if (state.messages[i].role === 'user') {
+              lastUserMsgIndex = i
+              break
+            }
+          }
           if (lastUserMsgIndex !== -1) {
             state.messages[lastUserMsgIndex] = action.payload.userMessage
           }
@@ -1103,6 +1118,7 @@ export const {
   setSelectedModel, 
   setSessionTitle, 
   clearMessages, 
+  setMessages,
   clearError 
 } = chatSlice.actions
 

@@ -42,6 +42,7 @@ import {
   sendNewMessageFrom,
   setSelectedModel,
   setSessionTitle,
+  setMessages,
   clearError
 } from '../../store/chatSlice'
 import { supabase } from '../../lib/supabase'
@@ -59,6 +60,45 @@ interface NamedRelayConfig {
   supportsThinking?: boolean
   thinkingBudgetMode?: 'auto' | 'manual'
   thinkingBudget?: number
+}
+
+// 错误消息处理函数
+const formatErrorMessage = (error: any): string => {
+  if (typeof error === 'string') {
+    return formatErrorString(error)
+  }
+  
+  if (error instanceof Error) {
+    return formatErrorString(error.message)
+  }
+  
+  return '操作失败，请稍后重试'
+}
+
+const formatErrorString = (errorStr: string): string => {
+  // API相关错误
+  if (errorStr.includes('insufficient_quota') || errorStr.includes('quota')) {
+    return 'API账户余额不足，请检查您的API密钥设置'
+  }
+  if (errorStr.includes('invalid_api_key') || errorStr.includes('api_key')) {
+    return 'API密钥无效，请检查设置'
+  }
+  if (errorStr.includes('rate_limit') || errorStr.includes('too_many_requests')) {
+    return 'API调用频率过快，请稍后重试'
+  }
+  if (errorStr.includes('network') || errorStr.includes('fetch')) {
+    return '网络连接失败，请检查网络后重试'
+  }
+  if (errorStr.includes('timeout')) {
+    return '请求超时，请稍后重试'
+  }
+  
+  // 如果错误信息过长，截取前100个字符
+  if (errorStr.length > 100) {
+    return errorStr.substring(0, 100) + '...'
+  }
+  
+  return errorStr
 }
 
 export default function ChatSessionPage() {
@@ -610,7 +650,7 @@ export default function ChatSessionPage() {
         markApiResult(modelConfig.apiId, false)
       }
       
-      alert(`开始故事失败: ${error}`)
+      alert(`开始故事失败: ${formatErrorMessage(error)}`)
       setHasStarted(false) // 发生错误时回到配置界面
       setIsStartingStory(false)
     } finally {
@@ -641,7 +681,7 @@ export default function ChatSessionPage() {
 
     if (!systemPrompt || systemPrompt.trim() === '') {
       console.error('系统提示词为空，角色数据可能有问题')
-      alert('系统提示词为空，请检查角色配置或刷新页面重试')
+      alert('角色配置异常，请检查角色设置或刷新页面重试')
       return
     }
 
@@ -886,8 +926,11 @@ export default function ChatSessionPage() {
 
       console.log('✅ 消息删除成功')
 
-      // 4. 计算剩余消息
+      // 4. 立即更新UI状态，移除已删除的消息
       const remainingMessages = messages.slice(0, messageIndex)
+      
+      // 立即更新Redux状态中的消息列表
+      dispatch(setMessages(remainingMessages))
       
       // 给数据库一点时间完成删除操作
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -930,7 +973,13 @@ export default function ChatSessionPage() {
       setSelectedMessageId(null)
     } catch (error) {
       console.error('重新发送消息失败:', error)
-      alert(`重新发送失败: ${error}`)
+      
+      // 使用统一的错误处理
+      const errorMessage = `重新发送失败: ${formatErrorMessage(error)}`
+      alert(errorMessage)
+      
+      // 标记API使用失败
+      markApiResult(modelConfig.apiId, false)
       
       // 发生错误时重新加载消息列表
       dispatch(fetchMessages(currentSession.id))
@@ -1006,7 +1055,7 @@ export default function ChatSessionPage() {
       
     } catch (error) {
       console.error('批量删除失败:', error)
-      alert(`批量删除失败: ${error}`)
+      alert(`批量删除失败: ${formatErrorMessage(error)}`)
     }
   }
 
@@ -1093,7 +1142,7 @@ export default function ChatSessionPage() {
       // 标记API使用失败
       markApiResult(modelConfig.apiId, false)
       
-      alert(`获取灵感失败: ${error}`)
+      alert(`获取灵感失败: ${formatErrorMessage(error)}`)
     } finally {
       setIsGettingInspiration(false)
     }
@@ -1501,27 +1550,32 @@ export default function ChatSessionPage() {
                                     <Edit2 className="w-3 h-3 mr-1" />
                                     编辑
                                   </Button>
-                                  {/* 续写功能保留，但不限制于最后一条 */}
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleSendNewMessageFrom(message.id)}
-                                    disabled={isGenerating}
-                                    className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600"
-                                  >
-                                    <MessageSquarePlus className="w-3 h-3 mr-1" />
-                                    续写
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleGetInspiration()}
-                                    disabled={isGenerating || isGettingInspiration}
-                                    className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 hover:border-yellow-200 dark:hover:border-yellow-800 hover:text-yellow-600 dark:hover:text-yellow-400"
-                                  >
-                                    <Lightbulb className="w-3 h-3 mr-1" />
-                                    灵感
-                                  </Button>
+                                  {/* 只有最后一条AI消息可以续写 */}
+                                  {isLastMessage && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleSendNewMessageFrom(message.id)}
+                                      disabled={isGenerating}
+                                      className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600"
+                                    >
+                                      <MessageSquarePlus className="w-3 h-3 mr-1" />
+                                      续写
+                                    </Button>
+                                  )}
+                                  {/* 只有最后一条AI消息可以获取灵感 */}
+                                  {isLastMessage && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleGetInspiration()}
+                                      disabled={isGenerating || isGettingInspiration}
+                                      className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 hover:border-yellow-200 dark:hover:border-yellow-800 hover:text-yellow-600 dark:hover:text-yellow-400"
+                                    >
+                                      <Lightbulb className="w-3 h-3 mr-1" />
+                                      灵感
+                                    </Button>
+                                  )}
                                   <Button
                                     size="sm"
                                     variant="ghost"
