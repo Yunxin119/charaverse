@@ -5,10 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Search, 
   Plus, 
-  Filter, 
   Edit3, 
   Trash2, 
-  Globe, 
   User, 
   Clock,
   Tag,
@@ -18,10 +16,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
   DialogContent,
@@ -35,21 +31,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { 
-  getPromptTemplates, 
   getUserTemplates, 
   savePromptTemplate, 
   updatePromptTemplate,
-  deletePromptTemplate,
-  getTemplateDefaultContent,
-  createPresetTemplatesForUser
+  deletePromptTemplate
 } from '../lib/promptTemplates'
 import { type PromptTemplate } from '../lib/supabase'
 
 const templateTypes = [
   { value: '用户角色设定', label: '用户角色设定', icon: User },
   { value: '注意事项', label: '注意事项', icon: Tag },
-  { value: '初始情景', label: '初始情景', icon: Globe },
-  { value: '特殊要求', label: '特殊要求', icon: Filter },
+  { value: '初始情景', label: '初始情景', icon: Clock },
+  { value: '特殊要求', label: '特殊要求', icon: Edit3 },
   { value: '自定义模块', label: '自定义模块', icon: Plus }
 ]
 
@@ -58,7 +51,6 @@ export default function TemplatesPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedType, setSelectedType] = useState<string>('all')
-  const [viewMode, setViewMode] = useState<'my' | 'all'>('my')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<PromptTemplate | null>(null)
   
@@ -67,24 +59,21 @@ export default function TemplatesPage() {
     name: '',
     template_type: '用户角色设定',
     description: '',
-    content: {} as Record<string, string>,
-    is_public: false
+    content: ''
   })
 
-  // 加载模板列表
+  // 加载个人模板列表
   const loadTemplates = useCallback(async () => {
     try {
       setIsLoading(true)
-      const data = viewMode === 'my' 
-        ? await getUserTemplates(selectedType === 'all' ? undefined : selectedType)
-        : await getPromptTemplates(selectedType === 'all' ? undefined : selectedType)
+      const data = await getUserTemplates(selectedType === 'all' ? undefined : selectedType)
       setTemplates(data)
     } catch (error) {
       console.error('加载模板失败:', error)
     } finally {
       setIsLoading(false)
     }
-  }, [viewMode, selectedType])
+  }, [selectedType])
 
   useEffect(() => {
     loadTemplates()
@@ -96,8 +85,7 @@ export default function TemplatesPage() {
       name: '',
       template_type: '用户角色设定',
       description: '',
-      content: getTemplateDefaultContent('用户角色设定'),
-      is_public: false
+      content: ''
     })
   }
 
@@ -110,12 +98,24 @@ export default function TemplatesPage() {
 
   // 打开编辑对话框
   const handleEditTemplate = (template: PromptTemplate) => {
+    // 将复杂的content对象转换为简单的字符串
+    let contentStr = ''
+    if (typeof template.content === 'string') {
+      contentStr = template.content
+    } else if (typeof template.content === 'object' && template.content !== null) {
+      // 如果是对象，尝试提取主要内容
+      if (template.content.content) {
+        contentStr = template.content.content
+      } else {
+        contentStr = JSON.stringify(template.content, null, 2)
+      }
+    }
+
     setTemplateForm({
       name: template.name,
       template_type: template.template_type,
       description: template.description || '',
-      content: template.content,
-      is_public: template.is_public
+      content: contentStr
     })
     setEditingTemplate(template)
     setShowCreateDialog(true)
@@ -128,24 +128,34 @@ export default function TemplatesPage() {
       return
     }
 
+    if (!templateForm.content.trim()) {
+      alert('请输入模板内容')
+      return
+    }
+
     try {
+      const templateData = {
+        name: templateForm.name,
+        template_type: templateForm.template_type,
+        description: templateForm.description,
+        content: { content: templateForm.content }, // 统一使用这种格式
+        is_public: false // 固定为私人模板
+      }
+
       if (editingTemplate) {
         // 更新模板
-        await updatePromptTemplate(editingTemplate.id, {
-          name: templateForm.name,
-          content: templateForm.content,
-          description: templateForm.description,
-          is_public: templateForm.is_public
-        })
+        await updatePromptTemplate(editingTemplate.id, templateData)
       } else {
         // 创建新模板
-        await savePromptTemplate(templateForm)
+        await savePromptTemplate(templateData)
       }
       
       setShowCreateDialog(false)
       resetForm()
       setEditingTemplate(null)
       loadTemplates()
+      
+      alert(editingTemplate ? '模板更新成功！' : '模板创建成功！')
     } catch (error) {
       console.error('保存模板失败:', error)
       alert('保存模板失败，请重试')
@@ -159,42 +169,11 @@ export default function TemplatesPage() {
     try {
       await deletePromptTemplate(templateId)
       loadTemplates()
+      alert('模板删除成功！')
     } catch (error) {
       console.error('删除模板失败:', error)
       alert('删除模板失败，请重试')
     }
-  }
-
-  // 初始化预置模板
-  const handleCreatePresetTemplates = async () => {
-    try {
-      await createPresetTemplatesForUser()
-      alert('预置模板创建成功！')
-      loadTemplates()
-    } catch (error) {
-      console.error('创建预置模板失败:', error)
-      alert('创建预置模板失败，请重试')
-    }
-  }
-
-  // 更新模板类型时重置内容
-  const handleTypeChange = (type: string) => {
-    setTemplateForm(prev => ({
-      ...prev,
-      template_type: type,
-      content: getTemplateDefaultContent(type)
-    }))
-  }
-
-  // 更新模板内容
-  const updateTemplateContent = (key: string, value: string) => {
-    setTemplateForm(prev => ({
-      ...prev,
-      content: {
-        ...prev.content,
-        [key]: value
-      }
-    }))
   }
 
   // 过滤模板
@@ -202,93 +181,6 @@ export default function TemplatesPage() {
     template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     template.description?.toLowerCase().includes(searchQuery.toLowerCase())
   )
-
-  // 渲染模板内容编辑器
-  const renderContentEditor = () => {
-    const { template_type, content } = templateForm
-    
-    if (template_type === '用户角色设定') {
-      return (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>用户角色姓名</Label>
-              <Input
-                placeholder="用户角色姓名"
-                value={content.userRoleName || ''}
-                onChange={(e) => updateTemplateContent('userRoleName', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>用户角色年龄</Label>
-              <Input
-                placeholder="用户角色年龄"
-                value={content.userRoleAge || ''}
-                onChange={(e) => updateTemplateContent('userRoleAge', e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>用户角色性别</Label>
-            <Select value={content.userRoleGender || ''} onValueChange={(value) => updateTemplateContent('userRoleGender', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="选择性别" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="male">男</SelectItem>
-                <SelectItem value="female">女</SelectItem>
-                <SelectItem value="none">无性别</SelectItem>
-                <SelectItem value="other">其他</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>用户角色详细设定</Label>
-            <Textarea
-              placeholder="描述用户角色的详细信息..."
-              value={content.userRoleDetails || ''}
-              onChange={(e) => updateTemplateContent('userRoleDetails', e.target.value)}
-              className="min-h-[120px] resize-none"
-            />
-          </div>
-        </div>
-      )
-    } else if (template_type === '自定义模块') {
-      return (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>模块名称</Label>
-            <Input
-              placeholder="自定义模块名称"
-              value={content.name || ''}
-              onChange={(e) => updateTemplateContent('name', e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>模块内容</Label>
-            <Textarea
-              placeholder="输入模块内容..."
-              value={content.content || ''}
-              onChange={(e) => updateTemplateContent('content', e.target.value)}
-              className="min-h-[120px] resize-none"
-            />
-          </div>
-        </div>
-      )
-    } else {
-      return (
-        <div className="space-y-2">
-          <Label>内容</Label>
-          <Textarea
-            placeholder="输入模板内容..."
-            value={content.content || ''}
-            onChange={(e) => updateTemplateContent('content', e.target.value)}
-            className="min-h-[120px] resize-none"
-          />
-        </div>
-      )
-    }
-  }
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -318,19 +210,13 @@ export default function TemplatesPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-2xl">Prompt 模板库</CardTitle>
+                <CardTitle className="text-2xl">我的模板库</CardTitle>
                 <p className="text-slate-600 mt-1">管理和复用你的角色设定模板</p>
               </div>
-              <div className="flex space-x-2">
-                <Button variant="outline" onClick={handleCreatePresetTemplates}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  初始化预置模板
-                </Button>
-                <Button onClick={handleCreateTemplate}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  创建模板
-                </Button>
-              </div>
+              <Button onClick={handleCreateTemplate}>
+                <Plus className="w-4 h-4 mr-2" />
+                创建模板
+              </Button>
             </div>
           </CardHeader>
         </Card>
@@ -366,14 +252,6 @@ export default function TemplatesPage() {
                   ))}
                 </SelectContent>
               </Select>
-
-              {/* View Mode */}
-              <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'my' | 'all')}>
-                <TabsList>
-                  <TabsTrigger value="my">我的模板</TabsTrigger>
-                  <TabsTrigger value="all">所有模板</TabsTrigger>
-                </TabsList>
-              </Tabs>
             </div>
           </CardContent>
         </Card>
@@ -436,28 +314,26 @@ export default function TemplatesPage() {
                           </div>
                           
                           {/* Actions */}
-                          {template.user_id && (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Edit3 className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
-                                  <Edit3 className="w-4 h-4 mr-2" />
-                                  编辑
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleDeleteTemplate(template.id)}
-                                  className="text-red-600"
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  删除
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Edit3 className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
+                                <Edit3 className="w-4 h-4 mr-2" />
+                                编辑
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteTemplate(template.id)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                删除
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
 
                         {template.description && (
@@ -468,17 +344,10 @@ export default function TemplatesPage() {
 
                         <div className="flex items-center justify-between text-xs text-slate-500">
                           <div className="flex items-center space-x-3">
-                            {template.is_public ? (
-                              <span className="flex items-center">
-                                <Globe className="w-3 h-3 mr-1" />
-                                公开
-                              </span>
-                            ) : (
-                              <span className="flex items-center">
-                                <User className="w-3 h-3 mr-1" />
-                                私人
-                              </span>
-                            )}
+                            <span className="flex items-center">
+                              <User className="w-3 h-3 mr-1" />
+                              个人模板
+                            </span>
                             {template.usage_count > 0 && (
                               <span className="flex items-center">
                                 <Clock className="w-3 h-3 mr-1" />
@@ -526,7 +395,7 @@ export default function TemplatesPage() {
                 <Label htmlFor="template-type">模板类型 *</Label>
                 <Select 
                   value={templateForm.template_type} 
-                  onValueChange={handleTypeChange}
+                  onValueChange={(value) => setTemplateForm(prev => ({ ...prev, template_type: value }))}
                   disabled={!!editingTemplate} // 编辑时不允许修改类型
                 >
                   <SelectTrigger>
@@ -554,22 +423,19 @@ export default function TemplatesPage() {
               />
             </div>
 
-            {/* Content Editor */}
+            {/* Simplified Content Editor */}
             <div className="space-y-2">
-              <Label>模板内容</Label>
-              {renderContentEditor()}
-            </div>
-
-            {/* Public Setting */}
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="template-public"
-                checked={templateForm.is_public}
-                onCheckedChange={(checked) => setTemplateForm(prev => ({ ...prev, is_public: checked }))}
+              <Label htmlFor="template-content">模板内容 *</Label>
+              <Textarea
+                id="template-content"
+                placeholder="输入模板内容..."
+                value={templateForm.content}
+                onChange={(e) => setTemplateForm(prev => ({ ...prev, content: e.target.value }))}
+                className="min-h-[200px] resize-none"
               />
-              <Label htmlFor="template-public" className="text-sm">
-                公开模板（其他用户也可以使用）
-              </Label>
+              <p className="text-xs text-slate-500">
+                输入你的角色设定模板内容，支持多行文本
+              </p>
             </div>
 
             {/* Actions */}
