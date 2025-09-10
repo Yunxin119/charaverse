@@ -105,12 +105,14 @@ export default function PublicCharacterPage() {
         .eq('id', characterData.user_id)
         .single()
 
+      // 检查username是否存在且不为空字符串
+      const username = profileData?.username?.trim()
       setCharacter({
         ...characterData,
         profiles: {
           ...profileData,
-          // 如果没有username，提供友好的fallback
-          username: profileData?.username || '创作者'
+          // 如果没有username或username为空，提供友好的fallback
+          username: username || '创作者'
         }
       })
     } catch (error) {
@@ -141,12 +143,14 @@ export default function PublicCharacterPage() {
 
         const commentsWithProfiles = commentsData.map(comment => {
           const profile = profilesData?.find(profile => profile.id === comment.user_id)
+          // 检查username是否存在且不为空字符串
+          const username = profile?.username?.trim()
           return {
             ...comment,
             profiles: {
               ...profile,
-              // 如果没有username，提供友好的fallback
-              username: profile?.username || '评论者'
+              // 如果没有username或username为空，提供友好的fallback
+              username: username || '评论者'
             }
           }
         })
@@ -734,7 +738,7 @@ export default function PublicCharacterPage() {
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center space-x-2">
                                 <span className="font-medium text-slate-900 dark:text-white text-sm">
-                                  {comment.profiles?.username || '匿名用户'}
+                                  {comment.profiles?.username}
                                 </span>
                                 <span className="text-xs text-slate-500 dark:text-slate-400">
                                   {new Date(comment.created_at).toLocaleDateString()}

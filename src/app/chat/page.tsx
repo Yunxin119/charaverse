@@ -106,7 +106,14 @@ export default function ChatPage() {
         })
       )
 
-      setSessions(sessionsWithStats)
+      // 按最新消息时间排序（最新的在前）
+      const sortedSessions = sessionsWithStats.sort((a, b) => {
+        const timeA = new Date(a.last_message_at || a.created_at).getTime()
+        const timeB = new Date(b.last_message_at || b.created_at).getTime()
+        return timeB - timeA // 降序排列，最新的在前
+      })
+
+      setSessions(sortedSessions)
     } catch (error) {
       console.error('获取聊天记录失败:', error)
     } finally {

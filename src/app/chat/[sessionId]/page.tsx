@@ -1150,7 +1150,7 @@ export default function ChatSessionPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push('/characters')}
+              onClick={() => router.push('/chat')}
               className="p-2 h-8 w-8"
             >
               <ArrowLeft className="w-4 h-4" />

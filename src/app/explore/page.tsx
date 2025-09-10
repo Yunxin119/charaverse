@@ -104,12 +104,14 @@ export default function ExplorePage() {
         // 合并数据，添加更好的username fallback逻辑
         const charactersWithProfiles = charactersData.map(character => {
           const profile = profilesData?.find(profile => profile.id === character.user_id)
+          // 检查username是否存在且不为空字符串
+          const username = profile?.username?.trim()
           return {
             ...character,
             profiles: {
               ...profile,
-              // 改进fallback逻辑：如果没有username，显示友好的默认名称
-              username: profile?.username || '创作者'
+              // 改进fallback逻辑：如果没有username或username为空，显示友好的默认名称
+              username: username || '创作者'
             }
           }
         })

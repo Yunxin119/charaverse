@@ -39,18 +39,25 @@ export const signUp = createAsyncThunk(
 
     // 如果注册成功，创建用户资料
     if (data.user) {
+      // 确保username不为空
+      const trimmedUsername = username?.trim()
+      if (!trimmedUsername) {
+        throw new Error('用户名不能为空')
+      }
+
       const { error: profileError } = await supabase
         .from('profiles')
         .insert({
           id: data.user.id,
-          username: username.trim(),
+          username: trimmedUsername,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
 
       if (profileError) {
         console.error('创建用户资料失败:', profileError)
-        // 不抛出错误，因为用户已经注册成功
+        // 抛出错误，因为没有用户资料会导致显示问题
+        throw new Error('创建用户资料失败，请重试')
       }
     }
 
