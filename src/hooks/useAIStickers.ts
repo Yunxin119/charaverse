@@ -22,7 +22,7 @@ export default function useAIStickers(
   const [config, setConfig] = useState<AIStickerConfig | null>(null)
   
   // 防抖处理
-  const debounceRef = useRef<NodeJS.Timeout>()
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
   // 获取推荐配置
   const loadConfig = useCallback(async () => {

@@ -49,7 +49,7 @@ export default function StickerPicker({
   const [isLoadingCategory, setIsLoadingCategory] = useState(false)
   
   // 搜索防抖
-  const searchTimeoutRef = useRef<NodeJS.Timeout>()
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // 配置项
   const {

@@ -356,7 +356,7 @@ export class StickerService {
     const fileName = `${Date.now()}-${uploadData.file.name}`
     const filePath = `stickers/${fileName}`
     
-    const { data: uploadResult, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('stickers')
       .upload(filePath, uploadData.file)
     
