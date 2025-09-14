@@ -419,12 +419,53 @@ export default function ChatSessionPage() {
   // 获取完整的消息历史用于API调用（非智能模式下使用）
   const getCompleteMessageHistory = async (sessionId: string) => {
     try {
-      const result = await dispatch(fetchAllMessagesForAPI(sessionId)).unwrap()
-      console.log('🔧 获取完整消息历史:', result.length, '条消息')
-      return result
+      console.log('🔧 开始获取完整消息历史，sessionId:', sessionId)
+
+      // Supabase有默认1000行限制，需要分页获取所有消息
+      let allMessages: any[] = []
+      let from = 0
+      const batchSize = 1000
+      let hasMore = true
+
+      while (hasMore) {
+        console.log(`📡 获取消息批次: ${from} - ${from + batchSize}`)
+
+        const { data, error } = await supabase
+          .from('chat_messages')
+          .select('*')
+          .eq('session_id', sessionId)
+          .order('created_at', { ascending: true })
+          .range(from, from + batchSize - 1)
+
+        if (error) {
+          console.error('💥 直接查询消息失败:', error)
+          throw error
+        }
+
+        if (data && data.length > 0) {
+          allMessages = allMessages.concat(data)
+          console.log(`✅ 获取到 ${data.length} 条消息，总计: ${allMessages.length} 条`)
+
+          // 如果返回的数据少于批次大小，说明已经没有更多数据
+          if (data.length < batchSize) {
+            hasMore = false
+          } else {
+            from += batchSize
+          }
+        } else {
+          hasMore = false
+        }
+      }
+
+      console.log('✅ 成功获取完整消息历史:', allMessages.length, '条消息')
+      console.log('📊 前5条消息ID:', allMessages.slice(0, 5).map(m => m.id))
+      console.log('📊 最后5条消息ID:', allMessages.slice(-5).map(m => m.id))
+
+      return allMessages
     } catch (error) {
       console.error('获取完整消息历史失败:', error)
       // 如果获取失败，退回到使用当前UI显示的消息
+      console.log('⚠️ 退回到使用当前UI消息:', messages.length, '条')
       return messages
     }
   }

@@ -20,6 +20,7 @@ import {
   updateSessionTitle,
 } from '../../../store/chatSlice'
 import { getContextConfigSuggestions } from '../../../lib/enhancedChatSlice'
+import { useApiConfig } from '../../../lib/useApiConfig'
 
 export default function ChatSettingsPage() {
   const router = useRouter()
@@ -36,9 +37,17 @@ export default function ChatSettingsPage() {
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [tempTitle, setTempTitle] = useState('')
   const [chatBackground, setChatBackground] = useState('')
-  const [apiConfig, setApiConfig] = useState<{[key: string]: string}>({})
-  const [availableModels, setAvailableModels] = useState<string[]>([])
   const [currentSelectedModel, setCurrentSelectedModel] = useState<string>('')
+
+  // 使用新的API配置hook
+  const {
+    availableModels,
+    getModelConfig,
+    getModelDisplayName,
+    hasAnyApiConfig,
+    getModeDisplayText,
+    getHealthStats
+  } = useApiConfig()
   
   // 上下文配置状态
   const [contextConfig, setContextConfig] = useState({
@@ -77,59 +86,27 @@ export default function ChatSettingsPage() {
       setChatBackground(savedBg)
     }
 
-    // 加载API配置
-    const config: {[key: string]: string} = {}
-    const deepseek = localStorage.getItem('api_key_deepseek')
-    const gemini = localStorage.getItem('api_key_gemini')
-    const openai = localStorage.getItem('api_key_openai')
+    // API配置和可用模型现在由useApiConfig hook自动管理
     
-    if (deepseek) config.deepseek = deepseek
-    if (gemini) config.gemini = gemini
-    if (openai) config.openai = openai
-    
-    setApiConfig(config)
-    
-    // 根据可用API设置可选模型
-    const models: string[] = []
-    if (deepseek) {
-      models.push('deepseek-chat', 'deepseek-reasoner')
-    }
-    if (gemini) {
-      models.push('gemini-2.5-flash', 'gemini-2.5-pro')
-    }
-    if (openai) {
-      models.push('gpt-4o', 'gpt-4o-mini')
-    }
+  }, [sessionId, dispatch, currentCharacter?.id])
 
-    // 加载命名的中转配置并添加到可用模型
-    const savedNamedConfigs = localStorage.getItem('named_relay_configs')
-    if (savedNamedConfigs) {
-      try {
-        const namedConfigs = JSON.parse(savedNamedConfigs)
-        namedConfigs.forEach((namedConfig: any) => {
-          models.push(`named-relay-${namedConfig.id}`)
-        })
-      } catch (e) {
-        console.warn('Failed to parse named relay configs')
-      }
-    }
-    
-    setAvailableModels(models)
-    
+  // 同步模型选择状态
+  useEffect(() => {
     // 加载保存的模型选择
     const savedModel = localStorage.getItem(`chat_model_${sessionId}`)
-    if (savedModel && models.includes(savedModel)) {
+    if (savedModel && availableModels.includes(savedModel)) {
       setCurrentSelectedModel(savedModel)
+      dispatch(setSelectedModel(savedModel))
     } else if (selectedModel) {
       setCurrentSelectedModel(selectedModel)
-    } else if (models.length > 0) {
-      const defaultModel = models[0]
+    } else if (availableModels.length > 0) {
+      // 如果没有保存的模型，使用第一个可用模型
+      const defaultModel = availableModels[0]
       setCurrentSelectedModel(defaultModel)
       dispatch(setSelectedModel(defaultModel))
       localStorage.setItem(`chat_model_${sessionId}`, defaultModel)
     }
-    
-  }, [sessionId, dispatch, currentCharacter?.id])
+  }, [selectedModel, availableModels, sessionId, dispatch])
 
   // 监听currentTitle变化并更新本地状态
   useEffect(() => {
@@ -202,37 +179,6 @@ export default function ChatSettingsPage() {
     localStorage.setItem(`chat_model_${sessionId}`, model)
   }
 
-  // 模型显示名称
-  const getModelDisplayName = (model: string) => {
-    const modelNames: Record<string, string> = {
-      'deepseek-chat': 'DeepSeek Chat',
-      'deepseek-reasoner': 'DeepSeek Reasoner',
-      'gemini-2.5-flash': 'Gemini 2.5 Flash',
-      'gemini-2.5-pro': 'Gemini 2.5 Pro',
-      'gpt-4o': 'GPT-4o',
-      'gpt-4o-mini': 'GPT-4o Mini'
-    }
-    
-    // 处理命名中转API模型
-    if (model.startsWith('named-relay-')) {
-      const configId = model.replace('named-relay-', '')
-      const savedNamedConfigs = localStorage.getItem('named_relay_configs')
-      if (savedNamedConfigs) {
-        try {
-          const namedConfigs = JSON.parse(savedNamedConfigs)
-          const config = namedConfigs.find((c: any) => c.id === configId)
-          if (config) {
-            return config.name
-          }
-        } catch (e) {
-          console.warn('Failed to parse named relay configs')
-        }
-      }
-      return `中转配置 ${configId}`
-    }
-    
-    return modelNames[model] || model
-  }
 
   // 保存上下文配置
   const saveContextConfig = () => {
@@ -310,32 +256,17 @@ export default function ChatSettingsPage() {
     return prompt.trim()
   }
 
-  // 获取模型对应的API密钥
-  const getApiKeyForModel = (model: string): string | null => {
-    if (model.startsWith('deepseek')) return apiConfig.deepseek || null
-    if (model.startsWith('gemini')) return apiConfig.gemini || null
-    if (model.startsWith('gpt')) return apiConfig.openai || null
-    if (model.startsWith('named-relay-')) {
-      const configId = model.replace('named-relay-', '')
-      const savedNamedConfigs = localStorage.getItem('named_relay_configs')
-      if (savedNamedConfigs) {
-        try {
-          const namedConfigs = JSON.parse(savedNamedConfigs)
-          const config = namedConfigs.find((c: any) => c.id === configId)
-          return config?.apiKey || null
-        } catch (e) {
-          console.warn('Failed to parse named relay configs')
-        }
-      }
-    }
-    return null
+  // 获取模型配置（使用新的API池系统）
+  const getModelApiKey = (model: string): string | null => {
+    const config = getModelConfig(model)
+    return config.apiKey
   }
 
   const handleClearChat = () => {
     if (window.confirm('你确定要清空所有聊天记录吗？清空后AI会重新开始对话。')) {
       const currentModel = selectedModel || localStorage.getItem(`chat_model_${sessionId}`) || 'deepseek-chat'
       const systemPrompt = buildSystemPrompt()
-      const apiKey = getApiKeyForModel(currentModel)
+      const apiKey = getModelApiKey(currentModel)
       
       if (!systemPrompt) {
         alert('角色信息不完整，无法重新开始对话')
@@ -498,18 +429,36 @@ export default function ChatSettingsPage() {
         <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
           <Label className="text-sm font-medium text-slate-600 dark:text-slate-300">AI模型选择</Label>
           <div className="mt-2">
-            <Select value={currentSelectedModel || selectedModel || ''} onValueChange={handleModelChange}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="选择模型" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableModels.map((model) => (
-                  <SelectItem key={model} value={model}>
-                    {getModelDisplayName(model)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {!hasAnyApiConfig() ? (
+              <div className="text-center py-4 text-slate-500 dark:text-slate-400">
+                <p className="text-sm">请先在设置页面配置API密钥</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => router.push('/settings')}
+                >
+                  前往设置
+                </Button>
+              </div>
+            ) : availableModels.length === 0 ? (
+              <div className="text-center py-4 text-slate-500 dark:text-slate-400">
+                <p className="text-sm">正在加载可用模型...</p>
+              </div>
+            ) : (
+              <Select value={currentSelectedModel || selectedModel || ''} onValueChange={handleModelChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="选择模型" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableModels.map((model) => (
+                    <SelectItem key={model} value={model}>
+                      {getModelDisplayName(model)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
 

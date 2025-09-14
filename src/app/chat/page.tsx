@@ -81,27 +81,42 @@ export default function ChatPage() {
       // 为每个会话获取消息数量和最后消息时间
       const sessionsWithStats = await Promise.all(
         (sessionsData || []).map(async (session) => {
-          const { data: messagesData, error: messagesError } = await supabase
+          // 使用正确的Supabase计数查询
+          const { count: messageCount, error: countError } = await supabase
+            .from('chat_messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('session_id', session.id)
+
+          // 获取最后一条消息的时间
+          const { data: lastMessageData, error: lastMessageError } = await supabase
             .from('chat_messages')
             .select('created_at')
             .eq('session_id', session.id)
             .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
 
-          if (messagesError) {
-            console.error('获取消息统计失败:', messagesError)
-            return {
-              ...session,
-              character: session.characters,
-              message_count: 0,
-              last_message_at: session.created_at
-            }
+          if (countError) {
+            console.error('获取消息数量失败:', countError)
           }
+
+          if (lastMessageError) {
+            console.error('获取最后消息时间失败:', lastMessageError)
+          }
+
+          const finalMessageCount = messageCount || 0
+          const lastMessageAt = lastMessageData?.created_at || session.created_at
+
+          console.log(`会话 ${session.id} 消息统计:`, {
+            messageCount: finalMessageCount,
+            lastMessageAt
+          })
 
           return {
             ...session,
             character: session.characters,
-            message_count: messagesData.length,
-            last_message_at: messagesData.length > 0 ? messagesData[0].created_at : session.created_at
+            message_count: finalMessageCount,
+            last_message_at: lastMessageAt
           }
         })
       )
