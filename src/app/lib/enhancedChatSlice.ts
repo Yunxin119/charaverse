@@ -38,15 +38,28 @@ async function handleSummaryGeneration(params: {
     const summarizedMessageCount = activeSummariesCount * config.summaryThreshold
     const unSummarizedMessages = currentMessages.slice(summarizedMessageCount)
 
-    if (unSummarizedMessages.length >= config.summaryThreshold) {
-      console.log('生成新摘要...')
+    // 计算需要生成多少个摘要（批量生成避免每次都生成一个）
+    const neededSummaries = Math.floor(unSummarizedMessages.length / config.summaryThreshold)
+
+    if (neededSummaries > 0) {
+      console.log(`🎯 检测到需要生成 ${neededSummaries} 个摘要，未摘要消息数: ${unSummarizedMessages.length}`)
+
+      // 如果是第一次开启智能模式且需要大量摘要，给出提示
+      if (existingSummaries.length === 0 && neededSummaries > 2) {
+        console.log(`⚠️  首次开启智能模式，需要生成 ${neededSummaries} 个摘要。为避免大量API调用，每次只生成一个摘要。`)
+        console.log(`💡 建议：在聊天设置中调整摘要阈值或手动清理历史消息来减少摘要生成。`)
+      }
+
+      // 只生成一个摘要，避免一次性大量API调用
+      const messagesForThisSummary = unSummarizedMessages.slice(0, config.summaryThreshold)
+      console.log(`生成第 ${existingSummaries.length + 1} 个摘要 (处理 ${config.summaryThreshold} 条消息)...`)
       
       try {
         const newSummary = await generateSummary({
           sessionId,
           userId: session.user.id,
-          startMessageId: unSummarizedMessages[0]?.id || 0,
-          endMessageId: unSummarizedMessages[unSummarizedMessages.length - 1]?.id || 0,
+          startMessageId: messagesForThisSummary[0]?.id || 0,
+          endMessageId: messagesForThisSummary[messagesForThisSummary.length - 1]?.id || 0,
           characterName,
           apiKey,
           model,

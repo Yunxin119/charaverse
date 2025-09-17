@@ -182,7 +182,6 @@ export default function ChatSettingsPage() {
 
   // 保存上下文配置
   const saveContextConfig = () => {
-    console.log('💾 Settings保存配置:', contextConfig)
     localStorage.setItem(`context_config_${sessionId}`, JSON.stringify(contextConfig))
     localStorage.setItem(`use_enhanced_context_${sessionId}`, String(useEnhancedContext))
   }

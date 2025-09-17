@@ -222,16 +222,13 @@ export default function ChatSessionPage() {
   // 滚动到底部
   const scrollToBottom = (behavior: 'smooth' | 'instant' = 'smooth') => {
     try {
-      console.log('🔄 尝试滚动到底部, behavior:', behavior, 'messages:', messages.length)
       if (messagesEndRef.current) {
         messagesEndRef.current.scrollIntoView({ behavior })
-        console.log('✅ 使用 messagesEndRef 滚动')
       } else {
         // 备用方案：直接滚动容器到底部
         if (messagesContainerRef.current) {
           const container = messagesContainerRef.current
           container.scrollTop = container.scrollHeight
-          console.log('✅ 使用容器直接滚动')
         } else {
           console.warn('⚠️ 没有找到滚动目标元素')
         }
@@ -269,14 +266,7 @@ export default function ChatSessionPage() {
   }
 
   // 滚动到底部
-  useEffect(() => {
-    // 只在新消息添加时滚动到底部，不是在加载更多历史消息时
-    console.log('📜 消息变化触发滚动检查:', {
-      isLoadingMoreMessages,
-      hasStarted, 
-      messagesLength: messages.length
-    })
-    
+  useEffect(() => {    
     if (!isLoadingMoreMessages && hasStarted && messages.length > 0) {
       // 添加一个小延迟确保DOM已经渲染完成
       setTimeout(() => {
@@ -286,13 +276,7 @@ export default function ChatSessionPage() {
   }, [messages, isLoadingMoreMessages, hasStarted])
 
   // 页面初始化完成后自动滚动到底部
-  useEffect(() => {
-    console.log('🎯 初始化滚动检查:', {
-      hasStarted,
-      messagesLength: messages.length,
-      isLoadingMessages
-    })
-    
+  useEffect(() => {    
     if (hasStarted && messages.length > 0 && !isLoadingMessages) {
       // 页面初始化完成，立即滚动到底部
       setTimeout(() => {
@@ -738,13 +722,18 @@ export default function ChatSessionPage() {
 
     try {
       if (useEnhancedContext) {
+        // 智能模式也需要获取完整的消息历史，而不是只使用UI显示的10条
+        const completeMessages = await getCompleteMessageHistory(currentSession.id)
+        console.log('🔧 智能模式发送消息，使用完整历史:', completeMessages.length, '条消息')
+        console.log('🔧 智能上下文配置:', contextConfig)
+        console.log('🔧 UI消息数量（仅供对比）:', messages.length, '条')
         await dispatch(sendMessageWithContext({
           sessionId: currentSession.id,
           userMessage: messageToSend,
           systemPrompt,
           apiKey: modelConfig.apiKey,
           model: currentSelectedModel,
-          messages,
+          messages: completeMessages, // 使用完整的消息历史，而不是UI显示的messages
           thinkingBudget: getThinkingBudget(currentSelectedModel),
           contextConfig,
           characterName: currentCharacter?.name || '角色',
@@ -794,13 +783,17 @@ export default function ChatSessionPage() {
 
     try {
       if (useEnhancedContext) {
-        // 使用智能上下文管理重新生成
+        // 智能模式重新生成也需要获取完整的消息历史
+        const completeMessages = await getCompleteMessageHistory(currentSession.id)
+        console.log('🔧 智能模式重新生成，使用完整历史:', completeMessages.length, '条消息')
+        console.log('🔧 智能上下文配置:', contextConfig)
+        console.log('🔧 UI消息数量（仅供对比）:', messages.length, '条')
         await dispatch(regenerateMessageWithContext({
           sessionId: currentSession.id,
           systemPrompt,
           apiKey: modelConfig.apiKey,
           model: currentSelectedModel,
-          messages,
+          messages: completeMessages, // 使用完整的消息历史
           lastMessageId: messageId,
           thinkingBudget: getThinkingBudget(currentSelectedModel),
           contextConfig,
@@ -1112,10 +1105,9 @@ export default function ChatSessionPage() {
     setIsGettingInspiration(true)
 
     try {
-      // 获取完整的消息历史
-      const completeMessages = useEnhancedContext 
-        ? messages 
-        : await getCompleteMessageHistory(currentSession.id)
+      // 获取完整的消息历史（智能模式和非智能模式都需要完整历史）
+      const completeMessages = await getCompleteMessageHistory(currentSession.id)
+      console.log('🔧 获取灵感，使用完整历史:', completeMessages.length, '条消息')
 
       // 构建灵感提示词
       const inspirationPrompt = systemPrompt + `\n\n现在，请你跳出${currentCharacter?.name}的角色，如果现在你是用户的角色，你会如何回复？请直接回复，避免任何开场白。`

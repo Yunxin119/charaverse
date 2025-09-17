@@ -107,10 +107,10 @@ export default function ChatPage() {
           const finalMessageCount = messageCount || 0
           const lastMessageAt = lastMessageData?.created_at || session.created_at
 
-          console.log(`会话 ${session.id} 消息统计:`, {
-            messageCount: finalMessageCount,
-            lastMessageAt
-          })
+          // console.log(`会话 ${session.id} 消息统计:`, {
+          //   messageCount: finalMessageCount,
+          //   lastMessageAt
+          // })
 
           return {
             ...session,

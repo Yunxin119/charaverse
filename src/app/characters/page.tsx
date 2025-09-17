@@ -214,11 +214,11 @@ export default function CharactersPage() {
       <motion.div variants={itemVariants}>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">我的角色</h1>
-            <p className="text-slate-600 mt-1">管理你创建的所有AI角色 ({characters.length}个角色)</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">我的角色</h1>
+            <p className="text-slate-600 dark:text-slate-300 mt-1">管理你创建的所有AI角色 ({characters.length}个角色)</p>
           </div>
           <div className="flex items-center space-x-3">
-            <Button asChild className="bg-slate-900 hover:bg-slate-800">
+            <Button asChild className="bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900 text-white">
               <Link href="/characters/new">
                 <Plus className="w-4 h-4 mr-2" />
                 <span className="hidden sm:inline">创建新角色</span>
@@ -279,20 +279,20 @@ export default function CharactersPage() {
         <motion.div variants={itemVariants}>
           <Card className="border-slate-200/60">
             <CardContent className="py-12 px-4 text-center">
-              <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-full flex items-center justify-center">
-                <Users className="w-10 h-10 text-slate-400" />
+              <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center">
+                <Users className="w-10 h-10 text-slate-400 dark:text-slate-500" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
                 {searchQuery || filterType !== 'all' ? '没有找到匹配的角色' : '还没有创建角色'}
               </h3>
-              <p className="text-slate-500 mb-6 text-sm leading-relaxed max-w-sm mx-auto">
+              <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm leading-relaxed max-w-sm mx-auto">
                 {searchQuery || filterType !== 'all' 
                   ? '试试调整搜索条件或筛选选项'
                   : '创建你的第一个AI角色，开始精彩的对话体验'
                 }
               </p>
               {(!searchQuery && filterType === 'all') && (
-                <Button asChild className="bg-blue-600 hover:bg-blue-700 rounded-full px-6">
+                <Button asChild className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-full px-6">
                   <Link href="/characters/new">
                     <Plus className="w-4 h-4 mr-2" />
                     创建新角色
@@ -426,7 +426,7 @@ export default function CharactersPage() {
                         </Button>
                         <Button 
                           size="sm" 
-                          className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700"
+                          className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
                           onClick={() => handleChatClick(character.id)}
                         >
                           <MessageCircle className="w-3 h-3 mr-1.5" />

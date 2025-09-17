@@ -653,7 +653,7 @@ export default function NewCharacterPage() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => removeModule(module.id)}
-                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 flex-shrink-0 ml-2 h-8 w-8 p-0"
+                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/30 flex-shrink-0 ml-2 h-8 w-8 p-0"
                                   >
                                     <X className="w-4 h-4" />
                                   </Button>
@@ -826,11 +826,11 @@ export default function NewCharacterPage() {
                   <Button
                     type="submit"
                     disabled={isLoading || !basicInfo.name.trim()}
-                    className="bg-slate-900 hover:bg-slate-800 w-full sm:w-auto h-11 sm:h-10"
+                    className="bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900 text-white w-full sm:w-auto h-11 sm:h-10"
                   >
                     {isLoading ? (
                       <>
-                        <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white dark:border-slate-900 border-t-transparent dark:border-t-transparent" />
                         创建中...
                       </>
                     ) : (
