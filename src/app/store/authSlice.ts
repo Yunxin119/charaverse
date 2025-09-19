@@ -7,9 +7,20 @@ interface AuthState {
   error: string | null
 }
 
+// 从 localStorage 获取持久化的用户状态
+const getInitialUser = (): User | null => {
+  if (typeof window === 'undefined') return null
+  try {
+    const savedUser = localStorage.getItem('charaverse_user')
+    return savedUser ? JSON.parse(savedUser) : null
+  } catch {
+    return null
+  }
+}
+
 const initialState: AuthState = {
-  user: null,
-  loading: false,
+  user: getInitialUser(),
+  loading: getInitialUser() === null, // 如果有持久化用户状态，则不需要 loading
   error: null,
 }
 
@@ -93,6 +104,10 @@ const authSlice = createSlice({
       .addCase(signIn.fulfilled, (state, action) => {
         state.loading = false
         state.user = action.payload
+        // 持久化用户状态
+        if (typeof window !== 'undefined' && action.payload) {
+          localStorage.setItem('charaverse_user', JSON.stringify(action.payload))
+        }
       })
       .addCase(signIn.rejected, (state, action) => {
         state.loading = false
@@ -106,6 +121,10 @@ const authSlice = createSlice({
       .addCase(signUp.fulfilled, (state, action) => {
         state.loading = false
         state.user = action.payload
+        // 持久化用户状态
+        if (typeof window !== 'undefined' && action.payload) {
+          localStorage.setItem('charaverse_user', JSON.stringify(action.payload))
+        }
       })
       .addCase(signUp.rejected, (state, action) => {
         state.loading = false
@@ -114,11 +133,31 @@ const authSlice = createSlice({
       // Sign Out
       .addCase(signOut.fulfilled, (state) => {
         state.user = null
+        // 清除持久化的用户状态
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('charaverse_user')
+        }
       })
       // Check Auth
+      .addCase(checkAuth.pending, (state) => {
+        state.loading = true
+        state.error = null
+      })
       .addCase(checkAuth.fulfilled, (state, action) => {
         state.user = action.payload
         state.loading = false
+        // 持久化用户状态
+        if (typeof window !== 'undefined') {
+          if (action.payload) {
+            localStorage.setItem('charaverse_user', JSON.stringify(action.payload))
+          } else {
+            localStorage.removeItem('charaverse_user')
+          }
+        }
+      })
+      .addCase(checkAuth.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.error.message || 'Authentication check failed'
       })
   },
 })

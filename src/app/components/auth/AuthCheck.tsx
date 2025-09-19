@@ -10,7 +10,14 @@ export function AuthCheck({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAppSelector((state) => state.auth)
 
   useEffect(() => {
-    dispatch(checkAuth())
+    // 只有在没有持久化用户状态时才需要检查认证
+    const savedUser = typeof window !== 'undefined' ? localStorage.getItem('charaverse_user') : null
+    if (!savedUser) {
+      dispatch(checkAuth())
+    } else {
+      // 如果有持久化状态，仍然需要验证是否有效，但可以在后台进行
+      dispatch(checkAuth())
+    }
   }, [dispatch])
 
   if (loading) {
