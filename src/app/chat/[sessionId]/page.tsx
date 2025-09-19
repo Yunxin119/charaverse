@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAppSelector, useAppDispatch } from '../../store/hooks'
 import { 
   fetchCharacter, 
@@ -48,6 +49,8 @@ import {
 import { supabase } from '../../lib/supabase'
 import { sendMessageWithContext, getContextConfigSuggestions, regenerateMessageWithContext } from '../../lib/enhancedChatSlice'
 import { useApiConfig } from '../../lib/useApiConfig'
+import { ApiPoolManager } from '../../components/ApiPoolManager'
+import { ApiManagerModal } from '../../../components/ApiManagerModal'
 
 // 保留命名中转配置接口以兼容现有功能
 interface NamedRelayConfig {
@@ -149,6 +152,13 @@ export default function ChatSessionPage() {
   // 批量删除相关状态
   const [isBatchDeleteMode, setIsBatchDeleteMode] = useState(false)
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<number>>(new Set())
+
+  // 用于跟踪消息变化类型的状态
+  const [previousMessageCount, setPreviousMessageCount] = useState(0)
+  const [isLazyLoading, setIsLazyLoading] = useState(false)
+
+  // API管理弹窗状态
+  const [showApiModal, setShowApiModal] = useState(false)
   
   
   // 从localStorage加载上下文配置
@@ -265,22 +275,50 @@ export default function ChatSessionPage() {
     return processedContent
   }
 
-  // 滚动到底部
-  useEffect(() => {    
-    if (!isLoadingMoreMessages && hasStarted && messages.length > 0) {
-      // 添加一个小延迟确保DOM已经渲染完成
-      setTimeout(() => {
-        scrollToBottom()
-      }, 100)
+  // 滚动到底部 - 只有当新增消息时才滚动
+  useEffect(() => {
+    if (!isLoadingMoreMessages && !isLazyLoading && hasStarted && messages.length > 0) {
+      // 检查是否是新增消息（消息数量增加且最后一条消息是新的）
+      const isNewMessage = messages.length > previousMessageCount
+
+      if (isNewMessage) {
+        console.log('🔄 检测到新消息，滚动到底部', {
+          current: messages.length,
+          previous: previousMessageCount,
+          isLazyLoading,
+          isLoadingMoreMessages
+        })
+        // 添加一个小延迟确保DOM已经渲染完成
+        setTimeout(() => {
+          scrollToBottom()
+        }, 100)
+      } else {
+        console.log('📜 消息数量变化但非新增，跳过滚动', {
+          current: messages.length,
+          previous: previousMessageCount,
+          isLazyLoading,
+          isLoadingMoreMessages
+        })
+      }
+
+      // 更新消息数量记录
+      setPreviousMessageCount(messages.length)
+    } else if (isLazyLoading || isLoadingMoreMessages) {
+      console.log('🚫 正在加载状态，完全跳过滚动逻辑', {
+        isLazyLoading,
+        isLoadingMoreMessages
+      })
     }
-  }, [messages, isLoadingMoreMessages, hasStarted])
+  }, [messages, isLoadingMoreMessages, isLazyLoading, hasStarted, previousMessageCount])
 
   // 页面初始化完成后自动滚动到底部
-  useEffect(() => {    
+  useEffect(() => {
     if (hasStarted && messages.length > 0 && !isLoadingMessages) {
       // 页面初始化完成，立即滚动到底部
       setTimeout(() => {
         scrollToBottom('instant')
+        // 初始化时设置消息数量基准
+        setPreviousMessageCount(messages.length)
       }, 200)
     }
   }, [hasStarted, isLoadingMessages, messages.length])
@@ -294,13 +332,15 @@ export default function ChatSessionPage() {
       const { scrollTop, scrollHeight, clientHeight } = container
       
       // 当滚动到顶部附近时加载更多消息
-      if (scrollTop < 100 && hasMoreMessages && !isLoadingMoreMessages) {
+      if (scrollTop < 100 && hasMoreMessages && !isLoadingMoreMessages && !isLazyLoading) {
+        setIsLazyLoading(true)
         const currentScrollHeight = scrollHeight
-        
+
         // 获取最早消息的时间戳
         const earliestMessage = messages[0]
         const beforeTimestamp = earliestMessage?.created_at
-        
+
+        console.log('📜 开始lazy loading历史消息')
         dispatch(fetchMoreMessages({
           sessionId,
           beforeTimestamp
@@ -309,6 +349,12 @@ export default function ChatSessionPage() {
           const newScrollHeight = container.scrollHeight
           const scrollDiff = newScrollHeight - currentScrollHeight
           container.scrollTop = scrollTop + scrollDiff
+
+          console.log('✅ lazy loading完成，保持滚动位置')
+          setIsLazyLoading(false)
+        }).catch((error) => {
+          console.error('❌ lazy loading失败:', error)
+          setIsLazyLoading(false)
         })
       }
     }
@@ -1265,21 +1311,25 @@ export default function ChatSessionPage() {
               const modeText = getModeDisplayText();
               
               return (
-                <div className="flex items-center space-x-1 text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-md">
+                <button
+                  onClick={() => setShowApiModal(true)}
+                  className="flex items-center space-x-1 text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors cursor-pointer"
+                  title="点击管理API配置"
+                >
                   <div className={`w-2 h-2 rounded-full ${
-                    healthStats.unhealthy > 0 ? 'bg-amber-500' : 
+                    healthStats.unhealthy > 0 ? 'bg-amber-500' :
                     healthStats.total > 0 ? 'bg-green-500' : 'bg-gray-400'
                   }`} />
                   <span className="whitespace-nowrap">
-                    {healthStats.total > 0 
-                      ? `${healthStats.healthy}/${healthStats.total} API` 
+                    {healthStats.total > 0
+                      ? `${healthStats.healthy}/${healthStats.total} API`
                       : '无API'
                     }
                   </span>
                   {healthStats.total > 1 && (
                     <span className="text-xs opacity-75">({modeText.replace('模式', '')})</span>
                   )}
-                </div>
+                </button>
               );
             })()}
             
@@ -1463,7 +1513,7 @@ export default function ChatSessionPage() {
                       <div 
                         className={`p-3 sm:p-4 rounded-2xl break-words transition-all duration-200 ${
                           message.role === 'user' 
-                            ? 'bg-blue-500 text-white rounded-br-md' 
+                            ? 'bg-sky-500 dark:bg-sky-800 text-white rounded-br-md' 
                             : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-md hover:bg-slate-50 dark:hover:bg-slate-700'
                         } ${
                           !isBatchDeleteMode && selectedMessageId === message.id ? 'ring-2 ring-blue-500' : ''
@@ -1782,6 +1832,12 @@ export default function ChatSessionPage() {
           )}
         </div>
       )}
+
+      {/* API管理弹窗 */}
+      <ApiManagerModal
+        isOpen={showApiModal}
+        onClose={() => setShowApiModal(false)}
+      />
     </div>
   )
 }
