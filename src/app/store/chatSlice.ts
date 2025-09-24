@@ -882,7 +882,7 @@ const chatSlice = createSlice({
       .addCase(fetchMessages.fulfilled, (state, action) => {
         state.isLoadingMessages = false
         state.messages = action.payload
-        state.hasMoreMessages = action.payload.length === 10 // 如果返回等于10条，可能还有更多消息
+        state.hasMoreMessages = action.payload.length >= 10 // 如果返回等于10条，可能还有更多消息
       })
       .addCase(fetchMessages.rejected, (state, action) => {
         state.isLoadingMessages = false
@@ -907,7 +907,7 @@ const chatSlice = createSlice({
         state.isLoadingMoreMessages = false
         // 在消息列表前面添加更早的消息
         state.messages = [...action.payload, ...state.messages]
-        state.hasMoreMessages = action.payload.length === 10 // 如果返回的消息等于10条，可能还有更多
+        state.hasMoreMessages = action.payload.length >= 10 // 如果返回的消息等于10条，可能还有更多
       })
       .addCase(fetchMoreMessages.rejected, (state, action) => {
         state.isLoadingMoreMessages = false

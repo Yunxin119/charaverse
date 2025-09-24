@@ -156,6 +156,8 @@ export default function ChatSessionPage() {
   // 用于跟踪消息变化类型的状态
   const [previousMessageCount, setPreviousMessageCount] = useState(0)
   const [isLazyLoading, setIsLazyLoading] = useState(false)
+  const [lastScrollTop, setLastScrollTop] = useState(0)
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // API管理弹窗状态
   const [showApiModal, setShowApiModal] = useState(false)
@@ -330,38 +332,90 @@ export default function ChatSessionPage() {
 
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = container
-      
-      // 当滚动到顶部附近时加载更多消息
-      if (scrollTop < 100 && hasMoreMessages && !isLoadingMoreMessages && !isLazyLoading) {
-        setIsLazyLoading(true)
-        const currentScrollHeight = scrollHeight
 
-        // 获取最早消息的时间戳
-        const earliestMessage = messages[0]
-        const beforeTimestamp = earliestMessage?.created_at
-
-        console.log('📜 开始lazy loading历史消息')
-        dispatch(fetchMoreMessages({
-          sessionId,
-          beforeTimestamp
-        })).then(() => {
-          // 加载完成后，保持滚动位置（防止跳到顶部）
-          const newScrollHeight = container.scrollHeight
-          const scrollDiff = newScrollHeight - currentScrollHeight
-          container.scrollTop = scrollTop + scrollDiff
-
-          console.log('✅ lazy loading完成，保持滚动位置')
-          setIsLazyLoading(false)
-        }).catch((error) => {
-          console.error('❌ lazy loading失败:', error)
-          setIsLazyLoading(false)
-        })
+      // 清除之前的防抖定时器
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
       }
+
+      // 防抖处理，避免频繁触发
+      scrollTimeoutRef.current = setTimeout(() => {
+        // 检查所有必要条件
+        if (!hasMoreMessages || isLoadingMoreMessages || isLazyLoading || messages.length === 0) {
+          console.log('🚫 跳过lazy loading:', {
+            hasMoreMessages,
+            isLoadingMoreMessages,
+            isLazyLoading,
+            messagesLength: messages.length
+          })
+          return
+        }
+
+        // 增加滚动阈值，更容易触发加载
+        const threshold = 200
+        const isNearTop = scrollTop < threshold
+
+        // 确保是向上滚动
+        const isScrollingUp = scrollTop < lastScrollTop
+        setLastScrollTop(scrollTop)
+
+        if (isNearTop && isScrollingUp) {
+          console.log('📜 触发lazy loading条件:', {
+            scrollTop,
+            threshold,
+            isScrollingUp,
+            hasMoreMessages,
+            isLoadingMoreMessages,
+            isLazyLoading
+          })
+
+          setIsLazyLoading(true)
+          const currentScrollHeight = scrollHeight
+
+          // 获取最早消息的时间戳
+          const earliestMessage = messages[0]
+          const beforeTimestamp = earliestMessage?.created_at
+
+          console.log('📜 开始lazy loading历史消息，最早消息时间:', beforeTimestamp)
+
+          dispatch(fetchMoreMessages({
+            sessionId,
+            beforeTimestamp
+          }))
+          .unwrap()
+          .then(() => {
+            // 加载完成后，保持滚动位置（防止跳到顶部）
+            setTimeout(() => {
+              const newScrollHeight = container.scrollHeight
+              const scrollDiff = newScrollHeight - currentScrollHeight
+              if (scrollDiff > 0) {
+                container.scrollTop = scrollTop + scrollDiff
+                console.log('✅ lazy loading完成，调整滚动位置:', {
+                  oldScrollTop: scrollTop,
+                  newScrollTop: scrollTop + scrollDiff,
+                  scrollDiff
+                })
+              }
+              setIsLazyLoading(false)
+            }, 100)
+          })
+          .catch((error) => {
+            console.error('❌ lazy loading失败:', error)
+            setIsLazyLoading(false)
+            // 可以在这里添加用户提示
+          })
+        }
+      }, 150) // 150ms防抖延迟
     }
 
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-  }, [sessionId, messages.length, hasMoreMessages, isLoadingMoreMessages, hasStarted, dispatch])
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
+      }
+    }
+  }, [sessionId, messages.length, hasMoreMessages, isLoadingMoreMessages, hasStarted, isLazyLoading, lastScrollTop, dispatch])
 
   // API配置在useApiConfig hook中自动处理
   // 不再需要手动加载配置
@@ -1151,20 +1205,86 @@ export default function ChatSessionPage() {
     setIsGettingInspiration(true)
 
     try {
-      // 获取完整的消息历史（智能模式和非智能模式都需要完整历史）
-      const completeMessages = await getCompleteMessageHistory(currentSession.id)
-      console.log('🔧 获取灵感，使用完整历史:', completeMessages.length, '条消息')
+      // 根据智能模式设置选择不同的处理方式
+      let messageHistory: any[] = []
+      let inspirationPrompt = systemPrompt + `\n\n现在，请你跳出${currentCharacter?.name}的角色，如果现在你是用户的角色，你会如何回复？请使用第一第二人称，直接回复，避免任何开场白。`
 
-      // 构建灵感提示词
-      const inspirationPrompt = systemPrompt + `\n\n现在，请你跳出${currentCharacter?.name}的角色，如果现在你是用户的角色，你会如何回复？请直接回复，避免任何开场白。`
+      if (useEnhancedContext) {
+        // 智能模式：使用智能上下文处理（类似sendMessageWithContext的逻辑）
+        const completeMessages = await getCompleteMessageHistory(currentSession.id)
+        console.log('🔧 获取灵感（智能模式），使用完整历史:', completeMessages.length, '条消息')
+        console.log('🔧 智能上下文配置:', contextConfig)
 
-      // 构建消息历史
-      const messageHistory = completeMessages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }))
+        try {
+          // 使用与 sendMessageWithContext 相同的智能处理逻辑（包含摘要）
+          const { ContextManager } = require('../../lib/contextManager')
+          const { getSummaries } = require('../../lib/enhancedChatSlice')
+          const contextManager = new ContextManager(contextConfig)
 
-      console.log('🔧 获取灵感，使用消息历史:', messageHistory.length, '条消息')
+          // 1. 获取现有摘要
+          const { data: { session } } = await supabase.auth.getSession()
+          if (!session?.user) {
+            throw new Error('用户未登录')
+          }
+
+          const existingSummaries = await getSummaries(currentSession.id, session.user.id)
+          const summaries = existingSummaries.map(s => s.content)
+          console.log('🔧 获取到现有摘要:', summaries.length, '条')
+
+          // 2. 构建最终上下文（使用现有摘要）
+          let messagesToProcess = completeMessages
+          if (summaries.length > 0) {
+            const config = contextManager.getConfig()
+            const summarizedMessageCount = summaries.length * config.summaryThreshold
+            messagesToProcess = completeMessages.slice(summarizedMessageCount)
+            console.log(`🧠 使用摘要模式: ${summaries.length}个摘要，跳过前${summarizedMessageCount}条消息，处理${messagesToProcess.length}条消息`)
+
+            // 确保至少保留最近的几条消息
+            if (messagesToProcess.length === 0) {
+              const minMessages = Math.min(config.keepRecentMessages, completeMessages.length)
+              messagesToProcess = completeMessages.slice(-minMessages)
+              console.log(`⚠️ 摘要覆盖了所有消息，强制保留最近${minMessages}条消息`)
+            }
+          }
+
+          // 3. 使用 ContextManager 构建上下文
+          const context = await contextManager.buildContext({
+            systemPrompt: inspirationPrompt,
+            messages: messagesToProcess,
+            summaries: summaries.length > 0 ? summaries : undefined
+          })
+
+          if (context && context.messages && Array.isArray(context.messages)) {
+            messageHistory = context.messages
+            console.log('🔧 智能模式处理后消息数量:', messageHistory.length, '条')
+            console.log('🔧 上下文统计:', context.stats)
+            console.log('🔧 使用摘要数量:', summaries.length, '条')
+          } else {
+            console.warn('⚠️ 智能上下文处理失败，回退到完整历史')
+            messageHistory = completeMessages.map(msg => ({
+              role: msg.role,
+              content: msg.content
+            }))
+          }
+        } catch (error) {
+          console.error('❌ 智能上下文处理出错，回退到完整历史:', error)
+          messageHistory = completeMessages.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          }))
+        }
+      } else {
+        // 非智能模式：获取并使用完整的消息历史
+        const completeMessages = await getCompleteMessageHistory(currentSession.id)
+        console.log('🔧 获取灵感（非智能模式），使用完整历史:', completeMessages.length, '条消息')
+
+        messageHistory = completeMessages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }))
+      }
+
+      console.log('🔧 获取灵感，最终使用消息历史:', messageHistory.length, '条消息')
 
       // 调用API获取灵感
       const requestBody: any = {
@@ -1172,7 +1292,7 @@ export default function ChatSessionPage() {
         systemPrompt: inspirationPrompt,
         apiKey: modelConfig.apiKey,
         model: currentSelectedModel,
-        customUserMessage: `现在，请你跳出${currentCharacter?.name}的角色，如果现在你是用户的角色，你会如何回复？请直接回复，避免任何开场白。`
+        customUserMessage: `现在，请你跳出${currentCharacter?.name}的角色，如果现在你是用户的角色，你会如何回复？请使用第一第二人称，直接回复，避免任何开场白。`
       }
 
       // 只有Gemini 2.5系列模型才添加thinkingBudget
