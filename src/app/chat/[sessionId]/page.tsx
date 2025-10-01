@@ -5,10 +5,10 @@ import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { 
-  Send, 
-  Settings, 
-  RefreshCw, 
+import {
+  Send,
+  Settings,
+  RefreshCw,
   Edit2,
   X,
   Bot,
@@ -20,7 +20,8 @@ import {
   ChevronRight,
   BookOpen,
   Trash2,
-  Lightbulb
+  Lightbulb,
+  Brain
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -503,7 +504,7 @@ export default function ChatSessionPage() {
   // 获取完整的消息历史用于API调用（非智能模式下使用）
   const getCompleteMessageHistory = async (sessionId: string) => {
     try {
-      console.log('🔧 开始获取完整消息历史，sessionId:', sessionId)
+      // console.log('🔧 开始获取完整消息历史，sessionId:', sessionId)
 
       // Supabase有默认1000行限制，需要分页获取所有消息
       let allMessages: any[] = []
@@ -512,7 +513,7 @@ export default function ChatSessionPage() {
       let hasMore = true
 
       while (hasMore) {
-        console.log(`📡 获取消息批次: ${from} - ${from + batchSize}`)
+        // console.log(`📡 获取消息批次: ${from} - ${from + batchSize}`)
 
         const { data, error } = await supabase
           .from('chat_messages')
@@ -528,7 +529,7 @@ export default function ChatSessionPage() {
 
         if (data && data.length > 0) {
           allMessages = allMessages.concat(data)
-          console.log(`✅ 获取到 ${data.length} 条消息，总计: ${allMessages.length} 条`)
+          // console.log(`✅ 获取到 ${data.length} 条消息，总计: ${allMessages.length} 条`)
 
           // 如果返回的数据少于批次大小，说明已经没有更多数据
           if (data.length < batchSize) {
@@ -541,15 +542,15 @@ export default function ChatSessionPage() {
         }
       }
 
-      console.log('✅ 成功获取完整消息历史:', allMessages.length, '条消息')
-      console.log('📊 前5条消息ID:', allMessages.slice(0, 5).map(m => m.id))
-      console.log('📊 最后5条消息ID:', allMessages.slice(-5).map(m => m.id))
+      // console.log('✅ 成功获取完整消息历史:', allMessages.length, '条消息')
+      // console.log('📊 前5条消息ID:', allMessages.slice(0, 5).map(m => m.id))
+      // console.log('📊 最后5条消息ID:', allMessages.slice(-5).map(m => m.id))
 
       return allMessages
     } catch (error) {
       console.error('获取完整消息历史失败:', error)
       // 如果获取失败，退回到使用当前UI显示的消息
-      console.log('⚠️ 退回到使用当前UI消息:', messages.length, '条')
+      // console.log('⚠️ 退回到使用当前UI消息:', messages.length, '条')
       return messages
     }
   }
@@ -1228,7 +1229,7 @@ export default function ChatSessionPage() {
           }
 
           const existingSummaries = await getSummaries(currentSession.id, session.user.id)
-          const summaries = existingSummaries.map(s => s.content)
+          const summaries = existingSummaries.map((s: any) => s.content)
           console.log('🔧 获取到现有摘要:', summaries.length, '条')
 
           // 2. 构建最终上下文（使用现有摘要）
@@ -1462,6 +1463,17 @@ export default function ChatSessionPage() {
                 title="查看日记"
               >
                 <BookOpen className="w-4 h-4" />
+              </Button>
+            )}
+            {hasStarted && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => router.push(`/chat/${sessionId}/memory`)}
+                className="p-2 h-8 w-8"
+                title="记忆管理"
+              >
+                <Brain className="w-4 h-4" />
               </Button>
             )}
             <Button

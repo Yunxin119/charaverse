@@ -33,7 +33,7 @@ async function callDeepSeek(messages: ChatMessage[], systemPrompt: string, apiKe
         ...messages
       ],
       temperature: 1,
-      max_tokens: 5000,
+      max_tokens: 8000,
     }),
   })
 
@@ -108,6 +108,24 @@ async function callGemini(messages: ChatMessage[], systemPrompt: string, apiKey:
       parts: [{ text: userMessage }]
     })
   }
+  const safetySettings = [
+    {
+      category: "HARM_CATEGORY_HARASSMENT",
+      threshold: "BLOCK_ONLY_HIGH",
+    },
+    {
+      category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+      threshold: "BLOCK_ONLY_HIGH",
+    },
+    {
+      category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+      threshold: "BLOCK_ONLY_HIGH",
+    },
+    {
+      category: "HARM_CATEGORY_HATE_SPEECH",
+      threshold: "BLOCK_ONLY_HIGH",
+    },
+  ];
 
   // 构建请求体
   const requestBody: {
@@ -121,13 +139,15 @@ async function callGemini(messages: ChatMessage[], systemPrompt: string, apiKey:
       topP: number
       thinkingConfig?: { thinkingBudget?: number } | Record<string, never>
     }
+    safetySettings: Array<{ category: string, threshold: string }>
   } = {
     contents: contents,
     generationConfig: {
       temperature: 1.0,
-      maxOutputTokens: 4000,
+      maxOutputTokens: 8000,
       topP: 0.95,
-    }
+    },
+    safetySettings: safetySettings,
   }
 
   // 只有2.5系列模型才支持thinking配置
@@ -337,7 +357,7 @@ async function callOpenAI(messages: ChatMessage[], systemPrompt: string, apiKey:
         ...messages
       ],
       temperature: 1,
-      max_tokens: 2000,
+      max_tokens: 8000,
     }),
   })
 
@@ -406,7 +426,7 @@ async function callRelayAPI(messages: ChatMessage[], systemPrompt: string, apiKe
     model: actualModel,
     messages: apiMessages,
     temperature: 1,
-    max_tokens: 4000,
+    max_tokens: 8000,
   }
 
   // 如果actualModel是Gemini 2.5系列且有thinking budget，添加相应配置
@@ -689,3 +709,4 @@ export async function POST(request: NextRequest) {
     )
   }
 } 
+

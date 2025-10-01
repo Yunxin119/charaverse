@@ -79,11 +79,16 @@ export function useApiConfig() {
       if (savedNamedConfigs) {
         const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs);
         namedConfigs.forEach((namedConfig) => {
-          models.push(`named-relay-${namedConfig.id}`);
+          // 验证配置完整性后才添加到可用模型列表
+          if (namedConfig.id && namedConfig.apiKey && namedConfig.baseUrl && namedConfig.modelName) {
+            models.push(`named-relay-${namedConfig.id}`);
+          } else {
+            console.warn(`跳过不完整的命名中转配置: ${namedConfig.id}`);
+          }
         });
       }
     } catch (e) {
-      console.warn('Failed to parse named relay configs');
+      console.warn('Failed to parse named relay configs:', e);
     }
 
     setAvailableModels(models);
@@ -115,8 +120,12 @@ export function useApiConfig() {
           }
         }
       } catch (e) {
-        console.warn('Failed to parse named relay configs');
+        console.warn('Failed to parse named relay configs:', e);
       }
+
+      // 如果找不到对应的命名中转配置，返回错误信息
+      console.error(`❌ 命名中转配置不存在: ${configId}`);
+      throw new Error(`命名中转配置 ${configId} 不存在，请检查配置是否已删除或损坏`);
     }
 
     // 处理标准模型 - 使用新的API选择逻辑
@@ -249,6 +258,30 @@ export function useApiConfig() {
     return apiManager.getHealthStats();
   }, []);
 
+  // 清理无效的命名中转配置
+  const cleanupInvalidNamedConfigs = useCallback(() => {
+    try {
+      const savedNamedConfigs = localStorage.getItem('named_relay_configs');
+      if (savedNamedConfigs) {
+        const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs);
+        const validConfigs = namedConfigs.filter(config =>
+          config.id && config.apiKey && config.baseUrl && config.modelName
+        );
+
+        if (validConfigs.length !== namedConfigs.length) {
+          console.log(`🧹 清理了 ${namedConfigs.length - validConfigs.length} 个无效的命名中转配置`);
+          localStorage.setItem('named_relay_configs', JSON.stringify(validConfigs));
+          updateAvailableModels(); // 更新可用模型列表
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      console.warn('清理命名中转配置时出错:', e);
+      return false;
+    }
+  }, [updateAvailableModels]);
+
   return {
     config,
     availableModels,
@@ -259,7 +292,8 @@ export function useApiConfig() {
     getProviderModeDisplayText,
     getModeDisplayText, // 向后兼容的通用模式显示
     getHealthStats,
-    
+    cleanupInvalidNamedConfigs,
+
     // 直接暴露API管理器的方法
     getProviderMode: apiManager.getProviderMode.bind(apiManager),
     setProviderMode: apiManager.setProviderMode.bind(apiManager),

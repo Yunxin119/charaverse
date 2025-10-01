@@ -53,8 +53,6 @@ export default function ChatSettingsPage() {
   const [contextConfig, setContextConfig] = useState({
     maxContextTokens: 4000,
     reservedTokens: 1000,
-    enableSummary: true,
-    summaryThreshold: 20,
     keepRecentMessages: 10
   })
   const [useEnhancedContext, setUseEnhancedContext] = useState(true) // 默认开启智能模式以节省tokens
@@ -486,7 +484,7 @@ export default function ChatSettingsPage() {
                           <p className="font-medium text-green-600 mb-1">✅ 开启智能模式 (推荐)</p>
                           <ul className="text-sm space-y-1">
                             <li>• 🧠 智能截断：只发送必要的消息，大幅节省tokens</li>
-                            <li>• ⚡ 自动摘要：长对话中AI依然记得早期内容</li>
+                            <li>• 📜 摘要记忆：使用手动生成的摘要作AI记忆</li>
                             <li>• 💰 成本控制：可预测的API调用成本</li>
                             <li>• 📊 实时统计：精确显示token使用情况</li>
                           </ul>
@@ -495,20 +493,20 @@ export default function ChatSettingsPage() {
                           <p className="font-medium text-orange-600 mb-1">⚠️ 关闭智能模式</p>
                           <ul className="text-sm space-y-1">
                             <li>• 📤 发送全部消息：可能浪费大量tokens</li>
-                            <li>• ⚡  完整记忆：长对话中AI会有所有之前聊天的精确</li>
+                            <li>• ⚡ 完整记忆：长对话中AI会有所有之前聊天的精确记忆</li>
                             <li>• 💸 成本不可控：tokens消耗难以预测</li>
                           </ul>
                         </div>
                         <div className="pt-2 border-t border-slate-200">
                           <p className="text-xs text-slate-600">
-                            💡 建议保持开启状态，特别是进行长对话时
+                            💡 建议开启智能模式，并在记忆管理器中手动生成摘要
                           </p>
                         </div>
                       </div>
                     </TooltipContent>
                   </Tooltip>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">智能截断和摘要记忆 (推荐开启)</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">智能截断和手动摘要记忆 (推荐开启)</p>
               </div>
               <Switch
                 checked={useEnhancedContext}
@@ -544,21 +542,18 @@ export default function ChatSettingsPage() {
                         <strong>预留生成空间:</strong> 为AI回复预留的token空间，确保AI有足够空间生成完整回复
                       </div>
                       <div>
-                        <strong>摘要阈值:</strong> 当消息数超过此值时自动生成摘要压缩历史，数值越小摘要越频繁
-                      </div>
-                      <div>
                         <strong>保留最近消息:</strong> 无论如何都会保留的最新消息数量，确保对话连贯性
                       </div>
                     </div>
                     <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
                       <p className="text-xs text-blue-600 dark:text-blue-300">
-                        💡 建议：首次使用可点击"应用模型推荐配置"获得最佳设置
+                        💡 建议：点击"应用模型推荐配置"获得最佳设置。智能模式会自动使用记忆管理器中的摘要
                       </p>
                     </div>
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <div className="flex items-center space-x-2 mb-1">
                       <Label className="text-xs text-slate-600 dark:text-slate-300">最大上下文 (tokens)</Label>
@@ -635,44 +630,6 @@ export default function ChatSettingsPage() {
                   </div>
                   <div>
                     <div className="flex items-center space-x-2 mb-1">
-                      <Label className="text-xs text-slate-600 dark:text-slate-300">摘要阈值</Label>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 text-slate-400 hover:text-slate-600 touch-manipulation"
-                          >
-                            <Info className="w-3 h-3" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-xs p-3">
-                          <div className="space-y-2">
-                            <p className="font-medium">自动摘要触发条件</p>
-                            <p className="text-sm">当对话消息数超过此值时，系统会自动生成摘要来压缩历史对话，释放更多上下文空间。</p>
-                            <div className="text-sm">
-                              <p className="font-medium">推荐值：</p>
-                              <p>• 频繁摘要(记忆好): 15-20</p>
-                              <p>• 适中摘要: 20-25</p>
-                              <p>• 少量摘要(节省成本): 25-30</p>
-                            </div>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                    <Input
-                      type="number"
-                      value={contextConfig.summaryThreshold}
-                      onChange={(e) => setContextConfig(prev => ({
-                        ...prev,
-                        summaryThreshold: parseInt(e.target.value) || 20
-                      }))}
-                      className="h-10 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2 mb-1">
                       <Label className="text-xs text-slate-600 dark:text-slate-300">保留最近消息</Label>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -722,6 +679,15 @@ export default function ChatSettingsPage() {
                     className="h-10 px-4 text-sm touch-manipulation"
                   >
                     应用模型推荐配置
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => router.push(`/chat/${sessionId}/memory`)}
+                    className="h-10 px-4 text-sm touch-manipulation flex items-center space-x-1"
+                  >
+                    <Brain className="w-3 h-3" />
+                    <span>记忆管理器</span>
                   </Button>
                 </div>
 

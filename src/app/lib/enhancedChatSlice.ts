@@ -2,150 +2,201 @@ import { createAsyncThunk } from '@reduxjs/toolkit'
 import { supabase, type ChatMessage, type ChatSummary } from './supabase'
 import { ContextManager, ContextConfig } from './contextManager'
 
-// 摘要生成处理函数
-async function handleSummaryGeneration(params: {
-  contextManager: ContextManager
-  currentMessages: ChatMessage[]
-  sessionId: string
-  characterName: string
-  apiKey: string
-  model: string
-  baseUrl?: string
-  actualModel?: string
-  thinkingBudget?: number
-}): Promise<{ summaries: string[], actualSummarizedCount: number }> {
-  const { contextManager, currentMessages, sessionId, characterName, apiKey, model, baseUrl, actualModel, thinkingBudget } = params
-  
-  let summaries: string[] = []
-  
-  if (contextManager.shouldGenerateSummary(currentMessages)) {
-    console.log('检测到需要生成摘要，获取现有摘要...')
-    
-    // 获取用户session
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user) {
-      throw new Error('用户未登录')
+
+// 获取摘要覆盖的消息范围
+async function getSummaryCoverageRanges(sessionId: string, userId: string): Promise<{start: number, end: number}[]> {
+  try {
+    const { data: summaries, error } = await supabase
+      .from('chat_summaries')
+      .select('start_message_id, end_message_id')
+      .eq('session_id', sessionId)
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .not('start_message_id', 'is', null)
+      .not('end_message_id', 'is', null)
+      .order('start_message_id', { ascending: true })
+
+    if (error || !summaries) {
+      console.warn('获取摘要覆盖范围失败:', error)
+      return []
     }
-    
-    // 获取现有摘要
-    const existingSummaries = await getSummaries(sessionId, session.user.id)
-    summaries = existingSummaries.map(s => s.content)
-    console.log(`📖 获取到${existingSummaries.length}个现有摘要:`, existingSummaries.map((s, i) => `[${i+1}] ${s.content.substring(0, 50)}...`))
 
-    // 检查是否需要生成新摘要
-    const config = contextManager.getConfig()
-    const activeSummariesCount = existingSummaries.filter(s => s.is_active).length
-    const summarizedMessageCount = activeSummariesCount * config.summaryThreshold
-    const unSummarizedMessages = currentMessages.slice(summarizedMessageCount)
+    // 合并重叠或连续的范围
+    const ranges: {start: number, end: number}[] = []
+    for (const summary of summaries) {
+      const newRange = { start: summary.start_message_id, end: summary.end_message_id }
 
-    // 计算需要生成多少个摘要（批量生成避免每次都生成一个）
-    const neededSummaries = Math.floor(unSummarizedMessages.length / config.summaryThreshold)
+      // 尝试与现有范围合并
+      let merged = false
+      for (let i = 0; i < ranges.length; i++) {
+        const existingRange = ranges[i]
 
-    if (neededSummaries > 0) {
-      console.log(`🎯 检测到需要生成 ${neededSummaries} 个摘要，未摘要消息数: ${unSummarizedMessages.length}`)
-
-      // 如果是第一次开启智能模式且需要大量摘要，给出提示
-      if (existingSummaries.length === 0 && neededSummaries > 2) {
-        console.log(`⚠️  首次开启智能模式，需要生成 ${neededSummaries} 个摘要。为避免大量API调用，每次只生成一个摘要。`)
-        console.log(`💡 建议：在聊天设置中调整摘要阈值或手动清理历史消息来减少摘要生成。`)
-      }
-
-      // 只生成一个摘要，避免一次性大量API调用
-      const messagesForThisSummary = unSummarizedMessages.slice(0, config.summaryThreshold)
-      console.log(`生成第 ${existingSummaries.length + 1} 个摘要 (处理 ${config.summaryThreshold} 条消息)...`)
-      
-      try {
-        const newSummary = await generateSummary({
-          sessionId,
-          userId: session.user.id,
-          startMessageId: messagesForThisSummary[0]?.id || 0,
-          endMessageId: messagesForThisSummary[messagesForThisSummary.length - 1]?.id || 0,
-          characterName,
-          apiKey,
-          model,
-          accessToken: session.access_token,
-          baseUrl,
-          actualModel,
-          thinkingBudget
-        })
-
-        if (newSummary) {
-          summaries.push(newSummary.content)
-          console.log(`✨ 生成新摘要并添加:`, newSummary.content.substring(0, 100) + '...')
-          
-          // 检查是否需要进行摘要压缩（8-5-3策略：8条触发，压缩前5条，保留最近3条）
-          // 重新获取最新的摘要列表（因为可能有其他并发操作）
-          const currentSummaries = await getSummaries(sessionId, session.user.id)
-          const activeLevelOneSummaries = currentSummaries
-            .filter(s => s.is_active && s.summary_level === 1)
-            .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) // 按时间排序
-          
-          const totalActiveSummaries = activeLevelOneSummaries.length + 1 // 包含即将生成的新摘要
-          
-          // 8-5-3策略：当摘要达到8条时，压缩最早的5条，保留最近的3条
-          if (totalActiveSummaries >= 8) {
-            console.log(`🎯 检测到${totalActiveSummaries}个一级摘要，触发8-5-3压缩策略...`)
-            console.log('📋 压缩策略：压缩最早的5条摘要，保留最近的3条摘要以应对用户可能的修改')
-            
-            // 取最早的5个一级摘要进行压缩（保留最近3条不动）
-            const summariesToCompress = activeLevelOneSummaries.slice(0, 5)
-            const summariesToKeep = activeLevelOneSummaries.slice(5)
-            
-            console.log(`🔄 准备压缩：${summariesToCompress.length}条稳定摘要`)
-            console.log(`🛡️ 保持独立：${summariesToKeep.length}条最近摘要 + 1条新摘要`)
-            
-            try {
-              const superSummary = await generateSuperSummary({
-                sessionId,
-                userId: session.user.id,
-                summariesToCompress,
-                characterName,
-                apiKey,
-                model,
-                accessToken: session.access_token,
-                baseUrl,
-                actualModel,
-                thinkingBudget
-              })
-              
-              if (superSummary) {
-                // 重新获取摘要列表以反映压缩后的状态
-                const updatedSummaries = await getSummaries(sessionId, session.user.id)
-                summaries = updatedSummaries.map(s => s.content)
-                
-                // 统计压缩效果
-                const levelOneSummaries = updatedSummaries.filter(s => s.summary_level === 1).length
-                const levelTwoSummaries = updatedSummaries.filter(s => s.summary_level === 2).length
-                
-                console.log(`🏆 8-5-3压缩成功！摘要结构：`)
-                console.log(`   - 超级摘要(L2)：${levelTwoSummaries}条`)
-                console.log(`   - 一级摘要(L1)：${levelOneSummaries}条`)
-                console.log(`   - 总摘要数：${updatedSummaries.length}条`)
-              }
-            } catch (compressionError) {
-              console.error('🔥 摘要压缩失败，但不影响正常功能:', compressionError)
-            }
-          } else {
-            console.log(`📊 当前一级摘要：${totalActiveSummaries}条，距离压缩阈值(8条)还有${8 - totalActiveSummaries}条`)
+        // 检查是否重叠或连续
+        if (newRange.start <= existingRange.end + 1 && newRange.end >= existingRange.start - 1) {
+          // 合并范围
+          ranges[i] = {
+            start: Math.min(existingRange.start, newRange.start),
+            end: Math.max(existingRange.end, newRange.end)
           }
-          
-          console.log(`📝 当前总摘要数量: ${summaries.length}`)
-        } else {
-          console.log('⚠️ 摘要生成返回null，继续使用现有摘要')
+          merged = true
+          break
         }
-      } catch (error) {
-        console.error('❌ 摘要生成失败:', error)
-        console.log('🔄 摘要生成失败，继续使用现有摘要，不影响消息处理')
-        // 摘要失败时不抛出错误，继续使用现有摘要
+      }
+
+      if (!merged) {
+        ranges.push(newRange)
       }
     }
+
+    ranges.sort((a, b) => a.start - b.start)
+    console.log('📊 摘要覆盖范围:', ranges)
+    return ranges
+  } catch (error) {
+    console.error('获取摘要覆盖范围时出错:', error)
+    return []
   }
-  
-  // 计算实际被摘要覆盖的消息数量
-  const config = contextManager.getConfig()
-  const actualSummarizedCount = summaries.length * config.summaryThreshold
-  
-  return { summaries, actualSummarizedCount }
+}
+
+// 获取记忆表格数据
+async function getMemoryTableData(sessionId: string, userId: string): Promise<string> {
+  try {
+    const { data: memories, error } = await supabase
+      .from('chat_memories')
+      .select('type, title, content, importance, metadata')
+      .eq('session_id', sessionId)
+      .eq('user_id', userId)
+      .gte('importance', 5) // 只包含重要度5分以上的记忆
+      .order('importance', { ascending: false })
+      .limit(20) // 最多20条记忆
+
+    if (error || !memories || memories.length === 0) {
+      console.log('📋 没有可用的记忆表格数据')
+      return ''
+    }
+
+    // 按类型分组记忆
+    const groupedMemories = memories.reduce((groups: any, memory) => {
+      if (!groups[memory.type]) {
+        groups[memory.type] = []
+      }
+      groups[memory.type].push(memory)
+      return groups
+    }, {})
+
+    let memoryText = '\n【重要记忆表格】\n'
+
+    // 按类型输出记忆
+    if (groupedMemories.character) {
+      memoryText += '\n👤 人物记忆:\n'
+      groupedMemories.character.forEach((m: any) => {
+        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
+        if (m.metadata) {
+          const meta = m.metadata
+          if (meta.name) memoryText += `  姓名: ${meta.name}\n`
+          if (meta.relationship) memoryText += `  关系: ${meta.relationship}\n`
+          if (meta.nickname) memoryText += `  称呼: ${meta.nickname}\n`
+        }
+      })
+    }
+
+    if (groupedMemories.event) {
+      memoryText += '\n📅 事件记忆:\n'
+      groupedMemories.event.forEach((m: any) => {
+        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
+        if (m.metadata) {
+          const meta = m.metadata
+          if (meta.time) memoryText += `  时间: ${meta.time}\n`
+          if (meta.location) memoryText += `  地点: ${meta.location}\n`
+          if (meta.participants) memoryText += `  参与者: ${meta.participants.join(', ')}\n`
+        }
+      })
+    }
+
+    if (groupedMemories.setting) {
+      memoryText += '\n🏛️ 设定记忆:\n'
+      groupedMemories.setting.forEach((m: any) => {
+        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
+        if (m.metadata?.location) memoryText += `  地点: ${m.metadata.location}\n`
+        if (m.metadata?.atmosphere) memoryText += `  氛围: ${m.metadata.atmosphere}\n`
+      })
+    }
+
+    if (groupedMemories.emotion) {
+      memoryText += '\n💭 情感记忆:\n'
+      groupedMemories.emotion.forEach((m: any) => {
+        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
+        if (m.metadata) {
+          const meta = m.metadata
+          if (meta.emotion_type) memoryText += `  情感: ${meta.emotion_type}\n`
+          if (meta.intensity) memoryText += `  强度: ${meta.intensity}/10\n`
+        }
+      })
+    }
+
+    if (groupedMemories.spacetime) {
+      memoryText += '\n⏰ 时空记忆:\n'
+      groupedMemories.spacetime.forEach((m: any) => {
+        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
+        if (m.metadata) {
+          const meta = m.metadata
+          if (meta.date) memoryText += `  日期: ${meta.date}\n`
+          if (meta.time) memoryText += `  时间: ${meta.time}\n`
+          if (meta.location) memoryText += `  地点: ${meta.location}\n`
+          if (meta.characters) memoryText += `  在场角色: ${meta.characters.join(', ')}\n`
+        }
+      })
+    }
+
+    if (groupedMemories.relationship) {
+      memoryText += '\n🤝 关系记忆:\n'
+      groupedMemories.relationship.forEach((m: any) => {
+        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
+        if (m.metadata) {
+          const meta = m.metadata
+          if (meta.character_name) memoryText += `  角色: ${meta.character_name}\n`
+          if (meta.relationship) memoryText += `  关系: ${meta.relationship}\n`
+          if (meta.attitude) memoryText += `  态度: ${meta.attitude}\n`
+          if (meta.affection) memoryText += `  好感度: ${meta.affection}/10\n`
+          if (meta.trust) memoryText += `  信任度: ${meta.trust}/10\n`
+        }
+      })
+    }
+
+    if (groupedMemories.task) {
+      memoryText += '\n📋 任务约定:\n'
+      groupedMemories.task.forEach((m: any) => {
+        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
+        if (m.metadata) {
+          const meta = m.metadata
+          if (meta.task_type) memoryText += `  类型: ${meta.task_type}\n`
+          if (meta.scheduled_time) memoryText += `  约定时间: ${meta.scheduled_time}\n`
+          if (meta.status) memoryText += `  状态: ${meta.status}\n`
+          if (meta.priority) memoryText += `  优先级: ${meta.priority}\n`
+        }
+      })
+    }
+
+    if (groupedMemories.item) {
+      memoryText += '\n📦 重要物品:\n'
+      groupedMemories.item.forEach((m: any) => {
+        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
+        if (m.metadata) {
+          const meta = m.metadata
+          if (meta.item_name) memoryText += `  物品名: ${meta.item_name}\n`
+          if (meta.owner) memoryText += `  拥有者: ${meta.owner}\n`
+          if (meta.location) memoryText += `  位置: ${meta.location}\n`
+          if (meta.emotional_value) memoryText += `  情感价值: ${meta.emotional_value}/10\n`
+        }
+      })
+    }
+
+    console.log(`🧠 获取到${memories.length}条记忆表格数据`)
+    return memoryText
+
+  } catch (error) {
+    console.error('获取记忆表格数据失败:', error)
+    return ''
+  }
 }
 
 // 构建最终上下文函数
@@ -154,38 +205,69 @@ async function buildFinalContext(params: {
   systemPrompt: string
   currentMessages: ChatMessage[]
   summaries: string[]
-  actualSummarizedCount?: number  // 新增：实际被摘要覆盖的消息数量
+  sessionId: string
+  userId: string
 }) {
-  const { contextManager, systemPrompt, currentMessages, summaries, actualSummarizedCount } = params
-  
-  // 如果有摘要，只传递未被摘要的消息部分
+  const { contextManager, systemPrompt, currentMessages, summaries, sessionId, userId } = params
+
+  // 如果有摘要，根据实际覆盖范围智能跳过消息
   let messagesToProcess = currentMessages
   if (summaries.length > 0) {
     const config = contextManager.getConfig()
-    
-    // 使用实际摘要覆盖的消息数量，而不是期望的数量
-    const summarizedMessageCount = actualSummarizedCount !== undefined 
-      ? actualSummarizedCount 
-      : summaries.length * config.summaryThreshold
-    
-    messagesToProcess = currentMessages.slice(summarizedMessageCount)
-    console.log(`🧠 使用摘要模式: ${summaries.length}个摘要，跳过前${summarizedMessageCount}条消息，处理${messagesToProcess.length}条消息`)
-    
-    // 确保至少保留最近的几条消息
-    if (messagesToProcess.length === 0) {
+
+    // 获取摘要覆盖的消息范围
+    const coverageRanges = await getSummaryCoverageRanges(sessionId, userId)
+
+    if (coverageRanges.length > 0) {
+      // 计算被覆盖的消息数量
+      const coveredMessageIds = new Set<number>()
+      for (const range of coverageRanges) {
+        for (let id = range.start; id <= range.end; id++) {
+          coveredMessageIds.add(id)
+        }
+      }
+
+      // 筛选出未被摘要覆盖的消息
+      const uncoveredMessages = currentMessages.filter(msg => !coveredMessageIds.has(msg.id))
+
+      // 如果有未覆盖的消息，使用它们；否则保留最近的消息
+      if (uncoveredMessages.length > 0) {
+        messagesToProcess = uncoveredMessages
+        console.log(`🧠 智能摘要模式: ${summaries.length}个摘要，覆盖${coveredMessageIds.size}条消息，使用${messagesToProcess.length}条未覆盖消息`)
+      } else {
+        // 如果所有消息都被覆盖，保留最近的几条消息
+        const minMessages = Math.min(config.keepRecentMessages, currentMessages.length)
+        messagesToProcess = currentMessages.slice(-minMessages)
+        console.log(`⚠️ 所有消息都被摘要覆盖，强制保留最近${minMessages}条消息`)
+      }
+    } else {
+      // 如果无法获取覆盖范围，降级到保留最近消息
       const minMessages = Math.min(config.keepRecentMessages, currentMessages.length)
       messagesToProcess = currentMessages.slice(-minMessages)
-      console.log(`⚠️ 摘要覆盖了所有消息，强制保留最近${minMessages}条消息`)
+      console.log(`⚠️ 无法获取摘要覆盖范围，保留最近${minMessages}条消息`)
     }
   } else {
     console.log(`📝 无摘要模式: 处理全部${messagesToProcess.length}条消息`)
   }
-  
+
+  // 获取记忆表格数据
+  const memoryTableData = await getMemoryTableData(sessionId, userId)
+  console.log(`🧠 记忆表格数据长度: ${memoryTableData.length} 字符`)
+  if (memoryTableData) {
+    console.log(`🧠 记忆表格预览: ${memoryTableData.substring(0, 200)}...`)
+  }
+
   const finalSummaries = summaries.length > 0 ? summaries : undefined
   console.log(`🎯 传递给buildContext的摘要:`, finalSummaries ? finalSummaries.map((s, i) => `[${i+1}] ${s.substring(0, 50)}...`) : '无摘要')
-  
+
+  // 将记忆表格数据附加到系统提示词中
+  const enhancedSystemPrompt = memoryTableData
+    ? systemPrompt + memoryTableData
+    : systemPrompt
+  console.log(`🎯 最终系统提示词长度: ${enhancedSystemPrompt.length} 字符 (原始: ${systemPrompt.length}, 记忆表格: ${memoryTableData.length})`)
+
   return await contextManager.buildContext({
-    systemPrompt,
+    systemPrompt: enhancedSystemPrompt,
     messages: messagesToProcess,
     summaries: finalSummaries
   })
@@ -244,85 +326,6 @@ export const getSummaries = async (sessionId: string, userId: string): Promise<C
   }
 }
 
-// 生成超级摘要（压缩多个摘要）
-export const generateSuperSummary = async (params: {
-  sessionId: string
-  userId: string
-  summariesToCompress: ChatSummary[]
-  characterName: string
-  apiKey: string
-  model?: string
-  accessToken: string
-  baseUrl?: string
-  actualModel?: string
-  thinkingBudget?: number
-}): Promise<ChatSummary | null> => {
-  try {
-    if (!params.apiKey || !params.accessToken) {
-      throw new Error('缺少必要的认证参数')
-    }
-
-    const { summariesToCompress } = params
-    if (summariesToCompress.length < 2) {
-      console.log('⚠️ 摘要数量不足，无需压缩')
-      return null
-    }
-
-    console.log(`🔄 开始压缩${summariesToCompress.length}个摘要为超级摘要`)
-
-    // 构建超级摘要内容
-    const summaryContents = summariesToCompress
-      .map((s, i) => `[摘要${i+1}] ${s.content}`)
-      .join('\n\n')
-
-    // 调用摘要API
-    const response = await fetch('/api/chat/summary', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${params.accessToken}`,
-        'x-api-key': params.apiKey,
-        'x-model': params.model || 'deepseek-chat',
-        'x-base-url': params.baseUrl || '',
-        'x-actual-model': params.actualModel || '',
-        'x-thinking-budget': params.thinkingBudget?.toString() || ''
-      },
-      body: JSON.stringify({
-        sessionId: params.sessionId,
-        userId: params.userId,
-        summaryContent: summaryContents,
-        summaryType: 'super',
-        characterName: params.characterName,
-        parentSummaryIds: summariesToCompress.map(s => s.id)
-      })
-    })
-
-    if (!response.ok) {
-      throw new Error(`超级摘要生成失败: ${response.status}`)
-    }
-
-    const result = await response.json()
-    const superSummary = result.summary
-
-    if (superSummary) {
-      // 标记原摘要为已压缩
-      await supabase
-        .from('chat_summaries')
-        .update({ 
-          is_active: false, 
-          compressed_at: new Date().toISOString() 
-        })
-        .in('id', summariesToCompress.map(s => s.id))
-
-      console.log(`✨ 成功生成超级摘要并压缩${summariesToCompress.length}个原摘要`)
-    }
-
-    return superSummary
-  } catch (error) {
-    console.error('❌ 超级摘要生成失败:', error)
-    return null
-  }
-}
 
 // 生成摘要
 export const generateSummary = async (params: {
@@ -433,18 +436,14 @@ export const sendMessageWithContext = createAsyncThunk(
       currentMessages.push(userMsgData)
     }
 
-    // 4. 处理摘要逻辑
-    const { summaries, actualSummarizedCount } = await handleSummaryGeneration({
-      contextManager,
-      currentMessages,
-      sessionId,
-      characterName,
-      apiKey,
-      model,
-      baseUrl,
-      actualModel,
-      thinkingBudget
-    })
+    // 4. 获取现有摘要（不自动生成新摘要）
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) {
+      throw new Error('用户未登录')
+    }
+
+    const existingSummaries = await getSummaries(sessionId, session.user.id)
+    const summaries = existingSummaries.map(s => s.content)
 
     // 5. 构建最终上下文
     const context = await buildFinalContext({
@@ -452,7 +451,8 @@ export const sendMessageWithContext = createAsyncThunk(
       systemPrompt,
       currentMessages,
       summaries,
-      actualSummarizedCount
+      sessionId,
+      userId: session.user.id
     })
 
     // 6. 记录上下文统计信息
@@ -502,7 +502,8 @@ export const sendMessageWithContext = createAsyncThunk(
     if (!response.ok) {
       const errorText = await response.text()
       console.error('API响应错误:', response.status, errorText)
-      throw new Error(`Failed to get AI response: ${response.status} ${errorText}`)
+      throw new Error("AI模型返回空响应，可能是内容被过滤。")
+      //throw new Error(`Failed to get AI response: ${response.status} ${errorText}`)
     }
 
     const aiResponse = await response.json()
@@ -573,18 +574,14 @@ export const regenerateMessageWithContext = createAsyncThunk(
     // 2. 创建上下文管理器
     const contextManager = new ContextManager(contextConfig)
     
-    // 3. 处理摘要逻辑
-    const { summaries, actualSummarizedCount } = await handleSummaryGeneration({
-      contextManager,
-      currentMessages: filteredMessages,
-      sessionId,
-      characterName,
-      apiKey,
-      model,
-      baseUrl,
-      actualModel,
-      thinkingBudget
-    })
+    // 3. 获取现有摘要（不自动生成新摘要）
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) {
+      throw new Error('用户未登录')
+    }
+
+    const existingSummaries = await getSummaries(sessionId, session.user.id)
+    const summaries = existingSummaries.map(s => s.content)
 
     // 4. 构建最终上下文
     const context = await buildFinalContext({
@@ -592,7 +589,8 @@ export const regenerateMessageWithContext = createAsyncThunk(
       systemPrompt,
       currentMessages: filteredMessages,
       summaries,
-      actualSummarizedCount
+      sessionId,
+      userId: session.user.id
     })
 
     // 5. 最终安全检查
@@ -699,43 +697,6 @@ export const detectAndHandleSummaryInvalidation = async (
       }
     }
 
-    // 检查是否有孤立的超级摘要需要失效
-    const { data: superSummaries } = await supabase
-      .from('chat_summaries')
-      .select('*, parent_summaries')
-      .eq('session_id', sessionId)
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .gt('summary_level', 1)
-
-    if (superSummaries && superSummaries.length > 0) {
-      for (const superSummary of superSummaries) {
-        if (superSummary.parent_summaries && superSummary.parent_summaries.length > 0) {
-          // 检查父摘要是否仍然有效
-          const { data: parentSummaries } = await supabase
-            .from('chat_summaries')
-            .select('id')
-            .in('id', superSummary.parent_summaries)
-            .eq('is_active', true)
-
-          const activeParentCount = parentSummaries?.length || 0
-          const expectedParentCount = superSummary.parent_summaries.length
-
-          // 如果父摘要大部分已失效，则失效超级摘要
-          if (activeParentCount < expectedParentCount * 0.5) {
-            await supabase
-              .from('chat_summaries')
-              .update({ 
-                is_active: false, 
-                invalidated_at: new Date().toISOString() 
-              })
-              .eq('id', superSummary.id)
-            
-            console.log(`⚠️ 超级摘要${superSummary.id}的父摘要大部分已失效，已自动失效`)
-          }
-        }
-      }
-    }
   } catch (error) {
     console.error('🔥 摘要失效检测失败:', error)
   }
@@ -802,56 +763,7 @@ export const rebuildSummarySystem = async (params: {
       messageIndex += config.summaryThreshold
     }
 
-    // 3. 使用8-5-3策略自动压缩摘要
-    while (newSummaries.length >= 8) {
-      console.log(`🎯 重建过程中检测到${newSummaries.length}个摘要，应用8-5-3压缩策略...`)
-      
-      // 获取要压缩的摘要（最早的5个）
-      const { data: summariesToCompress } = await supabase
-        .from('chat_summaries')
-        .select('*')
-        .eq('session_id', params.sessionId)
-        .eq('user_id', params.userId)
-        .eq('is_active', true)
-        .eq('summary_level', 1)
-        .order('created_at', { ascending: true })
-        .limit(5)
-      
-      if (summariesToCompress && summariesToCompress.length >= 5) {
-        console.log(`🔄 重建中压缩最早的${summariesToCompress.length}条摘要，保留最近的${newSummaries.length - 5}条`)
-        
-        const superSummary = await generateSuperSummary({
-          sessionId: params.sessionId,
-          userId: params.userId,
-          summariesToCompress,
-          characterName: params.characterName,
-          apiKey: params.apiKey,
-          model: params.model,
-          accessToken: params.accessToken,
-          baseUrl: params.baseUrl,
-          actualModel: params.actualModel,
-          thinkingBudget: params.thinkingBudget
-        })
-        
-        if (superSummary) {
-          // 重新计算摘要数量
-          const { data: updatedSummaries } = await supabase
-            .from('chat_summaries')
-            .select('*')
-            .eq('session_id', params.sessionId)
-            .eq('user_id', params.userId)
-            .eq('is_active', true)
-            .eq('summary_level', 1)
-          
-          newSummaries = updatedSummaries?.map(s => s.content) || []
-          console.log(`🏆 重建压缩成功，当前一级摘要数：${newSummaries.length}`)
-        } else {
-          break // 压缩失败，退出循环
-        }
-      } else {
-        break // 没有足够的摘要可压缩
-      }
-    }
+    // 摘要重建完成，无需压缩
 
     // 4. 获取最终的摘要列表
     const finalSummaries = await getSummaries(params.sessionId, params.userId)
@@ -870,37 +782,37 @@ export const rebuildSummarySystem = async (params: {
 
 // 工具函数：获取上下文配置建议
 export const getContextConfigSuggestions = (model: string): Partial<ContextConfig> => {
-  // 根据不同模型提供不同的配置建议
+  // 根据不同模型提供不同的配置建议（已移除summaryThreshold，摘要由记忆管理器手动控制）
   switch (true) {
     case model.includes('gpt-4'):
       return {
         maxContextTokens: 8000,
         reservedTokens: 1500,
-        summaryThreshold: 30
+        keepRecentMessages: 15  // GPT-4可以处理更多消息
       }
     case model.includes('gpt-3.5'):
       return {
         maxContextTokens: 4000,
         reservedTokens: 1000,
-        summaryThreshold: 20
+        keepRecentMessages: 10
       }
     case model.includes('gemini'):
       return {
-        maxContextTokens: 20000,  // 增加到20k，Gemini 2.5支持更大上下文
-        reservedTokens: 2000,     // 相应增加预留空间
-        summaryThreshold: 25
+        maxContextTokens: 20000,  // Gemini 2.5支持更大上下文
+        reservedTokens: 2000,
+        keepRecentMessages: 20   // 利用更大的上下文
       }
     case model.includes('deepseek'):
       return {
         maxContextTokens: 4000,
         reservedTokens: 1000,
-        summaryThreshold: 20
+        keepRecentMessages: 10
       }
     default:
       return {
         maxContextTokens: 4000,
         reservedTokens: 1000,
-        summaryThreshold: 20
+        keepRecentMessages: 10
       }
   }
 }

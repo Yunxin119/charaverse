@@ -4,19 +4,18 @@ import { ChatMessage } from './supabase'
 export interface ContextConfig {
   maxContextTokens: number        // 最大上下文token数
   reservedTokens: number          // 为生成预留的token数
-  enableSummary: boolean          // 是否启用摘要功能
-  summaryThreshold: number        // 触发摘要的消息数量阈值
   keepRecentMessages: number      // 保留的最近消息数量
-  summaryModel?: string           // 用于摘要的模型（可选）
+  enableSummary?: boolean         // 是否启用摘要
+  summaryThreshold?: number      // 摘要阈值
 }
 
 // 默认配置
 export const DEFAULT_CONTEXT_CONFIG: ContextConfig = {
   maxContextTokens: 4000,        // 大部分模型的安全上下文长度
   reservedTokens: 1000,          // 为AI生成预留1000 tokens
-  enableSummary: true,
-  summaryThreshold: 20,          // 超过20条消息时开始摘要
   keepRecentMessages: 10,        // 始终保留最近10条消息
+  enableSummary: true,           // 默认启用摘要
+  summaryThreshold: 20,          // 默认摘要阈值
 }
 
 // 简单的token计数器（粗略估算）
@@ -202,8 +201,8 @@ ${conversationText}
 
   // 判断是否需要生成摘要
   shouldGenerateSummary(messages: ChatMessage[]): boolean {
-    return this.config.enableSummary && 
-           messages.length >= this.config.summaryThreshold
+    return (this.config.enableSummary ?? true) && 
+           messages.length >= (this.config.summaryThreshold ?? 20)
   }
 
   // 获取当前配置
