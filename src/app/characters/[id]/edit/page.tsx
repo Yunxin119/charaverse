@@ -34,6 +34,7 @@ import { useAppSelector } from '../../../store/hooks'
 import { TemplateManager } from '../../../components/TemplateManager'
 import { SimpleAvatarUpload } from '../../../components/AvatarUpload'
 import { uploadCharacterAvatar } from '../../../lib/avatarUpload'
+import { MultiCharacterManager } from '../../../lib/multiCharacterManager'
 
 interface BasicInfo {
   name: string
@@ -97,6 +98,7 @@ export default function EditCharacterPage() {
 
   const [activeTab, setActiveTab] = useState('basic')
   const [avatarTimestamp, setAvatarTimestamp] = useState(Date.now())
+  const [isCreatingMultiSession, setIsCreatingMultiSession] = useState(false)
 
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -338,6 +340,34 @@ export default function EditCharacterPage() {
     } catch (error) {
       console.error('头像上传失败:', error)
       throw error
+    }
+  }
+
+  // 创建多角色会话
+  const handleCreateMultiCharacterSession = async () => {
+    if (!user || !characterId) return
+
+    setIsCreatingMultiSession(true)
+
+    try {
+      const manager = new MultiCharacterManager(user.id)
+      const multiSession = await manager.createMultiCharacterSession({
+        characterIds: [parseInt(characterId)],
+        title: `与 ${basicInfo.name} 的多角色对话`,
+        rotationMode: 'manual'
+      })
+
+      if (multiSession) {
+        // 直接跳转到新创建的多角色会话
+        router.push(`/chat/${multiSession.id}`)
+      } else {
+        alert('创建多角色会话失败')
+      }
+    } catch (error) {
+      console.error('创建多角色会话失败:', error)
+      alert(`创建多角色会话失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setIsCreatingMultiSession(false)
     }
   }
 
@@ -937,15 +967,25 @@ export default function EditCharacterPage() {
                   取消
                 </Button>
                 <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:space-x-3">
-                  {/* <Button
+                  <Button
                     type="button"
                     variant="outline"
-                    disabled={!basicInfo.name.trim()}
+                    disabled={isCreatingMultiSession || !basicInfo.name.trim()}
+                    onClick={handleCreateMultiCharacterSession}
                     className="w-full sm:w-auto h-11 sm:h-10"
                   >
-                    <Eye className="w-4 h-4 mr-2" />
-                    预览
-                  </Button> */}
+                    {isCreatingMultiSession ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        创建中...
+                      </>
+                    ) : (
+                      <>
+                        <Users className="w-4 h-4 mr-2" />
+                        启动多角色会话
+                      </>
+                    )}
+                  </Button>
                   <Button
                     type="submit"
                     disabled={isLoading || !basicInfo.name.trim()}

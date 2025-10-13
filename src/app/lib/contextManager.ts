@@ -49,6 +49,7 @@ export class ContextManager {
     worldInfo?: string[]
     exampleDialogues?: string[]
     summaries?: string[]
+    memoryTableData?: string
   }): Promise<{
     systemPrompt: string
     messages: { role: string; content: string }[]
@@ -60,7 +61,7 @@ export class ContextManager {
       hasSummary: boolean
     }
   }> {
-    const { systemPrompt, messages, characterCard, worldInfo, exampleDialogues, summaries } = params
+    const { systemPrompt, messages, characterCard, worldInfo, exampleDialogues, summaries, memoryTableData } = params
 
     // 1. 计算核心组件的token数
     const corePromptParts = [
@@ -68,7 +69,8 @@ export class ContextManager {
       characterCard || '',
       ...(worldInfo || []),
       ...(exampleDialogues || []),
-      ...(summaries || [])
+      ...(summaries || []),
+      memoryTableData || ''
     ]
     
     const corePrompt = corePromptParts.filter(part => part.trim()).join('\n\n')

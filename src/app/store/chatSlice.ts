@@ -236,17 +236,18 @@ export const fetchMoreMessages = createAsyncThunk(
 // 发送消息并获取AI回复
 export const sendMessage = createAsyncThunk(
   'chat/sendMessage',
-  async ({ 
-    sessionId, 
-    userMessage, 
-    systemPrompt, 
-    apiKey, 
+  async ({
+    sessionId,
+    userMessage,
+    systemPrompt,
+    apiKey,
     model,
     messages,
     thinkingBudget,
     baseUrl,
-    actualModel
-  }: { 
+    actualModel,
+    speakingCharacterId
+  }: {
     sessionId: string
     userMessage: string
     systemPrompt: string
@@ -256,6 +257,7 @@ export const sendMessage = createAsyncThunk(
     thinkingBudget?: number
     baseUrl?: string
     actualModel?: string
+    speakingCharacterId?: string
   }) => {
     let userMsgData = null
     
@@ -340,13 +342,20 @@ export const sendMessage = createAsyncThunk(
     }
 
     // 保存AI消息
+    const aiMsgInsert: any = {
+      session_id: sessionId,
+      role: 'assistant',
+      content: aiResponse.content
+    }
+
+    // 如果有剧本角色ID，添加到消息中
+    if (speakingCharacterId) {
+      aiMsgInsert.speaker_script_character_id = speakingCharacterId
+    }
+
     const { data: aiMsgData, error: aiMsgError } = await supabase
       .from('chat_messages')
-      .insert({
-        session_id: sessionId,
-        role: 'assistant',
-        content: aiResponse.content
-      })
+      .insert(aiMsgInsert)
       .select()
       .single()
 

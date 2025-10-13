@@ -230,8 +230,14 @@ export async function POST(request: NextRequest) {
 
     let summaryPrompt = ''
     if (useMemoryTable) {
-      summaryPrompt = `请分析以下对话，参考角色设定、之前的摘要和重要记忆，生成结构化的记忆表格和简洁摘要。
+      summaryPrompt = `你正在为一个角色扮演对话生成记忆表格。务必基于以下角色设定信息理解和记录对话内容。
 ${characterContext ? `${characterContext}\n` : ''}${previousContext ? `${previousContext}\n` : ''}
+【重要提示】
+- 记忆表格必须基于角色的背景、性格、关系设定来理解对话
+- 不要凭空推断角色身份，而是使用已提供的角色设定信息
+- 角色的前情提要、背景故事、世界观等信息都应该被纳入记忆理解的参考框架
+- 记录的记忆要与角色设定保持一致，体现角色特色
+
 请严格按照以下JSON格式返回，不要添加任何其他内容：
 
 {
@@ -315,10 +321,12 @@ ${characterContext ? `${characterContext}\n` : ''}${previousContext ? `${previou
   * item: item_name, owner, description, importance_reason, location, acquisition_method, emotional_value等
 
 要求：
-- 严格遵循提供的角色设定信息，确保生成的记忆和摘要符合角色的人设
+- 【核心】严格基于角色设定信息理解对话，不要脱离角色背景推断
+- 角色的人设、背景、世界观、关系网等都是记忆理解的重要依据
 - 记忆表格的content字段要详细，包含具体的对话细节和情境
 - 重要度评分要准确反映对故事发展的影响程度
 - 摘要要体现角色特色和世界观背景
+- 对于角色设定中已明确的信息（如身份、背景、关系等），优先使用设定信息而非推断
 
 当前对话内容：
 ${conversationText}

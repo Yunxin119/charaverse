@@ -23,13 +23,13 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Textarea } from '@/components/ui/textarea'
-import { supabase } from '../../../lib/supabase'
+import { supabase, type ScriptCharacter } from '../../../lib/supabase'
 import { useAppSelector } from '../../../store/hooks'
 import ImageUpload from '../../../components/ImageUpload'
 import ImageViewer from '../../../components/ImageViewer'
 import { uploadCommentImages, type CompressedImage } from '../../../lib/imageUtils'
 
-interface Character {
+interface Script {
   id: number
   name: string
   avatar_url?: string
@@ -38,6 +38,8 @@ interface Character {
   likes_count: number
   created_at: string
   user_id: string
+  script_type: 'single' | 'multi'
+  script_characters?: ScriptCharacter[]
   profiles?: {
     username?: string
   }
@@ -54,12 +56,12 @@ interface Comment {
   }
 }
 
-export default function PublicCharacterPage() {
+export default function PublicScriptPage() {
   const { id } = useParams()
   const router = useRouter()
   const { user } = useAppSelector((state) => state.auth)
-  
-  const [character, setCharacter] = useState<Character | null>(null)
+
+  const [script, setScript] = useState<Script | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isLiking, setIsLiking] = useState(false)
@@ -80,35 +82,35 @@ export default function PublicCharacterPage() {
     }
     
     if (id) {
-      fetchCharacterDetails()
+      fetchScriptDetails()
       fetchComments()
     }
   }, [id, user, router])
 
-  const fetchCharacterDetails = async () => {
+  const fetchScriptDetails = async () => {
     try {
-      // 获取角色详情
-      const { data: characterData, error: characterError } = await supabase
+      // 获取剧本详情
+      const { data: scriptData, error: scriptError } = await supabase
         .from('characters')
         .select('*')
         .eq('id', id)
         .eq('is_public', true)
         .single()
 
-      if (characterError) throw characterError
-      if (!characterData) throw new Error('角色不存在或未公开')
+      if (scriptError) throw scriptError
+      if (!scriptData) throw new Error('剧本不存在或未公开')
 
       // 获取创作者信息
       const { data: profileData } = await supabase
         .from('profiles')
         .select('username')
-        .eq('id', characterData.user_id)
+        .eq('id', scriptData.user_id)
         .single()
 
       // 检查username是否存在且不为空字符串
       const username = profileData?.username?.trim()
-      setCharacter({
-        ...characterData,
+      setScript({
+        ...scriptData,
         profiles: {
           ...profileData,
           // 如果没有username或username为空，提供友好的fallback
@@ -116,7 +118,7 @@ export default function PublicCharacterPage() {
         }
       })
     } catch (error) {
-      console.error('获取角色详情失败:', error)
+      console.error('获取剧本详情失败:', error)
       router.push('/explore')
     } finally {
       setIsLoading(false)
@@ -164,18 +166,18 @@ export default function PublicCharacterPage() {
 
   // 点赞功能
   const handleLike = async () => {
-    if (!character || isLiking) return
-    
+    if (!script || isLiking) return
+
     setIsLiking(true)
     try {
       const { error } = await supabase
         .from('characters')
-        .update({ likes_count: character.likes_count + 1 })
-        .eq('id', character.id)
+        .update({ likes_count: script.likes_count + 1 })
+        .eq('id', script.id)
 
       if (error) throw error
-      
-      setCharacter(prev => prev ? { ...prev, likes_count: prev.likes_count + 1 } : null)
+
+      setScript(prev => prev ? { ...prev, likes_count: prev.likes_count + 1 } : null)
     } catch (error) {
       console.error('点赞失败:', error)
     } finally {
@@ -183,30 +185,32 @@ export default function PublicCharacterPage() {
     }
   }
 
-  // 复制角色到我的角色库
-  const handleCopyCharacter = async () => {
-    if (!character || isCopying) return
-    
+  // 复制剧本到我的剧本库
+  const handleCopyScript = async () => {
+    if (!script || isCopying) return
+
     setIsCopying(true)
     try {
       const { error } = await supabase
         .from('characters')
         .insert({
           user_id: user!.id,
-          name: `${character.name} (副本)`,
-          avatar_url: character.avatar_url,
-          prompt_template: character.prompt_template,
+          name: `${script.name} (副本)`,
+          avatar_url: script.avatar_url,
+          prompt_template: script.prompt_template,
+          script_type: script.script_type,
+          script_characters: script.script_characters,
           is_public: false,
           likes_count: 0
         })
 
       if (error) throw error
-      
+
       // 成功提示并跳转
-      alert('角色已成功复制到你的角色库！')
+      alert('剧本已成功复制到你的剧本库！')
       router.push('/characters')
     } catch (error) {
-      console.error('复制角色失败:', error)
+      console.error('复制剧本失败:', error)
       alert('复制失败，请重试')
     } finally {
       setIsCopying(false)
@@ -215,21 +219,23 @@ export default function PublicCharacterPage() {
 
   // 开始聊天
   const handleStartChat = async () => {
-    if (!character) return
-    
+    if (!script) return
+
     try {
       const { data: session, error } = await supabase
         .from('chat_sessions')
         .insert({
           user_id: user!.id,
-          character_id: character.id,
-          title: `与 ${character.name} 的对话`
+          character_id: script.id,
+          title: script.script_type === 'multi'
+            ? `${script.name} 多角色对话`
+            : `与 ${script.name} 的对话`
         })
         .select()
         .single()
 
       if (error) throw error
-      
+
       router.push(`/chat/${session.id}`)
     } catch (error) {
       console.error('创建聊天会话失败:', error)
@@ -353,7 +359,7 @@ export default function PublicCharacterPage() {
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <h1 className="text-base font-semibold text-slate-900 dark:text-white">角色详情</h1>
+            <h1 className="text-base font-semibold text-slate-900 dark:text-white">剧本详情</h1>
             <div className="w-8 h-8"></div>
           </div>
         </div>
@@ -367,7 +373,7 @@ export default function PublicCharacterPage() {
     )
   }
 
-  if (!character) {
+  if (!script) {
     return (
       <div className="h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
         <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex-shrink-0">
@@ -380,13 +386,13 @@ export default function PublicCharacterPage() {
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <h1 className="text-base font-semibold text-slate-900 dark:text-white">角色详情</h1>
+            <h1 className="text-base font-semibold text-slate-900 dark:text-white">剧本详情</h1>
             <div className="w-8 h-8"></div>
           </div>
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center p-4">
-            <p className="text-slate-600 dark:text-slate-300 mb-4">角色不存在或未公开</p>
+            <p className="text-slate-600 dark:text-slate-300 mb-4">剧本不存在或未公开</p>
             <Button onClick={() => router.push('/explore')}>
               返回探索页面
             </Button>
@@ -428,12 +434,12 @@ export default function PublicCharacterPage() {
             </Button>
             
             <div className="w-full aspect-[1.8/1] overflow-hidden relative">
-              {/* Avatar Background or Default Background */}
-              {character.avatar_url ? (
+              {/* Script Cover Background */}
+              {script.avatar_url ? (
                 <>
-                  <div 
+                  <div
                     className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-                    style={{ backgroundImage: `url(${character.avatar_url})` }}
+                    style={{ backgroundImage: `url(${script.avatar_url})` }}
                   ></div>
                   <div className="absolute inset-0 bg-black/50"></div>
                 </>
@@ -450,40 +456,38 @@ export default function PublicCharacterPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent dark:from-black/80 dark:via-black/40"></div>
                 </>
               )}
-              
-              {/* Character Avatar - 右下角位置 */}
+
+              {/* Script Cover - 右下角位置 */}
               <div className="absolute bottom-6 right-6">
-                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-2xl bg-white">
-                  {character.avatar_url ? (
-                    <img 
-                      src={character.avatar_url} 
-                      alt={character.name}
+                <div className="w-32 h-32 rounded-lg overflow-hidden border-4 border-white shadow-2xl bg-white">
+                  {script.avatar_url ? (
+                    <img
+                      src={script.avatar_url}
+                      alt={script.name}
                       className="w-full h-full object-cover"
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                       <span className="text-white text-4xl font-bold">
-                        {character.name.charAt(0)}
+                        {script.name.charAt(0)}
                       </span>
                     </div>
                   )}
                 </div>
               </div>
-              
-              {/* Character Info - 左下角位置 */}
+
+              {/* Script Info - 左下角位置 */}
               <div className="absolute bottom-6 left-6 text-white z-10">
                 <h1 className="text-4xl font-bold drop-shadow-lg mb-2">
-                  {character.name}
+                  {script.name}
                 </h1>
                 <div className="flex items-center space-x-4 text-lg drop-shadow mb-2">
-                  {character.prompt_template?.basic_info?.age && (
-                    <span>{character.prompt_template.basic_info.age}</span>
-                  )}
-                  {character.prompt_template?.basic_info?.gender && (
-                    <span>
-                      {character.prompt_template.basic_info.gender === 'male' ? '男' : 
-                       character.prompt_template.basic_info.gender === 'female' ? '女' : 
-                       character.prompt_template.basic_info.gender === 'none' ? '无性别' : '其他'}
+                  <span className="px-3 py-1 bg-white/20 rounded-full text-sm">
+                    {script.script_type === 'single' ? '单角色剧本' : '多角色剧本'}
+                  </span>
+                  {script.script_characters && (
+                    <span className="px-3 py-1 bg-white/20 rounded-full text-sm">
+                      {script.script_characters.length} 个角色
                     </span>
                   )}
                 </div>
@@ -491,20 +495,20 @@ export default function PublicCharacterPage() {
                   <div className="w-6 h-6 rounded-full overflow-hidden border border-white/30">
                     <div className="w-full h-full bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center">
                       <span className="text-white text-xs font-bold">
-                        {character.profiles?.username?.charAt(0) || 'U'}
+                        {script.profiles?.username?.charAt(0) || 'U'}
                       </span>
                     </div>
                   </div>
-                  <button 
+                  <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (character.user_id) {
-                        router.push(`/user/${character.user_id}`)
+                      if (script.user_id) {
+                        router.push(`/user/${script.user_id}`)
                       }
                     }}
                     className="text-sm opacity-90 drop-shadow hover:opacity-100 hover:underline transition-all duration-200"
                   >
-                    {character.profiles?.username}
+                    {script.profiles?.username}
                   </button>
                 </div>
               </div>
@@ -519,28 +523,86 @@ export default function PublicCharacterPage() {
           >
             <Card className="dark:bg-slate-800/50 dark:border-slate-700 backdrop-blur-sm">
               <CardContent className="p-6">
-                {/* Introduction */}
-                {character.prompt_template?.basic_info?.introduction && (
+                {/* Script Introduction */}
+                {script.prompt_template?.basic_info?.introduction && (
                   <div className="mb-6">
                     <h3 className="font-semibold text-slate-900 dark:text-white mb-3 flex items-center">
                       <MessageCircle className="w-5 h-5 mr-2" />
-                      角色介绍
+                      剧本介绍
                     </h3>
                     <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-base">
-                      {character.prompt_template.basic_info.introduction}
+                      {script.prompt_template.basic_info.introduction}
                     </p>
                   </div>
                 )}
 
+                {/* Script Characters List */}
+                {script.script_characters && script.script_characters.length > 1 && (
+                  <div className="mb-6">
+                    <h3 className="font-semibold text-slate-900 dark:text-white mb-3 flex items-center">
+                      <User className="w-5 h-5 mr-2" />
+                      剧本角色
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {script.script_characters.map((scriptChar, index) => (
+                        <div key={scriptChar.id} className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 dark:bg-slate-800/30">
+                          <div className="flex items-start space-x-3">
+                            <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                              {scriptChar.avatar_url ? (
+                                <img
+                                  src={scriptChar.avatar_url}
+                                  alt={scriptChar.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <span className="text-white text-lg font-bold">
+                                  {scriptChar.name.charAt(0)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-slate-900 dark:text-white mb-1">
+                                {scriptChar.name}
+                              </h4>
+                              {scriptChar.description && (
+                                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                                  {scriptChar.description}
+                                </p>
+                              )}
+                              {scriptChar.personality?.traits && scriptChar.personality.traits.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {scriptChar.personality.traits.slice(0, 3).map((trait, traitIndex) => (
+                                    <span
+                                      key={traitIndex}
+                                      className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                                    >
+                                      {trait}
+                                    </span>
+                                  ))}
+                                  {scriptChar.personality.traits.length > 3 && (
+                                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                                      +{scriptChar.personality.traits.length - 3}个特征
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Keywords */}
-                {character.prompt_template?.basic_info?.keywords && character.prompt_template.basic_info.keywords.length > 0 && (
+                {script.prompt_template?.basic_info?.keywords && script.prompt_template.basic_info.keywords.length > 0 && (
                   <div className="mb-6">
                     <h3 className="font-semibold text-slate-900 dark:text-white mb-3 flex items-center">
                       <Star className="w-5 h-5 mr-2" />
                       关键词
                     </h3>
                     <div className="flex flex-wrap gap-2">
-                      {character.prompt_template.basic_info.keywords.map((keyword: string, index: number) => (
+                      {script.prompt_template.basic_info.keywords.map((keyword: string, index: number) => (
                         <span
                           key={index}
                           className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800"
@@ -552,9 +614,9 @@ export default function PublicCharacterPage() {
                   </div>
                 )}
 
-                {/* Character Settings - Collapsible */}
-                {(character.prompt_template?.basic_info?.description || 
-                  (character.prompt_template?.modules && character.prompt_template.modules.length > 0)) && (
+                {/* Script Settings - Collapsible */}
+                {(script.prompt_template?.basic_info?.description ||
+                  (script.prompt_template?.modules && script.prompt_template.modules.length > 0)) && (
                   <div className="mb-6">
                     <button
                       onClick={() => setIsSettingsExpanded(!isSettingsExpanded)}
@@ -562,7 +624,7 @@ export default function PublicCharacterPage() {
                     >
                       <h3 className="font-semibold text-slate-900 dark:text-white flex items-center">
                         <Settings className="w-5 h-5 mr-2" />
-                        角色设定
+                        剧本设定
                       </h3>
                       {isSettingsExpanded ? (
                         <ChevronUp className="w-5 h-5 text-slate-600 dark:text-slate-400" />
@@ -580,22 +642,22 @@ export default function PublicCharacterPage() {
                         className="mt-4 space-y-4"
                       >
                         {/* Basic Info Description */}
-                        {character.prompt_template?.basic_info?.description && (
+                        {script.prompt_template?.basic_info?.description && (
                           <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 dark:bg-slate-800/30">
                             <h4 className="font-medium text-slate-900 dark:text-white mb-2 flex items-center">
                               <User className="w-4 h-4 mr-2" />
                               基本设定
                             </h4>
                             <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-sm">
-                              {character.prompt_template.basic_info.description}
+                              {script.prompt_template.basic_info.description}
                             </p>
                           </div>
                         )}
 
                         {/* Modules */}
-                        {character.prompt_template?.modules && character.prompt_template.modules.length > 0 && (
+                        {script.prompt_template?.modules && script.prompt_template.modules.length > 0 && (
                           <>
-                            {character.prompt_template.modules.map((module: any, index: number) => (
+                            {script.prompt_template.modules.map((module: any, index: number) => (
                               <div key={index} className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 dark:bg-slate-800/30">
                                 <h4 className="font-medium text-slate-900 dark:text-white mb-2">{module.type}</h4>
                                 {module.type === '用户角色设定' ? (
@@ -603,8 +665,8 @@ export default function PublicCharacterPage() {
                                     {module.userRoleName && <p><strong>姓名:</strong> {module.userRoleName}</p>}
                                     {module.userRoleAge && <p><strong>年龄:</strong> {module.userRoleAge}</p>}
                                     {module.userRoleGender && <p><strong>性别:</strong> {
-                                      module.userRoleGender === 'male' ? '男' : 
-                                      module.userRoleGender === 'female' ? '女' : 
+                                      module.userRoleGender === 'male' ? '男' :
+                                      module.userRoleGender === 'female' ? '女' :
                                       module.userRoleGender === 'none' ? '无性别' : '其他'
                                     }</p>}
                                     {module.userRoleDetails && <p><strong>详情:</strong> {module.userRoleDetails}</p>}
@@ -630,31 +692,31 @@ export default function PublicCharacterPage() {
                 <div className="flex items-center justify-between mb-6 text-sm text-slate-500 dark:text-slate-400">
                   <div className="flex items-center space-x-1">
                     <Heart className="w-4 h-4" />
-                    <span>{character.likes_count} 点赞</span>
+                    <span>{script.likes_count} 点赞</span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <Clock className="w-4 h-4" />
-                    <span>{new Date(character.created_at).toLocaleDateString()}</span>
+                    <span>{new Date(script.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
 
                 {/* Action Buttons */}
                 <div className="grid grid-cols-2 gap-3 mb-4">
-                  <Button 
-                    onClick={handleCopyCharacter}
+                  <Button
+                    onClick={handleCopyScript}
                     disabled={isCopying}
                     variant="outline"
                     className="h-12"
                   >
                     <Star className="w-4 h-4 mr-2" />
-                    {isCopying ? '复制中...' : '复制到角色库'}
+                    {isCopying ? '复制中...' : '复制到剧本库'}
                   </Button>
-                  <Button 
+                  <Button
                     onClick={handleStartChat}
                     className="h-12 bg-blue-600 hover:bg-blue-700"
                   >
                     <MessageCircle className="w-4 h-4 mr-2" />
-                    开始聊天
+                    {script.script_type === 'multi' ? '开始多角色对话' : '开始聊天'}
                   </Button>
                 </div>
 
@@ -666,7 +728,7 @@ export default function PublicCharacterPage() {
                   className="w-full h-12 text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/20"
                 >
                   <Heart className="w-4 h-4 mr-2" />
-                  {isLiking ? '点赞中...' : `点赞 (${character.likes_count})`}
+                  {isLiking ? '点赞中...' : `点赞 (${script.likes_count})`}
                 </Button>
               </CardContent>
             </Card>
@@ -686,7 +748,7 @@ export default function PublicCharacterPage() {
               {/* Add Comment */}
               <div className="mb-6">
                 <Textarea
-                  placeholder="分享你对这个角色的看法..."
+                  placeholder="分享你对这个剧本的看法..."
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   className="min-h-[100px] mb-3 resize-none dark:bg-slate-700 dark:border-slate-600 dark:text-white"

@@ -57,7 +57,7 @@ async function getSummaryCoverageRanges(sessionId: string, userId: string): Prom
   }
 }
 
-// 获取记忆表格数据
+// 获取记忆表格数据 - 优化版（参考SillyTavern）
 async function getMemoryTableData(sessionId: string, userId: string): Promise<string> {
   try {
     const { data: memories, error } = await supabase
@@ -65,9 +65,10 @@ async function getMemoryTableData(sessionId: string, userId: string): Promise<st
       .select('type, title, content, importance, metadata')
       .eq('session_id', sessionId)
       .eq('user_id', userId)
+      .eq('is_enabled', true) // 只获取启用的记忆
       .gte('importance', 5) // 只包含重要度5分以上的记忆
       .order('importance', { ascending: false })
-      .limit(20) // 最多20条记忆
+      .limit(80) 
 
     if (error || !memories || memories.length === 0) {
       console.log('📋 没有可用的记忆表格数据')
@@ -83,111 +84,143 @@ async function getMemoryTableData(sessionId: string, userId: string): Promise<st
       return groups
     }, {})
 
-    let memoryText = '\n【重要记忆表格】\n'
+    let memoryText = '\n【重要记忆表格】\n记忆按重要度排序，仅展示启用且重要度≥5的记忆。\n'
 
-    // 按类型输出记忆
-    if (groupedMemories.character) {
-      memoryText += '\n👤 人物记忆:\n'
-      groupedMemories.character.forEach((m: any) => {
-        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
-        if (m.metadata) {
-          const meta = m.metadata
-          if (meta.name) memoryText += `  姓名: ${meta.name}\n`
-          if (meta.relationship) memoryText += `  关系: ${meta.relationship}\n`
-          if (meta.nickname) memoryText += `  称呼: ${meta.nickname}\n`
-        }
-      })
+    // 优先级顺序：relationship > character > task > event > spacetime > emotion > setting > item
+    const typeOrder = ['relationship', 'character', 'task', 'event', 'spacetime', 'emotion', 'setting', 'item']
+    const typeLabels: Record<string, string> = {
+      relationship: '🤝 关系状态',
+      character: '👤 人物信息',
+      task: '📋 任务约定',
+      event: '📅 重要事件',
+      spacetime: '⏰ 时空场景',
+      emotion: '💭 情感状态',
+      setting: '🏛️ 场景设定',
+      item: '📦 重要物品'
     }
 
-    if (groupedMemories.event) {
-      memoryText += '\n📅 事件记忆:\n'
-      groupedMemories.event.forEach((m: any) => {
-        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
-        if (m.metadata) {
-          const meta = m.metadata
-          if (meta.time) memoryText += `  时间: ${meta.time}\n`
-          if (meta.location) memoryText += `  地点: ${meta.location}\n`
-          if (meta.participants) memoryText += `  参与者: ${meta.participants.join(', ')}\n`
-        }
-      })
-    }
+    // 按优先级顺序输出记忆
+    for (const type of typeOrder) {
+      if (!groupedMemories[type]) continue
 
-    if (groupedMemories.setting) {
-      memoryText += '\n🏛️ 设定记忆:\n'
-      groupedMemories.setting.forEach((m: any) => {
-        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
-        if (m.metadata?.location) memoryText += `  地点: ${m.metadata.location}\n`
-        if (m.metadata?.atmosphere) memoryText += `  氛围: ${m.metadata.atmosphere}\n`
-      })
-    }
+      memoryText += `\n${typeLabels[type]}:\n`
 
-    if (groupedMemories.emotion) {
-      memoryText += '\n💭 情感记忆:\n'
-      groupedMemories.emotion.forEach((m: any) => {
-        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
-        if (m.metadata) {
-          const meta = m.metadata
-          if (meta.emotion_type) memoryText += `  情感: ${meta.emotion_type}\n`
-          if (meta.intensity) memoryText += `  强度: ${meta.intensity}/10\n`
-        }
-      })
-    }
-
-    if (groupedMemories.spacetime) {
-      memoryText += '\n⏰ 时空记忆:\n'
-      groupedMemories.spacetime.forEach((m: any) => {
-        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
-        if (m.metadata) {
-          const meta = m.metadata
-          if (meta.date) memoryText += `  日期: ${meta.date}\n`
-          if (meta.time) memoryText += `  时间: ${meta.time}\n`
-          if (meta.location) memoryText += `  地点: ${meta.location}\n`
-          if (meta.characters) memoryText += `  在场角色: ${meta.characters.join(', ')}\n`
-        }
-      })
-    }
-
-    if (groupedMemories.relationship) {
-      memoryText += '\n🤝 关系记忆:\n'
-      groupedMemories.relationship.forEach((m: any) => {
-        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
-        if (m.metadata) {
-          const meta = m.metadata
-          if (meta.character_name) memoryText += `  角色: ${meta.character_name}\n`
-          if (meta.relationship) memoryText += `  关系: ${meta.relationship}\n`
-          if (meta.attitude) memoryText += `  态度: ${meta.attitude}\n`
-          if (meta.affection) memoryText += `  好感度: ${meta.affection}/10\n`
-          if (meta.trust) memoryText += `  信任度: ${meta.trust}/10\n`
-        }
-      })
-    }
-
-    if (groupedMemories.task) {
-      memoryText += '\n📋 任务约定:\n'
-      groupedMemories.task.forEach((m: any) => {
-        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
-        if (m.metadata) {
-          const meta = m.metadata
-          if (meta.task_type) memoryText += `  类型: ${meta.task_type}\n`
-          if (meta.scheduled_time) memoryText += `  约定时间: ${meta.scheduled_time}\n`
-          if (meta.status) memoryText += `  状态: ${meta.status}\n`
-          if (meta.priority) memoryText += `  优先级: ${meta.priority}\n`
-        }
-      })
-    }
-
-    if (groupedMemories.item) {
-      memoryText += '\n📦 重要物品:\n'
-      groupedMemories.item.forEach((m: any) => {
-        memoryText += `• ${m.title} (重要度${m.importance}): ${m.content}\n`
-        if (m.metadata) {
-          const meta = m.metadata
-          if (meta.item_name) memoryText += `  物品名: ${meta.item_name}\n`
-          if (meta.owner) memoryText += `  拥有者: ${meta.owner}\n`
-          if (meta.location) memoryText += `  位置: ${meta.location}\n`
-          if (meta.emotional_value) memoryText += `  情感价值: ${meta.emotional_value}/10\n`
-        }
-      })
+      if (type === 'character') {
+        groupedMemories[type].forEach((m: any) => {
+          memoryText += `• ${m.title} (重要度${m.importance})\n`
+          memoryText += `  ${m.content}\n`
+          if (m.metadata) {
+            const meta = m.metadata
+            const details = []
+            if (meta.name) details.push(`姓名:${meta.name}`)
+            if (meta.relationship) details.push(`关系:${meta.relationship}`)
+            if (meta.nickname) details.push(`称呼:${meta.nickname}`)
+            if (meta.age) details.push(`年龄:${meta.age}`)
+            if (meta.occupation) details.push(`职业:${meta.occupation}`)
+            if (details.length > 0) memoryText += `  [${details.join(' | ')}]\n`
+          }
+        })
+      } else if (type === 'relationship') {
+        groupedMemories[type].forEach((m: any) => {
+          memoryText += `• ${m.title} (重要度${m.importance})\n`
+          memoryText += `  ${m.content}\n`
+          if (m.metadata) {
+            const meta = m.metadata
+            const details = []
+            if (meta.character_name) details.push(`角色:${meta.character_name}`)
+            if (meta.relationship) details.push(`关系:${meta.relationship}`)
+            if (meta.attitude) details.push(`态度:${meta.attitude}`)
+            if (meta.affection) details.push(`好感:${meta.affection}/10`)
+            if (meta.trust) details.push(`信任:${meta.trust}/10`)
+            if (details.length > 0) memoryText += `  [${details.join(' | ')}]\n`
+          }
+        })
+      } else if (type === 'task') {
+        groupedMemories[type].forEach((m: any) => {
+          const statusEmoji = m.metadata?.status === 'completed' ? '✅' : m.metadata?.status === 'in_progress' ? '🔄' : '⏳'
+          memoryText += `• ${statusEmoji} ${m.title} (重要度${m.importance})\n`
+          memoryText += `  ${m.content}\n`
+          if (m.metadata) {
+            const meta = m.metadata
+            const details = []
+            if (meta.task_type) details.push(`类型:${meta.task_type}`)
+            if (meta.scheduled_time) details.push(`时间:${meta.scheduled_time}`)
+            if (meta.status) details.push(`状态:${meta.status}`)
+            if (meta.priority) details.push(`优先级:${meta.priority}`)
+            if (details.length > 0) memoryText += `  [${details.join(' | ')}]\n`
+          }
+        })
+      } else if (type === 'event') {
+        groupedMemories[type].forEach((m: any) => {
+          memoryText += `• ${m.title} (重要度${m.importance})\n`
+          memoryText += `  ${m.content}\n`
+          if (m.metadata) {
+            const meta = m.metadata
+            const details = []
+            if (meta.time) details.push(`时间:${meta.time}`)
+            if (meta.location) details.push(`地点:${meta.location}`)
+            if (meta.participants?.length) details.push(`参与:${meta.participants.join(',')}`)
+            if (meta.impact) details.push(`影响:${meta.impact}`)
+            if (details.length > 0) memoryText += `  [${details.join(' | ')}]\n`
+          }
+        })
+      } else if (type === 'spacetime') {
+        groupedMemories[type].forEach((m: any) => {
+          memoryText += `• ${m.title} (重要度${m.importance})\n`
+          memoryText += `  ${m.content}\n`
+          if (m.metadata) {
+            const meta = m.metadata
+            const details = []
+            if (meta.date) details.push(`日期:${meta.date}`)
+            if (meta.time) details.push(`时间:${meta.time}`)
+            if (meta.location) details.push(`地点:${meta.location}`)
+            if (meta.characters?.length) details.push(`在场:${meta.characters.join(',')}`)
+            if (meta.weather) details.push(`天气:${meta.weather}`)
+            if (details.length > 0) memoryText += `  [${details.join(' | ')}]\n`
+          }
+        })
+      } else if (type === 'emotion') {
+        groupedMemories[type].forEach((m: any) => {
+          memoryText += `• ${m.title} (重要度${m.importance})\n`
+          memoryText += `  ${m.content}\n`
+          if (m.metadata) {
+            const meta = m.metadata
+            const details = []
+            if (meta.emotion_type) details.push(`情感:${meta.emotion_type}`)
+            if (meta.intensity) details.push(`强度:${meta.intensity}/10`)
+            if (meta.target) details.push(`对象:${meta.target}`)
+            if (meta.cause) details.push(`原因:${meta.cause}`)
+            if (details.length > 0) memoryText += `  [${details.join(' | ')}]\n`
+          }
+        })
+      } else if (type === 'setting') {
+        groupedMemories[type].forEach((m: any) => {
+          memoryText += `• ${m.title} (重要度${m.importance})\n`
+          memoryText += `  ${m.content}\n`
+          if (m.metadata) {
+            const meta = m.metadata
+            const details = []
+            if (meta.location) details.push(`地点:${meta.location}`)
+            if (meta.atmosphere) details.push(`氛围:${meta.atmosphere}`)
+            if (meta.significance) details.push(`意义:${meta.significance}`)
+            if (details.length > 0) memoryText += `  [${details.join(' | ')}]\n`
+          }
+        })
+      } else if (type === 'item') {
+        groupedMemories[type].forEach((m: any) => {
+          memoryText += `• ${m.title} (重要度${m.importance})\n`
+          memoryText += `  ${m.content}\n`
+          if (m.metadata) {
+            const meta = m.metadata
+            const details = []
+            if (meta.item_name) details.push(`物品:${meta.item_name}`)
+            if (meta.owner) details.push(`拥有者:${meta.owner}`)
+            if (meta.location) details.push(`位置:${meta.location}`)
+            if (meta.emotional_value) details.push(`情感价值:${meta.emotional_value}/10`)
+            if (details.length > 0) memoryText += `  [${details.join(' | ')}]\n`
+          }
+        })
+      }
     }
 
     console.log(`🧠 获取到${memories.length}条记忆表格数据`)
@@ -286,6 +319,7 @@ export interface EnhancedChatParams {
   characterName?: string
   baseUrl?: string
   actualModel?: string
+  speakingCharacterId?: string
 }
 
 // 获取会话的有效摘要（使用分层优化）
@@ -395,18 +429,19 @@ export const generateSummary = async (params: {
 export const sendMessageWithContext = createAsyncThunk(
   'chat/sendMessageWithContext',
   async (params: EnhancedChatParams) => {
-    const { 
-      sessionId, 
-      userMessage, 
-      systemPrompt, 
-      apiKey, 
-      model, 
-      messages, 
+    const {
+      sessionId,
+      userMessage,
+      systemPrompt,
+      apiKey,
+      model,
+      messages,
       thinkingBudget,
       contextConfig = {},
       characterName = '角色',
       baseUrl,
-      actualModel
+      actualModel,
+      speakingCharacterId
     } = params
 
     let userMsgData = null
@@ -514,13 +549,20 @@ export const sendMessageWithContext = createAsyncThunk(
     }
 
     // 8. 保存AI消息
+    const aiMsgInsert: any = {
+      session_id: sessionId,
+      role: 'assistant',
+      content: aiResponse.content || aiResponse.message || ''
+    }
+
+    // 如果有剧本角色ID，添加到消息中
+    if (speakingCharacterId) {
+      aiMsgInsert.speaker_script_character_id = speakingCharacterId
+    }
+
     const { data: aiMsgData, error: aiMsgError } = await supabase
       .from('chat_messages')
-      .insert({
-        session_id: sessionId,
-        role: 'assistant',
-        content: aiResponse.content || aiResponse.message || ''
-      })
+      .insert(aiMsgInsert)
       .select()
       .single()
 

@@ -32,17 +32,15 @@ import { useAppSelector } from '../../store/hooks'
 import { TemplateManager } from '../../components/TemplateManager'
 import { SimpleAvatarUpload } from '../../components/AvatarUpload'
 import { uploadCharacterAvatar } from '../../lib/avatarUpload'
+import { ScriptCharacter } from '../../lib/supabase'
 
 interface BasicInfo {
-  name: string
-  age: string
-  gender: string
-  keywords: string[]
-  description: string
-  avatar_url: string
+  name: string // 剧本名称
+  description: string // 剧本描述
+  avatar_url: string // 剧本封面
   is_public: boolean
-  introduction: string // 角色说明，给其他用户看的介绍
-  initialMessage?: string // 初始对话，角色的开场白
+  introduction: string // 剧本说明，给其他用户看的介绍
+  script_type: 'single' | 'multi' // 剧本类型
 }
 
 interface PromptModule {
@@ -64,29 +62,39 @@ export default function NewCharacterPage() {
   
   const [basicInfo, setBasicInfo] = useState<BasicInfo>({
     name: '',
-    age: '',
-    gender: '',
-    keywords: [],
     description: '',
     avatar_url: '',
     is_public: false,
     introduction: '',
-    initialMessage: ''
+    script_type: 'single'
   })
 
-  // 关键词输入状态
-  const [keywordInput, setKeywordInput] = useState('')
+  // 剧本角色列表
+  const [scriptCharacters, setScriptCharacters] = useState<ScriptCharacter[]>([
+    {
+      id: '1',
+      name: '',
+      description: '',
+      avatar_url: '',
+      personality: {
+        traits: [],
+        speaking_style: '',
+        background: ''
+      },
+      relationships: []
+    }
+  ])
 
   // 默认只有一个用户角色设定模块
   const [modules, setModules] = useState<PromptModule[]>([
-    { 
-      id: '1', 
-      type: '用户角色设定', 
-      content: '', 
-      userRoleName: '', 
-      userRoleAge: '', 
-      userRoleGender: '', 
-      userRoleDetails: '' 
+    {
+      id: '1',
+      type: '用户角色设定',
+      content: '',
+      userRoleName: '',
+      userRoleAge: '',
+      userRoleGender: '',
+      userRoleDetails: ''
     }
   ])
 
@@ -114,65 +122,51 @@ export default function NewCharacterPage() {
     }
   }
 
-  const handleBasicInfoChange = (field: keyof BasicInfo, value: string | boolean | string[]) => {
+  const handleBasicInfoChange = (field: keyof BasicInfo, value: string | boolean) => {
     setBasicInfo(prev => ({
       ...prev,
       [field]: value
     }))
   }
 
-  // 处理关键词输入
-  const handleKeywordInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    
-    // 检查是否输入了逗号（支持中文和英文逗号）
-    if (value.includes(',') || value.includes('，')) {
-      // 将中文逗号替换为英文逗号，然后分割
-      const normalizedValue = value.replace(/，/g, ',')
-      const parts = normalizedValue.split(',')
-      const keywords = parts.slice(0, -1).map(k => k.trim()).filter(k => k.length > 0)
-      const remaining = parts[parts.length - 1] // 逗号后的剩余内容
-      
-      if (keywords.length > 0) {
-        // 添加新关键词到列表中（去重）
-        const newKeywords = [...basicInfo.keywords]
-        keywords.forEach(keyword => {
-          if (!newKeywords.includes(keyword)) {
-            newKeywords.push(keyword)
-          }
-        })
-        handleBasicInfoChange('keywords', newKeywords)
-      }
-      
-      // 设置输入框为逗号后的剩余内容
-      setKeywordInput(remaining)
-    } else {
-      setKeywordInput(value)
+  // 剧本角色管理函数
+  const addScriptCharacter = () => {
+    const newId = Date.now().toString()
+    setScriptCharacters(prev => [...prev, {
+      id: newId,
+      name: '',
+      description: '',
+      avatar_url: '',
+      personality: {
+        traits: [],
+        speaking_style: '',
+        background: ''
+      },
+      relationships: []
+    }])
+  }
+
+  const updateScriptCharacter = (id: string, field: keyof ScriptCharacter, value: any) => {
+    setScriptCharacters(prev => prev.map(char =>
+      char.id === id ? { ...char, [field]: value } : char
+    ))
+  }
+
+  const updateScriptCharacterPersonality = (id: string, field: keyof ScriptCharacter['personality'], value: any) => {
+    setScriptCharacters(prev => prev.map(char =>
+      char.id === id ? {
+        ...char,
+        personality: { ...char.personality, [field]: value }
+      } : char
+    ))
+  }
+
+  const removeScriptCharacter = (id: string) => {
+    if (scriptCharacters.length > 1) {
+      setScriptCharacters(prev => prev.filter(char => char.id !== id))
     }
   }
 
-  // 处理按键事件
-  const handleKeywordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      const keyword = keywordInput.trim()
-      if (keyword && !basicInfo.keywords.includes(keyword)) {
-        handleBasicInfoChange('keywords', [...basicInfo.keywords, keyword])
-        setKeywordInput('')
-      }
-    } else if (e.key === 'Backspace' && keywordInput === '' && basicInfo.keywords.length > 0) {
-      // 如果输入框为空且按下退格键，删除最后一个关键词
-      const newKeywords = [...basicInfo.keywords]
-      newKeywords.pop()
-      handleBasicInfoChange('keywords', newKeywords)
-    }
-  }
-
-  // 删除关键词
-  const removeKeyword = (indexToRemove: number) => {
-    const newKeywords = basicInfo.keywords.filter((_, index) => index !== indexToRemove)
-    handleBasicInfoChange('keywords', newKeywords)
-  }
 
   // 添加新模块
   const addModule = (type: string) => {
@@ -259,10 +253,11 @@ export default function NewCharacterPage() {
         return module
       })
 
-      // 构建完整的 prompt template
-      const promptTemplate = { 
+      // 构建完整的 prompt template，包含剧本角色信息
+      const promptTemplate = {
         basic_info: basicInfo,
-        modules: processedModules
+        modules: processedModules,
+        script_characters: scriptCharacters
       }
 
       const { data, error } = await supabase
@@ -272,7 +267,9 @@ export default function NewCharacterPage() {
           name: basicInfo.name,
           avatar_url: basicInfo.avatar_url,
           prompt_template: promptTemplate,
-          is_public: basicInfo.is_public
+          is_public: basicInfo.is_public,
+          script_type: basicInfo.script_type,
+          script_characters: scriptCharacters
         })
         .select()
         .single()
@@ -429,145 +426,78 @@ export default function NewCharacterPage() {
         
         <motion.div variants={itemVariants}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="basic">基本信息</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="basic">剧本信息</TabsTrigger>
+              <TabsTrigger value="characters">角色设定</TabsTrigger>
               <TabsTrigger value="settings">其他设定</TabsTrigger>
             </TabsList>
 
-            {/* Basic Information Tab */}
+            {/* Script Information Tab */}
             <TabsContent value="basic" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>角色基本信息</CardTitle>
-                  <CardDescription>设置角色的基本属性和外观</CardDescription>
+                  <CardTitle>剧本基本信息</CardTitle>
+                  <CardDescription>设置剧本的基本属性和类型</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Character Name */}
-                    <div className="space-y-2">
-                      <Label htmlFor="name">角色名称 *</Label>
+                    {/* Script Name */}
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="name">剧本名称 *</Label>
                       <Input
                         id="name"
-                        placeholder="为你的AI角色起一个名字"
+                        placeholder="为你的剧本起一个名字"
                         value={basicInfo.name}
                         onChange={(e) => handleBasicInfoChange('name', e.target.value)}
                         required
                       />
                     </div>
 
-                    {/* Character Age */}
-                    <div className="space-y-2">
-                      <Label htmlFor="age">角色年龄</Label>
-                      <Input
-                        id="age"
-                        placeholder="例如：25岁 或 未知"
-                        value={basicInfo.age}
-                        onChange={(e) => handleBasicInfoChange('age', e.target.value)}
-                      />
-                    </div>
-
-                    {/* Character Gender */}
-                    <div className="space-y-2">
-                      <Label htmlFor="gender">角色性别</Label>
-                      <Select value={basicInfo.gender} onValueChange={(value) => handleBasicInfoChange('gender', value)}>
+                    {/* Script Type */}
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="script_type">剧本类型</Label>
+                      <Select value={basicInfo.script_type} onValueChange={(value: 'single' | 'multi') => handleBasicInfoChange('script_type', value)}>
                         <SelectTrigger>
-                          <SelectValue placeholder="选择性别" />
+                          <SelectValue placeholder="选择剧本类型" />
                         </SelectTrigger>
                         <SelectContent>
-                          {genderOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="single">单角色剧本</SelectItem>
+                          <SelectItem value="multi">多角色剧本</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
-
-                    {/* Character Keywords - 标签输入组件 */}
-                    <div className="space-y-2">
-                      <Label htmlFor="keywords">角色关键词</Label>
-                      <div className="space-y-3">
-                        {/* 关键词标签显示 */}
-                        {basicInfo.keywords.length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {basicInfo.keywords.map((keyword, index) => (
-                              <motion.div
-                                key={index}
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.8 }}
-                                className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm rounded-full border transition-colors"
-                              >
-                                <span>{keyword}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => removeKeyword(index)}
-                                  className="flex items-center justify-center w-4 h-4 rounded-full hover:bg-slate-300 transition-colors"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </motion.div>
-                            ))}
-                          </div>
-                        )}
-                        {/* 输入框 */}
-                        <Input
-                          id="keywords"
-                          placeholder={basicInfo.keywords.length === 0 ? "输入关键词，如古代，权谋，魔法..." : "继续添加关键词..."}
-                          value={keywordInput}
-                          onChange={handleKeywordInput}
-                          onKeyDown={handleKeywordKeyDown}
-                          className="w-full"
-                        />
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          输入关键词后按逗号、回车键来添加标签。按退格键删除最后一个标签。
-                        </p>
-                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {basicInfo.script_type === 'single'
+                          ? '单角色剧本：只包含一个角色，适合单人对话'
+                          : '多角色剧本：包含多个角色，支持角色之间的互动对话'
+                        }
+                      </p>
                     </div>
                   </div>
 
-                  {/* Detailed Description */}
+                  {/* Script Description */}
                   <div className="space-y-2">
-                    <Label htmlFor="description">详细设定</Label>
+                    <Label htmlFor="description">剧本背景</Label>
                     <Textarea
                       id="description"
-                      placeholder="详细描述你的角色，包括外观、性格、背景等..."
+                      placeholder="描述剧本的世界观、背景设定、故事环境等..."
                       value={basicInfo.description}
                       onChange={(e) => handleBasicInfoChange('description', e.target.value)}
                       className="min-h-[120px] resize-none"
                     />
-                    <p className="text-xs text-slate-500 dark:text-slate-400">此信息用于AI对话，不会公开显示</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">剧本背景将帮助AI理解整体设定和氛围</p>
                   </div>
 
-                  {/* Character Introduction */}
+                  {/* Script Introduction */}
                   <div className="space-y-2">
-                    <Label htmlFor="introduction">角色说明</Label>
+                    <Label htmlFor="introduction">剧本介绍</Label>
                     <Textarea
                       id="introduction"
-                      placeholder="为其他用户介绍这个角色，包括角色特点、使用场景、对话风格等..."
+                      placeholder="为其他用户介绍这个剧本，包括剧本特色、使用场景、对话风格等..."
                       value={basicInfo.introduction}
                       onChange={(e) => handleBasicInfoChange('introduction', e.target.value)}
                       className="min-h-[100px] resize-none"
                     />
-                    <p className="text-xs text-slate-500 dark:text-slate-400">此说明会在角色列表中显示，帮助其他用户了解角色</p>
-                  </div>
-
-                  {/* Initial Message */}
-                  <div className="space-y-2">
-                    <Label htmlFor="initialMessage" className="flex items-center">
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      初始对话（可选）
-                    </Label>
-                    <Textarea
-                      id="initialMessage"
-                      placeholder="设置角色的开场白，如：“你好，我是...”。如果不填写，AI将自动生成第一句话。"
-                      value={basicInfo.initialMessage || ''}
-                      onChange={(e) => handleBasicInfoChange('initialMessage', e.target.value)}
-                      className="min-h-[80px] resize-none"
-                    />
-                    <p className="text-xs text-slate-500 dark:text-slate-400">每位用户进入聊天时都会看到这句话，让角色体验更一致</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">此介绍会在剧本列表中显示，帮助其他用户了解剧本</p>
                   </div>
 
                   {/* Public Setting */}
@@ -581,10 +511,131 @@ export default function NewCharacterPage() {
                     />
                     <Label htmlFor="is_public" className="flex-1">
                       <div>
-                        <p className="font-medium">公开角色</p>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">允许其他用户发现和使用你的角色</p>
+                        <p className="font-medium">公开剧本</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">允许其他用户发现和使用你的剧本</p>
                       </div>
                     </Label>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Characters Definition Tab */}
+            <TabsContent value="characters" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>角色设定</CardTitle>
+                      <CardDescription>
+                        {basicInfo.script_type === 'single'
+                          ? '定义剧本中的主要角色'
+                          : '定义剧本中的所有角色，支持多角色互动'
+                        }
+                      </CardDescription>
+                    </div>
+                    {basicInfo.script_type === 'multi' && (
+                      <Button
+                        type="button"
+                        onClick={addScriptCharacter}
+                        size="sm"
+                        variant="outline"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        添加角色
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {scriptCharacters.map((character, index) => (
+                      <motion.div
+                        key={character.id}
+                        variants={itemVariants}
+                        className="border border-slate-200 dark:border-slate-600 rounded-lg p-4 space-y-4 bg-white dark:bg-slate-800"
+                      >
+                        {/* Character Header */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                              <Bot className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div>
+                              <h3 className="font-medium">
+                                {character.name || `角色 ${index + 1}`}
+                              </h3>
+                              <p className="text-sm text-gray-500">
+                                {basicInfo.script_type === 'single' ? '主角色' : `角色 #${index + 1}`}
+                              </p>
+                            </div>
+                          </div>
+
+                          {basicInfo.script_type === 'multi' && scriptCharacters.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeScriptCharacter(character.id)}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+
+                        {/* Character Form */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>角色名称 *</Label>
+                            <Input
+                              placeholder="角色名称"
+                              value={character.name}
+                              onChange={(e) => updateScriptCharacter(character.id, 'name', e.target.value)}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>角色描述</Label>
+                            <Input
+                              placeholder="简短描述角色特点"
+                              value={character.description || ''}
+                              onChange={(e) => updateScriptCharacter(character.id, 'description', e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>性格特征</Label>
+                          <Textarea
+                            placeholder="描述角色的性格、行为特点、说话风格等..."
+                            value={character.personality?.speaking_style || ''}
+                            onChange={(e) => updateScriptCharacterPersonality(character.id, 'speaking_style', e.target.value)}
+                            className="min-h-[100px] resize-none"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>角色背景</Label>
+                          <Textarea
+                            placeholder="角色的背景故事、经历、身份等..."
+                            value={character.personality?.background || ''}
+                            onChange={(e) => updateScriptCharacterPersonality(character.id, 'background', e.target.value)}
+                            className="min-h-[80px] resize-none"
+                          />
+                        </div>
+
+                        {basicInfo.script_type === 'multi' && scriptCharacters.length > 1 && (
+                          <div className="space-y-2">
+                            <Label>与其他角色的关系</Label>
+                            <Textarea
+                              placeholder="描述该角色与剧本中其他角色的关系、互动方式等..."
+                              className="min-h-[60px] resize-none"
+                            />
+                          </div>
+                        )}
+                      </motion.div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>

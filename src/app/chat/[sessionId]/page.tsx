@@ -30,9 +30,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAppSelector, useAppDispatch } from '../../store/hooks'
-import { 
-  fetchCharacter, 
-  fetchChatSession, 
+import {
+  fetchCharacter,
+  fetchChatSession,
   fetchMessages,
   fetchAllMessagesForAPI,
   fetchMoreMessages,
@@ -47,11 +47,14 @@ import {
   setMessages,
   clearError
 } from '../../store/chatSlice'
-import { supabase } from '../../lib/supabase'
+import { supabase, type ChatSession, type Character, type ScriptCharacter, type ScriptCharacterContext } from '../../lib/supabase'
 import { sendMessageWithContext, getContextConfigSuggestions, regenerateMessageWithContext } from '../../lib/enhancedChatSlice'
 import { useApiConfig } from '../../lib/useApiConfig'
 import { ApiPoolManager } from '../../components/ApiPoolManager'
 import { ApiManagerModal } from '../../../components/ApiManagerModal'
+import { MultiCharacterManager } from '../../lib/multiCharacterManager'
+import { ChatCharacterSelector } from '../../components/ChatCharacterSelector'
+import { MultiCharacterMessage } from '../../components/MultiCharacterMessage'
 
 // 保留命名中转配置接口以兼容现有功能
 interface NamedRelayConfig {
@@ -162,6 +165,14 @@ export default function ChatSessionPage() {
 
   // API管理弹窗状态
   const [showApiModal, setShowApiModal] = useState(false)
+
+  // 剧本多角色相关状态
+  const [isMultiCharacterMode, setIsMultiCharacterMode] = useState(false)
+  const [multiCharacterManager, setMultiCharacterManager] = useState<MultiCharacterManager | null>(null)
+  const [scriptCharacters, setScriptCharacters] = useState<ScriptCharacter[]>([])
+  const [currentSpeaker, setCurrentSpeaker] = useState<ScriptCharacter | null>(null)
+  const [showCharacterSelector, setShowCharacterSelector] = useState(false)
+  const [currentScript, setCurrentScript] = useState<Character | null>(null)
   
   
   // 从localStorage加载上下文配置
@@ -421,6 +432,38 @@ export default function ChatSessionPage() {
   // API配置在useApiConfig hook中自动处理
   // 不再需要手动加载配置
 
+  // 初始化多角色管理器
+  useEffect(() => {
+    if (user && sessionId !== 'new') {
+      const manager = new MultiCharacterManager(user.id)
+      setMultiCharacterManager(manager)
+    }
+  }, [user, sessionId])
+
+  // 检查会话类型并初始化剧本多角色状态
+  useEffect(() => {
+    if (multiCharacterManager && currentSession) {
+      const checkSessionType = async () => {
+        try {
+          const isMulti = await multiCharacterManager.isMultiCharacterSession(currentSession.id)
+          setIsMultiCharacterMode(isMulti)
+
+          if (isMulti) {
+            // 获取剧本多角色上下文信息
+            const context = await multiCharacterManager.getMultiCharacterContext(currentSession.id)
+            setCurrentScript(context.script)
+            setScriptCharacters(context.scriptCharacters)
+            setCurrentSpeaker(context.currentSpeaker || null)
+          }
+        } catch (error) {
+          console.error('检查会话类型失败:', error)
+        }
+      }
+
+      checkSessionType()
+    }
+  }, [multiCharacterManager, currentSession])
+
   // 初始化页面数据
   useEffect(() => {
     if (!user) {
@@ -432,20 +475,20 @@ export default function ChatSessionPage() {
       if (sessionId === 'new') {
         const urlParams = new URLSearchParams(window.location.search)
         const characterId = urlParams.get('characterId')
-        
+
         if (characterId) {
           dispatch(fetchCharacter(Number(characterId)))
         }
       } else {
         const session = await dispatch(fetchChatSession(sessionId)).unwrap()
-        
+
         // UI层面始终使用lazy loading（只显示10条），避免性能问题
         dispatch(fetchMessages(sessionId))
-        
+
         if (session.character_id) {
           dispatch(fetchCharacter(session.character_id))
         }
-        
+
         setHasStarted(true)
       }
     }
@@ -555,22 +598,63 @@ export default function ChatSessionPage() {
     }
   }
 
-  // 构建系统提示
-  const buildSystemPrompt = () => {
-    if (!currentCharacter?.prompt_template) {
+  // 构建系统提示（支持剧本多角色）
+  const buildSystemPrompt = (speakingCharacter?: Character | ScriptCharacter) => {
+    // 在剧本多角色模式下，优先使用当前发言的剧本角色
+    if (isMultiCharacterMode && currentSpeaker) {
+      const speakingScriptChar = speakingCharacter as ScriptCharacter || currentSpeaker
+
+      let prompt = `你正在参与一个剧本内多角色对话场景。你将扮演"${speakingScriptChar.name}"这个角色。\n\n`
+      prompt += `【对话规则】\n`
+      prompt += `- 你只能作为${speakingScriptChar.name}发言，不能代替其他角色发言\n`
+      prompt += `- 回复要简短自然，符合日常对话风格\n`
+      prompt += `- 不要预测或描述其他角色的行为和想法\n`
+      prompt += `- 保持角色的一致性和个性特点\n\n`
+
+      // 添加剧本中的其他角色信息
+      const otherCharacters = scriptCharacters.filter(c => c.id !== speakingScriptChar.id)
+      if (otherCharacters.length > 0) {
+        prompt += `【剧本中的其他角色】\n`
+        otherCharacters.forEach(c => {
+          prompt += `- ${c.name}${c.description ? ': ' + c.description : ''}\n`
+        })
+        prompt += `\n`
+      }
+
+      prompt += `【你的角色】\n`
+      prompt += `${speakingScriptChar.name}\n`
+      if (speakingScriptChar.description) {
+        prompt += `角色描述：${speakingScriptChar.description}\n`
+      }
+      if (speakingScriptChar.personality?.traits && speakingScriptChar.personality.traits.length > 0) {
+        prompt += `性格特点：${speakingScriptChar.personality.traits.join('、')}\n`
+      }
+      if (speakingScriptChar.personality?.speaking_style) {
+        prompt += `说话风格：${speakingScriptChar.personality.speaking_style}\n`
+      }
+      if (speakingScriptChar.personality?.background) {
+        prompt += `背景：${speakingScriptChar.personality.background}\n`
+      }
+
+      return prompt
+    }
+
+    // 单角色模式的处理
+    const character = speakingCharacter as Character || currentCharacter
+    if (!character?.prompt_template) {
       console.warn('角色或prompt_template为空')
       return ''
     }
-    
-    const { basic_info, modules } = currentCharacter.prompt_template
-    
+
+    const { basic_info, modules } = character.prompt_template
+
     if (!basic_info || !basic_info.name) {
       console.error('basic_info无效:', basic_info)
       return ''
     }
-    
+
     let prompt = `来玩角色扮演，接下来，你将完全成为"${basic_info.name}"与我对话。注意回复简短自然，日常对话即可。你不可以自己预测我的行为。你必须给予回复。\n\n`
-    
+
     prompt += `【你的角色】\n`
     prompt += `${basic_info.name}\n`
     if (basic_info.gender) {
@@ -788,7 +872,16 @@ export default function ChatSessionPage() {
   const handleSendMessage = async () => {
     if (!userInput.trim() || !currentSession || !currentSelectedModel || isGenerating) return
 
-    if (!currentCharacter) {
+    let speakingCharacter: Character | ScriptCharacter | null = currentCharacter
+    let speakingCharacterId: string | null = null
+
+    // 在剧本多角色模式下，使用当前发言的剧本角色
+    if (isMultiCharacterMode && currentSpeaker) {
+      speakingCharacter = currentSpeaker
+      speakingCharacterId = currentSpeaker.id
+    }
+
+    if (!speakingCharacter) {
       console.error('角色数据丢失，尝试重新加载')
       if (currentSession?.character_id) {
         await dispatch(fetchCharacter(currentSession.character_id))
@@ -797,7 +890,7 @@ export default function ChatSessionPage() {
     }
 
     const messageToSend = userInput.trim()
-    const systemPrompt = buildSystemPrompt()
+    const systemPrompt = buildSystemPrompt(speakingCharacter)
     const modelConfig = getModelConfig(currentSelectedModel)
     
     if (!modelConfig.apiKey) {
@@ -837,9 +930,10 @@ export default function ChatSessionPage() {
           messages: completeMessages, // 使用完整的消息历史，而不是UI显示的messages
           thinkingBudget: getThinkingBudget(currentSelectedModel),
           contextConfig,
-          characterName: currentCharacter?.name || '角色',
+          characterName: speakingCharacter?.name || '角色',
           baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
-          actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
+          actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined,
+          speakingCharacterId
         }))
       } else {
         // 非智能模式：获取并使用完整的消息历史
@@ -854,6 +948,7 @@ export default function ChatSessionPage() {
           messages: completeMessages, // 使用完整的消息历史
           thinkingBudget: getThinkingBudget(currentSelectedModel),
           baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
+          speakingCharacterId,
           actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
         }))
       }
@@ -1194,6 +1289,23 @@ export default function ChatSessionPage() {
     }
   }
 
+
+
+  const handleSwitchSpeaker = async (scriptCharacterId: string) => {
+    if (!multiCharacterManager || !currentSession) return
+
+    try {
+      await multiCharacterManager.switchCurrentSpeaker(currentSession.id, scriptCharacterId)
+
+      // 更新当前发言角色
+      const character = scriptCharacters.find(c => c.id === scriptCharacterId)
+      setCurrentSpeaker(character || null)
+    } catch (error) {
+      console.error('切换发言角色失败:', error)
+      alert(`切换发言角色失败: ${formatErrorMessage(error)}`)
+    }
+  }
+
   // 获取回复灵感
   const handleGetInspiration = async () => {
     if (!currentSession || !currentSelectedModel || isGettingInspiration) return
@@ -1248,11 +1360,17 @@ export default function ChatSessionPage() {
             }
           }
 
-          // 3. 使用 ContextManager 构建上下文
+          // 3. 获取记忆表格数据
+          const { getMemoryTableData } = require('../../lib/enhancedChatSlice')
+          const memoryTableData = await getMemoryTableData(currentSession.id, session.user.id)
+          console.log('🧠 获取到记忆表格数据:', memoryTableData.length, '字符')
+
+          // 4. 使用 ContextManager 构建上下文
           const context = await contextManager.buildContext({
             systemPrompt: inspirationPrompt,
             messages: messagesToProcess,
-            summaries: summaries.length > 0 ? summaries : undefined
+            summaries: summaries.length > 0 ? summaries : undefined,
+            memoryTableData: memoryTableData || undefined
           })
 
           if (context && context.messages && Array.isArray(context.messages)) {
@@ -1426,6 +1544,26 @@ export default function ChatSessionPage() {
           </div>
           
           <div className="flex items-center space-x-2">
+            {/* 当前发言角色显示 - 仅在多角色模式下显示 */}
+            {hasStarted && isMultiCharacterMode && currentSpeaker && (
+              <div className="flex items-center space-x-1 text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-md">
+                <span>当前：{currentSpeaker.name}</span>
+              </div>
+            )}
+
+            {/* 角色选择器按钮 - 仅在多角色模式下显示 */}
+            {hasStarted && isMultiCharacterMode && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowCharacterSelector(true)}
+                className="p-2 h-8 text-xs"
+                title="选择发言角色"
+              >
+                角色切换
+              </Button>
+            )}
+
             {/* API状态指示器 */}
             {hasStarted && (() => {
               const healthStats = getHealthStats();
@@ -1454,7 +1592,7 @@ export default function ChatSessionPage() {
               );
             })()}
             
-            {hasStarted && (
+            {/* {hasStarted && (
               <Button
                 size="sm"
                 variant="ghost"
@@ -1464,7 +1602,7 @@ export default function ChatSessionPage() {
               >
                 <BookOpen className="w-4 h-4" />
               </Button>
-            )}
+            )} */}
             {hasStarted && (
               <Button
                 size="sm"
@@ -1596,7 +1734,39 @@ export default function ChatSessionPage() {
             )}
             
             <AnimatePresence>
-              {messages.map((message, index) => (
+              {messages.map((message, index) => {
+                // 在多角色模式下使用多角色消息组件
+                if (isMultiCharacterMode) {
+                  return (
+                    <MultiCharacterMessage
+                      key={message.id}
+                      message={message}
+                      scriptCharacters={scriptCharacters}
+                      currentScript={currentScript}
+                      isSelected={selectedMessageIds.has(message.id)}
+                      isEditing={editingMessageId === message.id}
+                      editingContent={editingContent}
+                      isBatchDeleteMode={isBatchDeleteMode}
+                      isGenerating={isGenerating}
+                      isGettingInspiration={isGettingInspiration}
+                      isLastMessage={index === messages.length - 1 && message.role === 'assistant'}
+                      onEditSave={handleSaveEdit}
+                      onEditCancel={handleCancelEdit}
+                      onStartEdit={handleEditMessage}
+                      onRegenerateMessage={handleRegenerateMessage}
+                      onContinueMessage={handleSendNewMessageFrom}
+                      onGetInspiration={handleGetInspiration}
+                      onResendMessage={handleResendMessage}
+                      onDeleteMessage={handleDeleteMessage}
+                      onSelectMessage={(messageId) => setSelectedMessageId(messageId)}
+                      onToggleSelect={toggleMessageSelection}
+                      setEditingContent={setEditingContent}
+                    />
+                  )
+                }
+
+                // 单角色模式使用原有的消息显示逻辑
+                return (
                 <motion.div
                   key={message.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -1847,7 +2017,8 @@ export default function ChatSessionPage() {
                     </div>
                   </div>
                 </motion.div>
-              ))}
+                )
+              })}
             </AnimatePresence>
             
             {/* 生成中提示 - 包括开始故事时的loading */}
@@ -1970,6 +2141,25 @@ export default function ChatSessionPage() {
         isOpen={showApiModal}
         onClose={() => setShowApiModal(false)}
       />
+
+      {/* 角色选择器弹窗 */}
+      {isMultiCharacterMode && (
+        <Dialog open={showCharacterSelector} onOpenChange={setShowCharacterSelector}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>角色切换</DialogTitle>
+            </DialogHeader>
+            <ChatCharacterSelector
+              userId={user?.id || ''}
+              sessionId={currentSession?.id || ''}
+              scriptCharacters={scriptCharacters}
+              currentSpeaker={currentSpeaker}
+              onSwitchSpeaker={handleSwitchSpeaker}
+              onClose={() => setShowCharacterSelector(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

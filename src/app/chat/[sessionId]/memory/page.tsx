@@ -211,6 +211,8 @@ export default function MemoryManagePage() {
     content: '',
     importance: 5
   })
+  const [editingMemory, setEditingMemory] = useState<MemoryEntry | null>(null)
+  const [showEditMemoryDialog, setShowEditMemoryDialog] = useState(false)
 
   // 摘要控制相关状态
   const [messageCount, setMessageCount] = useState(0)
@@ -265,20 +267,39 @@ export default function MemoryManagePage() {
         }
 
         // 加载消息计数和详细信息
-        const { data: messageData } = await supabase
+        // 使用count获取总数，然后分批获取所有消息ID
+        const { count: totalCount } = await supabase
           .from('chat_messages')
-          .select('id', { count: 'exact' })
+          .select('id', { count: 'exact', head: true })
           .eq('session_id', sessionId)
-          .order('created_at', { ascending: true })
 
-        if (messageData) {
-          setMessageCount(messageData.length)
-          // 为每条消息创建索引映射（从1开始）
-          const messageIndexes = messageData.map((msg, index) => ({
-            id: msg.id,
-            index: index + 1
-          }))
-          setAllMessages(messageIndexes)
+        if (totalCount) {
+          setMessageCount(totalCount)
+
+          // 分批获取所有消息ID（每批1000条）
+          const allMessages: { id: number; index: number }[] = []
+          const batchSize = 1000
+          const batches = Math.ceil(totalCount / batchSize)
+
+          for (let i = 0; i < batches; i++) {
+            const { data: batchData } = await supabase
+              .from('chat_messages')
+              .select('id')
+              .eq('session_id', sessionId)
+              .order('created_at', { ascending: true })
+              .range(i * batchSize, (i + 1) * batchSize - 1)
+
+            if (batchData) {
+              const batchIndexes = batchData.map((msg, batchIndex) => ({
+                id: msg.id,
+                index: i * batchSize + batchIndex + 1
+              }))
+              allMessages.push(...batchIndexes)
+            }
+          }
+
+          setAllMessages(allMessages)
+          console.log(`📊 加载了 ${allMessages.length} / ${totalCount} 条消息ID`)
         }
 
         // 延迟计算摘要范围和智能上下文状态，确保summaries状态已更新
@@ -502,6 +523,122 @@ export default function MemoryManagePage() {
     }
   }
 
+  // 编辑记忆条目
+  const handleEditMemory = (memory: MemoryEntry) => {
+    setEditingMemory(memory)
+    setShowEditMemoryDialog(true)
+  }
+
+  // 保存编辑的记忆
+  const handleSaveEditedMemory = async () => {
+    if (!editingMemory || !editingMemory.title?.trim() || !editingMemory.content?.trim()) {
+      alert('请填写标题和内容')
+      return
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) throw new Error('用户未登录')
+
+      const response = await fetch('/api/chat/memory', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          memoryId: editingMemory.id,
+          updates: {
+            title: editingMemory.title,
+            content: editingMemory.content,
+            importance: editingMemory.importance,
+            metadata: editingMemory.metadata
+          }
+        })
+      })
+
+      if (!response.ok) throw new Error('更新记忆失败')
+
+      const result = await response.json()
+
+      setMemories(prev => prev.map(m => m.id === editingMemory.id ? result.memory : m))
+      setShowEditMemoryDialog(false)
+      setEditingMemory(null)
+    } catch (error) {
+      console.error('编辑记忆失败:', error)
+      alert('编辑失败，请重试')
+    }
+  }
+
+  // 切换记忆启用状态
+  const handleToggleMemoryEnabled = async (memory: MemoryEntry) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) throw new Error('用户未登录')
+
+      const newEnabledState = !(memory.metadata?.is_enabled ?? true)
+
+      const response = await fetch('/api/chat/memory', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          memoryId: memory.id,
+          updates: {
+            is_enabled: newEnabledState
+          }
+        })
+      })
+
+      if (!response.ok) throw new Error('更新记忆状态失败')
+
+      const result = await response.json()
+
+      setMemories(prev => prev.map(m => m.id === memory.id ? result.memory : m))
+    } catch (error) {
+      console.error('切换记忆状态失败:', error)
+      alert('操作失败，请重试')
+    }
+  }
+
+  // 更新任务状态
+  const handleUpdateTaskStatus = async (memory: MemoryEntry, newStatus: 'pending' | 'in_progress' | 'completed' | 'cancelled') => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) throw new Error('用户未登录')
+
+      const updatedMetadata = {
+        ...memory.metadata,
+        status: newStatus
+      }
+
+      const response = await fetch('/api/chat/memory', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          memoryId: memory.id,
+          updates: {
+            metadata: updatedMetadata
+          }
+        })
+      })
+
+      if (!response.ok) throw new Error('更新任务状态失败')
+
+      const result = await response.json()
+
+      setMemories(prev => prev.map(m => m.id === memory.id ? result.memory : m))
+    } catch (error) {
+      console.error('更新任务状态失败:', error)
+      alert('操作失败，请重试')
+    }
+  }
+
   // 根据记忆类型获取图标
   const getMemoryIcon = (type: string) => {
     switch (type) {
@@ -608,49 +745,48 @@ export default function MemoryManagePage() {
       : 0
   }
 
-  // 验证摘要生成顺序
+  // 验证摘要生成顺序 - 基于实际消息序号而非ID
   const validateSummarySequence = (startMessageId: number, endMessageId: number): { valid: boolean; message: string } => {
     if (!summaries.length) {
       // 如果没有任何摘要，可以生成第一个摘要
       return { valid: true, message: '' }
     }
 
-    // 获取现有摘要的最大结束位置
-    const maxEndId = Math.max(...summaries.map(s => s.end_message_id).filter(id => id !== undefined))
+    // 获取要生成的消息范围的序号
+    const startIndex = getMessageIndexById(startMessageId)
+    const endIndex = getMessageIndexById(endMessageId)
 
-    // 检查是否存在覆盖当前startMessageId之前范围的连续摘要
-    const sortedSummaries = [...summaries].sort((a, b) => (a.start_message_id || 0) - (b.start_message_id || 0))
-
-    // 检查从第一条消息到startMessageId是否有连续的摘要覆盖
-    let expectedNextStart = 1 // 从第一条消息开始
-    let hasContinuousCoverage = true
-
-    for (const summary of sortedSummaries) {
-      if (summary.start_message_id && summary.start_message_id > expectedNextStart) {
-        // 发现空隙
-        if (summary.start_message_id > startMessageId) {
-          // 空隙在我们要生成的范围之前
-          hasContinuousCoverage = false
-          break
-        }
-      }
-
-      if (summary.end_message_id && summary.end_message_id >= startMessageId - 1) {
-        // 找到覆盖或紧邻我们要生成范围的摘要
-        break
-      }
-
-      expectedNextStart = (summary.end_message_id || 0) + 1
+    if (!startIndex || !endIndex) {
+      return { valid: false, message: '无法找到对应的消息序号' }
     }
 
-    // 如果要生成的摘要不是紧接着现有摘要的，需要检查是否存在空隙
-    if (startMessageId > 1) {
-      const hasDirectPredecessor = sortedSummaries.some(s => s.end_message_id === startMessageId - 1)
+    // 检查是否存在覆盖当前范围之前的连续摘要（基于序号）
+    const sortedSummaries = [...summaries]
+      .filter(s => s.start_message_id && s.end_message_id)
+      .map(s => ({
+        ...s,
+        startIndex: getMessageIndexById(s.start_message_id!),
+        endIndex: getMessageIndexById(s.end_message_id!)
+      }))
+      .filter(s => s.startIndex && s.endIndex)
+      .sort((a, b) => (a.startIndex || 0) - (b.startIndex || 0))
 
-      if (!hasDirectPredecessor && startMessageId > maxEndId + 1) {
-        return {
-          valid: false,
-          message: `请先生成前面的摘要。当前最新摘要覆盖到第${maxEndId}条消息，您尝试生成第${startMessageId}-${endMessageId}条消息的摘要，中间存在空隙。请先生成第${maxEndId + 1}条开始的摘要。`
+    // 如果要生成的摘要不是从第1条开始，检查是否有前置摘要
+    if (startIndex > 1) {
+      // 找到结束位置最接近startIndex的摘要
+      const precedingSummaries = sortedSummaries.filter(s => (s.endIndex || 0) < startIndex)
+
+      if (precedingSummaries.length > 0) {
+        const latestPrecedingEnd = Math.max(...precedingSummaries.map(s => s.endIndex || 0))
+
+        // 检查是否存在未覆盖的消息（空隙）
+        // 只有当空隙超过1条消息时才认为是真正的空隙（允许跳过1-2条消息）
+        const gap = startIndex - latestPrecedingEnd - 1
+        if (gap > 2) {
+          return {
+            valid: false,
+            message: `请先生成前面的摘要。当前最新摘要覆盖到第${latestPrecedingEnd}条消息，您尝试生成第${startIndex}-${endIndex}条消息的摘要，中间有${gap}条消息未覆盖。建议先生成第${latestPrecedingEnd + 1}条开始的摘要。`
+          }
         }
       }
     }
@@ -1474,14 +1610,35 @@ export default function MemoryManagePage() {
                             </div>
                           </div>
 
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteMemory(memory.id)}
-                                      className="opacity-0 group-hover:opacity-100 text-red-600 hover:text-red-700 h-6 w-6 p-0 flex-shrink-0"
-                          >
-                                      <Trash2 className="w-3 h-3" />
-                          </Button>
+                                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleEditMemory(memory)}
+                                        className="text-blue-600 hover:text-blue-700 h-6 w-6 p-0"
+                                        title="编辑记忆"
+                                      >
+                                        <Edit3 className="w-3 h-3" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleToggleMemoryEnabled(memory)}
+                                        className={`h-6 w-6 p-0 ${(memory.metadata?.is_enabled ?? true) ? 'text-green-600 hover:text-green-700' : 'text-gray-400 hover:text-gray-500'}`}
+                                        title={(memory.metadata?.is_enabled ?? true) ? '点击禁用' : '点击启用'}
+                                      >
+                                        {(memory.metadata?.is_enabled ?? true) ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteMemory(memory.id)}
+                                        className="text-red-600 hover:text-red-700 h-6 w-6 p-0"
+                                        title="删除记忆"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    </div>
                         </div>
                                   <p className="text-sm text-slate-700 dark:text-slate-300 mb-2 line-clamp-2">
                           {memory.content}
@@ -1553,14 +1710,60 @@ export default function MemoryManagePage() {
                                         </div>
                                       )}
                                       
-                                      {/* 任务记忆 */}
+                                      {/* 任务记忆 - 带状态切换 */}
                                       {memory.type === 'task' && (
+                                        <div className="space-y-2">
+                                          <div className="flex flex-wrap gap-2">
+                                            {memory.metadata.scheduled_time && (
+                                              <span className="inline-flex items-center px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">
+                                                ⏰ {memory.metadata.scheduled_time}
+                                              </span>
+                                            )}
+                                            {memory.metadata.priority && (
+                                              <span className="inline-flex items-center px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs">
+                                                🔥 {memory.metadata.priority}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-xs text-slate-500 mr-2">状态:</span>
+                                            <button
+                                              onClick={() => handleUpdateTaskStatus(memory as TaskMemory, 'pending')}
+                                              className={`px-2 py-1 rounded text-xs transition-colors ${
+                                                memory.metadata.status === 'pending'
+                                                  ? 'bg-gray-200 text-gray-800 font-medium'
+                                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-150'
+                                              }`}
+                                            >
+                                              ⏳ 待处理
+                                            </button>
+                                            <button
+                                              onClick={() => handleUpdateTaskStatus(memory as TaskMemory, 'in_progress')}
+                                              className={`px-2 py-1 rounded text-xs transition-colors ${
+                                                memory.metadata.status === 'in_progress'
+                                                  ? 'bg-blue-200 text-blue-800 font-medium'
+                                                  : 'bg-blue-100 text-blue-600 hover:bg-blue-150'
+                                              }`}
+                                            >
+                                              🔄 进行中
+                                            </button>
+                                            <button
+                                              onClick={() => handleUpdateTaskStatus(memory as TaskMemory, 'completed')}
+                                              className={`px-2 py-1 rounded text-xs transition-colors ${
+                                                memory.metadata.status === 'completed'
+                                                  ? 'bg-green-200 text-green-800 font-medium'
+                                                  : 'bg-green-100 text-green-600 hover:bg-green-150'
+                                              }`}
+                                            >
+                                              ✅ 已完成
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* 旧的任务状态显示（保留作为fallback） */}
+                                      {memory.type === 'task' && false && memory.metadata.status && (
                                         <div className="flex flex-wrap gap-2">
-                                          {memory.metadata.scheduled_time && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">
-                                              ⏰ {memory.metadata.scheduled_time}
-                                            </span>
-                                          )}
                                           {memory.metadata.status && (
                                             <span className={`inline-flex items-center px-2 py-1 rounded text-xs ${
                                               memory.metadata.status === 'completed' ? 'bg-green-100 text-green-700' :
@@ -1568,7 +1771,7 @@ export default function MemoryManagePage() {
                                               memory.metadata.status === 'pending' ? 'bg-gray-100 text-gray-700' :
                                               'bg-red-100 text-red-700'
                                             }`}>
-                                              📊 {memory.metadata.status === 'completed' ? '已完成' : 
+                                              📊 {memory.metadata.status === 'completed' ? '已完成' :
                                                    memory.metadata.status === 'in_progress' ? '进行中' :
                                                    memory.metadata.status === 'pending' ? '待处理' : '已取消'}
                                             </span>
@@ -2155,6 +2358,81 @@ export default function MemoryManagePage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 编辑记忆对话框 */}
+      <Dialog open={showEditMemoryDialog} onOpenChange={setShowEditMemoryDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Edit3 className="w-5 h-5" />
+              <span>编辑记忆</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          {editingMemory && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">记忆类型</label>
+                <div className="p-2 bg-slate-100 rounded-md text-sm">
+                  {getMemoryTypeName(editingMemory.type)}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">标题</label>
+                <Input
+                  value={editingMemory.title || ''}
+                  onChange={(e) => setEditingMemory(prev => prev ? { ...prev, title: e.target.value } : null)}
+                  placeholder="为这个记忆起个标题..."
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">内容</label>
+                <Textarea
+                  value={editingMemory.content || ''}
+                  onChange={(e) => setEditingMemory(prev => prev ? { ...prev, content: e.target.value } : null)}
+                  placeholder="记录详细内容..."
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  重要度 ({editingMemory.importance}/10)
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  value={editingMemory.importance || 5}
+                  onChange={(e) => setEditingMemory(prev => prev ? { ...prev, importance: parseInt(e.target.value) } : null)}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowEditMemoryDialog(false)
+                    setEditingMemory(null)
+                  }}
+                >
+                  取消
+                </Button>
+                <Button
+                  onClick={handleSaveEditedMemory}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Save className="w-4 h-4 mr-1" />
+                  保存
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
