@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Character, MultiCharacterSession } from '../lib/supabase'
+import { Character } from '../lib/supabase'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,7 +32,12 @@ import {
 } from '@/components/ui/dialog'
 
 interface CharacterSelectorProps {
-  session: MultiCharacterSession
+  session: { 
+    id: string
+    characters?: Character[]
+    active_characters?: number[]
+    [key: string]: unknown 
+  }
   availableCharacters: Character[]
   currentSpeaker?: Character
   onSpeakerChange: (characterId: number) => void

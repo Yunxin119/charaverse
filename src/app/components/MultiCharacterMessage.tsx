@@ -61,8 +61,8 @@ export const MultiCharacterMessage: React.FC<MultiCharacterMessageProps> = ({
   className = ''
 }) => {
   // 获取发言角色信息（支持剧本多角色）
-  const speakerCharacter = message.speaker_script_character_id
-    ? scriptCharacters.find(c => c.id === message.speaker_script_character_id)
+  const speakerCharacter = message.speaker_character_id
+    ? scriptCharacters.find(c => c.id === message.speaker_character_id)
     : null
 
   const isUserMessage = message.role === 'user'
@@ -274,7 +274,7 @@ export const MultiCharacterMessage: React.FC<MultiCharacterMessageProps> = ({
                 {/* 消息内容 */}
                 <Card className={`
                   border-l-4 group relative
-                  ${speakerCharacter.id === scriptCharacters.find(c => c.id === message.speaker_script_character_id)?.id
+                  ${speakerCharacter.id === scriptCharacters.find(c => c.id === message.speaker_character_id)?.id
                     ? 'border-l-blue-500 bg-blue-50 dark:bg-blue-950'
                     : 'border-l-gray-300 bg-white dark:bg-gray-800'
                   }

@@ -41,6 +41,8 @@ interface BasicInfo {
   is_public: boolean
   introduction: string // 剧本说明，给其他用户看的介绍
   script_type: 'single' | 'multi' // 剧本类型
+  age?: string // 角色年龄
+  gender?: 'male' | 'female' | 'none' | 'other' // 角色性别
 }
 
 interface PromptModule {
@@ -152,13 +154,22 @@ export default function NewCharacterPage() {
     ))
   }
 
-  const updateScriptCharacterPersonality = (id: string, field: keyof ScriptCharacter['personality'], value: any) => {
-    setScriptCharacters(prev => prev.map(char =>
-      char.id === id ? {
-        ...char,
-        personality: { ...char.personality, [field]: value }
-      } : char
-    ))
+  const updateScriptCharacterPersonality = (id: string, field: 'traits' | 'speaking_style' | 'background', value: string[] | string | undefined) => {
+    setScriptCharacters(prev => prev.map(char => {
+      if (char.id === id) {
+        return {
+          ...char,
+          personality: { 
+            traits: char.personality?.traits || [],
+            speaking_style: char.personality?.speaking_style,
+            background: char.personality?.background,
+            ...char.personality,
+            [field]: value 
+          }
+        } as ScriptCharacter
+      }
+      return char
+    }))
   }
 
   const removeScriptCharacter = (id: string) => {

@@ -933,7 +933,7 @@ export default function ChatSessionPage() {
           characterName: speakingCharacter?.name || '角色',
           baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
           actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined,
-          speakingCharacterId
+          speakingCharacterId: speakingCharacterId || undefined
         }))
       } else {
         // 非智能模式：获取并使用完整的消息历史
@@ -948,7 +948,7 @@ export default function ChatSessionPage() {
           messages: completeMessages, // 使用完整的消息历史
           thinkingBudget: getThinkingBudget(currentSelectedModel),
           baseUrl: modelConfig.isRelay ? modelConfig.baseUrl : undefined,
-          speakingCharacterId,
+          speakingCharacterId: speakingCharacterId || undefined,
           actualModel: modelConfig.isRelay ? modelConfig.modelName : undefined
         }))
       }
@@ -1333,7 +1333,7 @@ export default function ChatSessionPage() {
           const ContextManagerModule = await import('../../lib/contextManager')
           const enhancedChatSliceModule = await import('../../lib/enhancedChatSlice')
           const { ContextManager } = ContextManagerModule
-          const { getSummaries } = enhancedChatSliceModule
+          const { getSummaries, getMemoryTableData } = enhancedChatSliceModule
           const contextManager = new ContextManager(contextConfig)
 
           // 1. 获取现有摘要
@@ -1350,7 +1350,7 @@ export default function ChatSessionPage() {
           let messagesToProcess = completeMessages
           if (summaries.length > 0) {
             const config = contextManager.getConfig()
-            const summarizedMessageCount = summaries.length * config.summaryThreshold
+            const summarizedMessageCount = summaries.length * (config.summaryThreshold || 50)
             messagesToProcess = completeMessages.slice(summarizedMessageCount)
             console.log(`🧠 使用摘要模式: ${summaries.length}个摘要，跳过前${summarizedMessageCount}条消息，处理${messagesToProcess.length}条消息`)
 
@@ -1363,7 +1363,6 @@ export default function ChatSessionPage() {
           }
 
           // 3. 获取记忆表格数据
-          const { getMemoryTableData } = enhancedChatSliceModule
           const memoryTableData = await getMemoryTableData(currentSession.id, session.user.id)
           console.log('🧠 获取到记忆表格数据:', memoryTableData.length, '字符')
 
@@ -1744,7 +1743,7 @@ export default function ChatSessionPage() {
                       key={message.id}
                       message={message}
                       scriptCharacters={scriptCharacters}
-                      currentScript={currentScript}
+                      currentScript={currentScript || undefined}
                       isSelected={selectedMessageIds.has(message.id)}
                       isEditing={editingMessageId === message.id}
                       editingContent={editingContent}

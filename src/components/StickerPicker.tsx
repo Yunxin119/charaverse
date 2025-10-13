@@ -98,11 +98,11 @@ export default function StickerPicker({
       }
       
       if (userId && maxRecentStickers > 0) {
-        setRecentStickers(results[resultIndex++] || [])
+        setRecentStickers((results[resultIndex++] as UserStickerUsage[]) || [])
       }
-      
+
       if (userId && enableFavorites) {
-        setFavoriteStickers(results[resultIndex++] || [])
+        setFavoriteStickers((results[resultIndex++] as UserStickerFavorite[]) || [])
       }
 
       // 加载默认分类的表情包

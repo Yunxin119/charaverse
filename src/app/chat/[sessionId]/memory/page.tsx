@@ -68,6 +68,7 @@ interface SpacetimeMemory extends BaseMemoryEntry {
     characters: string[]    // 此地角色
     weather?: string        // 天气
     atmosphere?: string     // 氛围
+    is_enabled?: boolean    // 是否启用
   }
 }
 
@@ -81,6 +82,7 @@ interface RelationshipMemory extends BaseMemoryEntry {
     affection: number       // 好感度 (1-10)
     trust: number          // 信任度 (1-10)
     last_interaction?: string // 最后互动
+    is_enabled?: boolean    // 是否启用
   }
 }
 
@@ -96,6 +98,7 @@ interface TaskMemory extends BaseMemoryEntry {
     duration?: string       // 持续时间
     status: 'pending' | 'in_progress' | 'completed' | 'cancelled' // 状态
     priority: 'low' | 'medium' | 'high' | 'urgent' // 优先级
+    is_enabled?: boolean    // 是否启用
   }
 }
 
@@ -110,6 +113,7 @@ interface ItemMemory extends BaseMemoryEntry {
     location?: string      // 存放地点
     acquisition_method?: string // 获得方式
     emotional_value?: number // 情感价值 (1-10)
+    is_enabled?: boolean    // 是否启用
   }
 }
 
@@ -125,6 +129,7 @@ interface CharacterMemory extends BaseMemoryEntry {
     nickname?: string       // 昵称/称呼
     age?: string           // 年龄
     occupation?: string    // 职业
+    is_enabled?: boolean    // 是否启用
     background?: string    // 背景
     special_traits?: string[] // 特殊特征
   }
@@ -141,6 +146,7 @@ interface EventMemory extends BaseMemoryEntry {
   impact: string
     event_type?: 'conversation' | 'action' | 'decision' | 'conflict' | 'celebration'
     consequences?: string   // 后果
+    is_enabled?: boolean    // 是否启用
   }
 }
 
@@ -154,6 +160,7 @@ interface SettingMemory extends BaseMemoryEntry {
   description: string
     atmosphere?: string
     significance?: string   // 重要性说明
+    is_enabled?: boolean    // 是否启用
   }
 }
 
@@ -167,6 +174,7 @@ interface EmotionMemory extends BaseMemoryEntry {
   duration: string
     target?: string        // 情感对象
     trigger?: string       // 触发因素
+    is_enabled?: boolean    // 是否启用
   }
 }
 
@@ -1714,12 +1722,12 @@ export default function MemoryManagePage() {
                                       {memory.type === 'task' && (
                                         <div className="space-y-2">
                                           <div className="flex flex-wrap gap-2">
-                                            {memory.metadata.scheduled_time && (
+                                            {'scheduled_time' in memory.metadata && memory.metadata.scheduled_time && (
                                               <span className="inline-flex items-center px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">
                                                 ⏰ {memory.metadata.scheduled_time}
                                               </span>
                                             )}
-                                            {memory.metadata.priority && (
+                                            {'priority' in memory.metadata && memory.metadata.priority && (
                                               <span className="inline-flex items-center px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs">
                                                 🔥 {memory.metadata.priority}
                                               </span>
@@ -1761,10 +1769,10 @@ export default function MemoryManagePage() {
                                         </div>
                                       )}
 
-                                      {/* 旧的任务状态显示（保留作为fallback） */}
-                                      {memory.type === 'task' && false && memory.metadata.status && (
+                                      {/* 旧的任务状态显示（保留作为fallback） - Disabled */}
+                                      {/* {memory.type === 'task' && false && 'status' in memory.metadata && memory.metadata.status && (
                                         <div className="flex flex-wrap gap-2">
-                                          {memory.metadata.status && (
+                                          {'status' in memory.metadata && memory.metadata.status && (
                                             <span className={`inline-flex items-center px-2 py-1 rounded text-xs ${
                                               memory.metadata.status === 'completed' ? 'bg-green-100 text-green-700' :
                                               memory.metadata.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
@@ -1776,7 +1784,7 @@ export default function MemoryManagePage() {
                                                    memory.metadata.status === 'pending' ? '待处理' : '已取消'}
                                             </span>
                                           )}
-                                          {memory.metadata.priority && (
+                                          {'priority' in memory.metadata && memory.metadata.priority && (
                                             <span className={`inline-flex items-center px-2 py-1 rounded text-xs ${
                                               memory.metadata.priority === 'urgent' ? 'bg-red-100 text-red-700' :
                                               memory.metadata.priority === 'high' ? 'bg-orange-100 text-orange-700' :
@@ -1789,7 +1797,7 @@ export default function MemoryManagePage() {
                                             </span>
                                           )}
                                         </div>
-                                      )}
+                                      )} */}
                                       
                                       {/* 物品记忆 */}
                                       {memory.type === 'item' && (

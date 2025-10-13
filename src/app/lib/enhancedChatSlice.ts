@@ -58,7 +58,7 @@ async function getSummaryCoverageRanges(sessionId: string, userId: string): Prom
 }
 
 // 获取记忆表格数据 - 优化版（参考SillyTavern）
-async function getMemoryTableData(sessionId: string, userId: string): Promise<string> {
+export async function getMemoryTableData(sessionId: string, userId: string): Promise<string> {
   try {
     const { data: memories, error } = await supabase
       .from('chat_memories')

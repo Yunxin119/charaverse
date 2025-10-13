@@ -1,12 +1,6 @@
 import { supabase } from './supabase'
 import type {
   Character,
-  ChatSession,
-  ChatMessage,
-  SessionCharacter,
-  MultiCharacterSession,
-  MultiCharacterContext,
-  EnhancedChatMessage,
   ScriptCharacterContext,
   ScriptCharacter
 } from './supabase'
@@ -29,7 +23,7 @@ export class MultiCharacterManager {
     characterIds: number[]
     title?: string
     rotationMode?: 'manual' | 'auto'
-  }): Promise<MultiCharacterSession | null> {
+  }): Promise<{ id: string; [key: string]: unknown } | null> {
     const { userId, characterIds, title, rotationMode = 'manual' } = params
 
     if (characterIds.length < 2) {
@@ -95,7 +89,7 @@ export class MultiCharacterManager {
         session_type: 'multi',
         active_characters: characterIds,
         characters
-      } as MultiCharacterSession
+      } as { id: string; [key: string]: unknown }
 
     } catch (error) {
       console.error('创建多角色会话失败:', error)
@@ -106,7 +100,7 @@ export class MultiCharacterManager {
   /**
    * 获取多角色会话的详细信息
    */
-  static async getMultiCharacterSession(sessionId: string, userId: string): Promise<MultiCharacterSession | null> {
+  static async getMultiCharacterSession(sessionId: string, userId: string): Promise<{ id: string; [key: string]: unknown } | null> {
     try {
       // 获取会话基本信息
       const { data: session, error: sessionError } = await supabase
@@ -133,7 +127,7 @@ export class MultiCharacterManager {
 
       if (scError) {
         console.error('获取会话角色失败:', scError)
-        return session as MultiCharacterSession
+        return session as { id: string; [key: string]: unknown }
       }
 
       // 提取角色信息
@@ -146,7 +140,7 @@ export class MultiCharacterManager {
         active_characters: activeCharacters,
         session_characters: sessionCharacters,
         characters
-      } as MultiCharacterSession
+      } as { id: string; [key: string]: unknown }
 
     } catch (error) {
       console.error('获取多角色会话失败:', error)
@@ -648,7 +642,7 @@ ${conversationContext ? `\n## 对话背景\n${conversationContext}` : ''}
 
       // 获取当前发言角色
       const currentSpeaker = session.current_script_character_id
-        ? scriptCharacters.find(char => char.id === session.current_script_character_id)
+        ? scriptCharacters.find((char: ScriptCharacter) => char.id === session.current_script_character_id)
         : scriptCharacters[0] // 默认第一个角色
 
       // 获取发言统计
@@ -667,7 +661,7 @@ ${conversationContext ? `\n## 对话背景\n${conversationContext}` : ''}
         script,
         scriptCharacters,
         currentSpeaker,
-        lastSpeaker: lastSpeaker ? scriptCharacters.find(char => char.id === lastSpeaker.character_id) : undefined,
+        lastSpeaker: lastSpeaker ? scriptCharacters.find((char: ScriptCharacter) => char.id === lastSpeaker.character_id) : undefined,
         speakingHistory
       }
     } catch (error) {
