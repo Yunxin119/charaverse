@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import StickerPicker from './StickerPicker'
 import StickerButton from './StickerButton'
@@ -46,7 +46,6 @@ export default function StickerInput({
     isOpen: isPickerOpen,
     openPicker,
     closePicker,
-    onStickerSelect: handlePickerSelect,
     config: pickerConfig
   } = useStickerPicker(stickerPickerConfig, onStickerSelect)
 

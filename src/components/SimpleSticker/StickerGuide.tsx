@@ -46,7 +46,7 @@ export default function StickerGuide({ isOpen, onClose }: StickerGuideProps) {
       title: '📁 自定义表情包',
       content: (
         <div className="space-y-3">
-          <p>在"贴图"标签页中上传你的专属表情包：</p>
+          <p>在&ldquo;贴图&rdquo;标签页中上传你的专属表情包：</p>
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
             <div className="flex items-center justify-center mb-3">
               <div className="w-16 h-16 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center">
@@ -54,7 +54,7 @@ export default function StickerGuide({ isOpen, onClose }: StickerGuideProps) {
               </div>
             </div>
             <p className="text-sm text-center text-gray-600 dark:text-gray-300">
-              点击"上传表情包"按钮选择图片
+              点击&ldquo;上传表情包&rdquo;按钮选择图片
             </p>
           </div>
           <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
@@ -70,7 +70,7 @@ export default function StickerGuide({ isOpen, onClose }: StickerGuideProps) {
       title: '⏰ 最近使用',
       content: (
         <div className="space-y-3">
-          <p>"最近"标签页自动记录你的表情包使用：</p>
+          <p>&ldquo;最近&rdquo;标签页自动记录你的表情包使用：</p>
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
             <div className="flex justify-center space-x-2 mb-2">
               {['😊', '👍', '🔥'].map(emoji => (

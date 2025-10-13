@@ -1330,8 +1330,10 @@ export default function ChatSessionPage() {
 
         try {
           // 使用与 sendMessageWithContext 相同的智能处理逻辑（包含摘要）
-          const { ContextManager } = require('../../lib/contextManager')
-          const { getSummaries } = require('../../lib/enhancedChatSlice')
+          const ContextManagerModule = await import('../../lib/contextManager')
+          const enhancedChatSliceModule = await import('../../lib/enhancedChatSlice')
+          const { ContextManager } = ContextManagerModule
+          const { getSummaries } = enhancedChatSliceModule
           const contextManager = new ContextManager(contextConfig)
 
           // 1. 获取现有摘要
@@ -1361,7 +1363,7 @@ export default function ChatSessionPage() {
           }
 
           // 3. 获取记忆表格数据
-          const { getMemoryTableData } = require('../../lib/enhancedChatSlice')
+          const { getMemoryTableData } = enhancedChatSliceModule
           const memoryTableData = await getMemoryTableData(currentSession.id, session.user.id)
           console.log('🧠 获取到记忆表格数据:', memoryTableData.length, '字符')
 

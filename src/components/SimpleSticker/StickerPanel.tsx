@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Image from 'next/image'
 
 // 简化的表情包类型
 export interface SimpleSticker {
@@ -425,11 +426,14 @@ export default function StickerPanel({ isOpen, onClose, onStickerClick, classNam
                       <span className="text-xl">{sticker.url}</span>
                     ) : (
                       <>
-                        <img 
+                        <Image 
                           src={sticker.url} 
                           alt={sticker.name}
-                          className="w-8 h-8 object-contain rounded"
+                          width={32}
+                          height={32}
+                          className="object-contain rounded"
                           loading="lazy"
+                          unoptimized
                         />
                         {/* 删除按钮（仅自定义表情包显示） */}
                         {activeTab === 'stickers' && (

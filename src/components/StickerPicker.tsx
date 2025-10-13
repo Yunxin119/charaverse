@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Image from 'next/image'
 import { StickerService } from '@/lib/stickerService'
 import type { 
   StickerPack, 
@@ -39,7 +40,6 @@ export default function StickerPicker({
   const [isSearching, setIsSearching] = useState(false)
   
   // 数据状态
-  const [stickerPacks, setStickerPacks] = useState<StickerPack[]>([])
   const [categoryStickers, setCategoryStickers] = useState<Sticker[]>([])
   const [recentStickers, setRecentStickers] = useState<UserStickerUsage[]>([])
   const [favoriteStickers, setFavoriteStickers] = useState<UserStickerFavorite[]>([])
@@ -54,7 +54,6 @@ export default function StickerPicker({
   // 配置项
   const {
     maxRecentStickers = 20,
-    maxFavoriteStickers = 50,
     enableSearch = true,
     enableCategories = true,
     enableFavorites = true,
@@ -66,6 +65,7 @@ export default function StickerPicker({
     if (isOpen) {
       loadInitialData()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
   // 加载初始数据
@@ -74,7 +74,7 @@ export default function StickerPicker({
       setIsLoading(true)
       
       // 并行加载数据
-      const promises: Promise<any>[] = []
+      const promises: Promise<unknown>[] = []
       
       if (enableCategories) {
         promises.push(StickerService.getStickerPacks())
@@ -93,7 +93,8 @@ export default function StickerPicker({
       let resultIndex = 0
 
       if (enableCategories) {
-        setStickerPacks(results[resultIndex++] || [])
+        // Results are loaded but not stored in state (loaded via loadCategoryStickers)
+        resultIndex++
       }
       
       if (userId && maxRecentStickers > 0) {
@@ -428,11 +429,13 @@ export default function StickerPicker({
                       transition-colors group
                     "
                   >
-                    <img
+                    <Image
                       src={sticker.image_url}
                       alt={sticker.name}
-                      className="w-full h-full object-cover"
+                      fill
+                      className="object-cover"
                       loading="lazy"
+                      unoptimized
                     />
                     {userId && enableFavorites && (
                       <button
