@@ -36,17 +36,18 @@ import { TemplateManager } from '../../../components/TemplateManager'
 import { SimpleAvatarUpload } from '../../../components/AvatarUpload'
 import { uploadCharacterAvatar } from '../../../lib/avatarUpload'
 import { MultiCharacterManager } from '../../../lib/multiCharacterManager'
+import { ScriptCharacter } from '../../../lib/supabase'
 
 interface BasicInfo {
-  name: string
-  age: string
-  gender: string
-  keywords: string[]
-  description: string
-  avatar_url: string
+  name: string // 角色名称
+  description: string // 角色描述
+  avatar_url: string // 角色头像
   is_public: boolean
-  introduction: string // 角色说明，给其他用户看的介绍
-  initialMessage?: string // 初始对话，角色的开场白
+  introduction: string // 角色说明
+  initialMessage?: string // 初始对话
+  age?: string // 角色年龄
+  gender?: 'male' | 'female' | 'none' | 'other' // 角色性别
+  keywords?: string[] // 角色关键词
 }
 
 interface PromptModule {
@@ -71,29 +72,23 @@ export default function EditCharacterPage() {
   
   const [basicInfo, setBasicInfo] = useState<BasicInfo>({
     name: '',
-    age: '',
-    gender: '',
-    keywords: [],
     description: '',
     avatar_url: '',
     is_public: false,
     introduction: '',
-    initialMessage: ''
+    keywords: []
   })
-
-  // 关键词输入状态
-  const [keywordInput, setKeywordInput] = useState('')
 
   // 默认只有一个用户角色设定模块
   const [modules, setModules] = useState<PromptModule[]>([
-    { 
-      id: '1', 
-      type: '用户角色设定', 
-      content: '', 
-      userRoleName: '', 
-      userRoleAge: '', 
-      userRoleGender: '', 
-      userRoleDetails: '' 
+    {
+      id: '1',
+      type: '用户角色设定',
+      content: '',
+      userRoleName: '',
+      userRoleAge: '',
+      userRoleGender: '',
+      userRoleDetails: ''
     }
   ])
 
@@ -152,14 +147,14 @@ export default function EditCharacterPage() {
           // 设置基本信息
           setBasicInfo({
             name: data.name || '',
-            age: basicInfoData.age || '',
-            gender: basicInfoData.gender || '',
-            keywords: basicInfoData.keywords || [],
             description: basicInfoData.description || '',
             avatar_url: data.avatar_url || '',
             is_public: data.is_public || false,
             introduction: basicInfoData.introduction || '',
-            initialMessage: basicInfoData.initialMessage || ''
+            initialMessage: basicInfoData.initialMessage || '',
+            age: basicInfoData.age || '',
+            gender: basicInfoData.gender || '',
+            keywords: basicInfoData.keywords || []
           })
 
           // 设置模块数据，如果没有模块则使用默认的用户角色设定
@@ -219,65 +214,13 @@ export default function EditCharacterPage() {
     loadCharacter()
   }, [characterId, user, router])
 
-  const handleBasicInfoChange = (field: keyof BasicInfo, value: string | boolean | string[]) => {
+  const handleBasicInfoChange = (field: keyof BasicInfo, value: string | boolean) => {
     setBasicInfo(prev => ({
       ...prev,
       [field]: value
     }))
   }
 
-  // 处理关键词输入
-  const handleKeywordInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    
-    // 检查是否输入了逗号（支持中文和英文逗号）
-    if (value.includes(',') || value.includes('，')) {
-      // 将中文逗号替换为英文逗号，然后分割
-      const normalizedValue = value.replace(/，/g, ',')
-      const parts = normalizedValue.split(',')
-      const keywords = parts.slice(0, -1).map(k => k.trim()).filter(k => k.length > 0)
-      const remaining = parts[parts.length - 1] // 逗号后的剩余内容
-      
-      if (keywords.length > 0) {
-        // 添加新关键词到列表中（去重）
-        const newKeywords = [...basicInfo.keywords]
-        keywords.forEach(keyword => {
-          if (!newKeywords.includes(keyword)) {
-            newKeywords.push(keyword)
-          }
-        })
-        handleBasicInfoChange('keywords', newKeywords)
-      }
-      
-      // 设置输入框为逗号后的剩余内容
-      setKeywordInput(remaining)
-    } else {
-      setKeywordInput(value)
-    }
-  }
-
-  // 处理按键事件
-  const handleKeywordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      const keyword = keywordInput.trim()
-      if (keyword && !basicInfo.keywords.includes(keyword)) {
-        handleBasicInfoChange('keywords', [...basicInfo.keywords, keyword])
-        setKeywordInput('')
-      }
-    } else if (e.key === 'Backspace' && keywordInput === '' && basicInfo.keywords.length > 0) {
-      // 如果输入框为空且按下退格键，删除最后一个关键词
-      const newKeywords = [...basicInfo.keywords]
-      newKeywords.pop()
-      handleBasicInfoChange('keywords', newKeywords)
-    }
-  }
-
-  // 删除关键词
-  const removeKeyword = (indexToRemove: number) => {
-    const newKeywords = basicInfo.keywords.filter((_, index) => index !== indexToRemove)
-    handleBasicInfoChange('keywords', newKeywords)
-  }
 
   // 添加新模块
   const addModule = (type: string) => {
@@ -393,7 +336,7 @@ export default function EditCharacterPage() {
       })
 
       // 构建完整的 prompt template
-      const promptTemplate = { 
+      const promptTemplate = {
         basic_info: basicInfo,
         modules: processedModules
       }
@@ -444,7 +387,7 @@ export default function EditCharacterPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-4">
-          <Loader2 className="w-8 h-8 mx-auto animate-spin text-slate-900 dark:text-white" />
+          {/* <Loader2 className="w-8 h-8 mx-auto animate-spin text-slate-900 dark:text-white" /> */}
           <p className="text-slate-600 dark:text-slate-300 dark:text-slate-300">加载角色数据中...</p>
         </div>
       </div>
@@ -639,47 +582,6 @@ export default function EditCharacterPage() {
                       </Select>
                     </div>
 
-                    {/* Character Keywords - 标签输入组件 */}
-                    <div className="space-y-2">
-                      <Label htmlFor="keywords">角色关键词</Label>
-                      <div className="space-y-3">
-                        {/* 关键词标签显示 */}
-                        {basicInfo.keywords.length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {basicInfo.keywords.map((keyword, index) => (
-                              <motion.div
-                                key={index}
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.8 }}
-                                className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm rounded-full border transition-colors"
-                              >
-                                <span>{keyword}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => removeKeyword(index)}
-                                  className="flex items-center justify-center w-4 h-4 rounded-full hover:bg-slate-300 transition-colors"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </motion.div>
-                            ))}
-                          </div>
-                        )}
-                        {/* 输入框 */}
-                        <Input
-                          id="keywords"
-                          placeholder={basicInfo.keywords.length === 0 ? "输入关键词，如古代，权谋，魔法..." : "继续添加关键词..."}
-                          value={keywordInput}
-                          onChange={handleKeywordInput}
-                          onKeyDown={handleKeywordKeyDown}
-                          className="w-full"
-                        />
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          输入关键词后按逗号、回车键来添加标签。按退格键删除最后一个标签。
-                        </p>
-                      </div>
-                    </div>
                   </div>
 
                   {/* Detailed Description */}
@@ -716,7 +618,7 @@ export default function EditCharacterPage() {
                     </Label>
                     <Textarea
                       id="initialMessage"
-                      placeholder="设置角色的开场白，如：“你好，我是...”。如果不填写，AI将自动生成第一句话。"
+                      placeholder="设置角色的开场白，如：你好，我是...。如果不填写，AI将自动生成第一句话。"
                       value={basicInfo.initialMessage || ''}
                       onChange={(e) => handleBasicInfoChange('initialMessage', e.target.value)}
                       className="min-h-[80px] resize-none"

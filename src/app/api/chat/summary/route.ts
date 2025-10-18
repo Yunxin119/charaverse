@@ -123,6 +123,8 @@ export async function POST(request: NextRequest) {
 
     // 构建角色设定信息
     let characterContext = ''
+    let userPersonaContext = ''
+
     if (character) {
       const prompt = character.prompt_template
       if (prompt) {
@@ -158,6 +160,40 @@ export async function POST(request: NextRequest) {
         if (prompt.world_setting && prompt.world_setting.description) {
           characterContext += `世界观设定: ${prompt.world_setting.description}\n`
         }
+
+        // 提取用户角色设定
+        if (prompt.modules && Array.isArray(prompt.modules)) {
+          const userPersonaModule = prompt.modules.find((m: any) => m.type === '用户角色设定')
+          if (userPersonaModule) {
+            userPersonaContext += '\n【用户角色设定】\n'
+            if (userPersonaModule.userRoleName) {
+              userPersonaContext += `用户角色姓名: ${userPersonaModule.userRoleName}\n`
+            }
+            if (userPersonaModule.userRoleAge) {
+              userPersonaContext += `用户角色年龄: ${userPersonaModule.userRoleAge}\n`
+            }
+            if (userPersonaModule.userRoleGender) {
+              const genderMap: Record<string, string> = {
+                'male': '男',
+                'female': '女',
+                'none': '无性别',
+                'other': '其他'
+              }
+              userPersonaContext += `用户角色性别: ${genderMap[userPersonaModule.userRoleGender] || userPersonaModule.userRoleGender}\n`
+            }
+            if (userPersonaModule.userRoleDetails) {
+              userPersonaContext += `用户角色详细设定: ${userPersonaModule.userRoleDetails}\n`
+            }
+            console.log('👤 找到用户角色设定:', {
+              name: userPersonaModule.userRoleName,
+              age: userPersonaModule.userRoleAge,
+              gender: userPersonaModule.userRoleGender,
+              hasDetails: !!userPersonaModule.userRoleDetails
+            })
+          } else {
+            console.log('ℹ️ 未找到用户角色设定模块')
+          }
+        }
       }
     }
 
@@ -191,18 +227,20 @@ export async function POST(request: NextRequest) {
       let previousMemories = null
 
       if (previousSummaryIds.length > 0) {
+        // 获取所有现有记忆（不仅仅是之前摘要的，包括所有会话的记忆）
+        // 这样AI可以决定是否需要更新/合并现有记忆
         const { data: memories } = await supabase
           .from('chat_memories')
-          .select('type, title, content, importance, summary_id')
+          .select('id, type, title, content, importance, metadata, summary_id')
           .eq('session_id', sessionId)
           .eq('user_id', userId)
-          .gte('importance', 7) // 只包含重要度7分以上的记忆
-          .in('summary_id', previousSummaryIds) // 只包含来自有效之前摘要的记忆
+          .eq('is_enabled', true)
+          .gte('importance', 6) // 包含重要度6分以上的记忆
           .order('importance', { ascending: false })
-          .limit(10) // 最多10条重要记忆
+          .limit(30) // 增加到30条，让AI有更多上下文来判断是否需要合并
 
         previousMemories = memories
-        console.log(`🧠 找到${previousMemories?.length || 0}个来自有效摘要的记忆`)
+        console.log(`🧠 找到${previousMemories?.length || 0}个现有记忆用于合并判断`)
       } else {
         console.log(`⚠️ 没有之前的摘要，跳过记忆查询`)
       }
@@ -219,10 +257,29 @@ export async function POST(request: NextRequest) {
       }
 
       if (previousMemories && previousMemories.length > 0) {
-        previousContext += '\n【重要记忆回顾】\n'
-        previousMemories.forEach(m => {
-          previousContext += `• ${m.title} (${m.type}, 重要度${m.importance}): ${m.content}\n`
-        })
+        previousContext += '\n【现有记忆表格（供更新/合并参考）】\n'
+        previousContext += '以下是已存在的记忆条目。如果当前对话提供了新信息，请UPDATE这些条目而不是创建新条目。\n\n'
+
+        // 按类型分组显示现有记忆
+        const memoryByType = previousMemories.reduce((groups: any, m: any) => {
+          if (!groups[m.type]) groups[m.type] = []
+          groups[m.type].push(m)
+          return groups
+        }, {})
+
+        for (const [type, mems] of Object.entries(memoryByType)) {
+          previousContext += `\n【${type}类记忆】\n`
+          ;(mems as any[]).forEach((m: any) => {
+            previousContext += `  ID: ${m.id}\n`
+            previousContext += `  标题: ${m.title}\n`
+            previousContext += `  内容: ${m.content}\n`
+            previousContext += `  重要度: ${m.importance}\n`
+            if (m.metadata && Object.keys(m.metadata).length > 0) {
+              previousContext += `  元数据: ${JSON.stringify(m.metadata)}\n`
+            }
+            previousContext += `\n`
+          })
+        }
       }
     } catch (error) {
       console.error('获取历史上下文失败:', error)
@@ -230,25 +287,47 @@ export async function POST(request: NextRequest) {
 
     let summaryPrompt = ''
     if (useMemoryTable) {
-      summaryPrompt = `你正在为一个角色扮演对话生成记忆表格。务必基于以下角色设定信息理解和记录对话内容。
-${characterContext ? `${characterContext}\n` : ''}${previousContext ? `${previousContext}\n` : ''}
-【重要提示】
-- 记忆表格必须基于角色的背景、性格、关系设定来理解对话
-- 不要凭空推断角色身份，而是使用已提供的角色设定信息
-- 角色的前情提要、背景故事、世界观等信息都应该被纳入记忆理解的参考框架
-- 记录的记忆要与角色设定保持一致，体现角色特色
+      summaryPrompt = `你正在为一个角色扮演对话生成/更新记忆表格。务必基于角色设定和现有记忆来理解对话。
+${characterContext ? `${characterContext}\n` : ''}${userPersonaContext ? `${userPersonaContext}\n` : ''}${previousContext ? `${previousContext}\n` : ''}
+【核心原则：记忆深化而非碎片化】
+1. **优先更新现有记忆**: 如果当前对话涉及已有记忆的人物/事件，请UPDATE而不是创建新条目
+2. **识别珍贵记忆**: 重点记录以下内容（重要度8-10）：
+   - 角色亲口讲述的过去经历、童年故事、家庭背景
+   - 角色珍视的人、物、地点的深层原因
+   - 角色的梦想、遗憾、创伤、转折点
+   - 角色内心深处的想法、价值观、信念
+   - 双方共同经历的重要时刻（第一次、特殊场合）
+3. **记忆合并策略**:
+   - 同一人物的多次提及 → 合并到一个character记忆，累积细节
+   - 持续的情感状态 → 更新emotion记忆的强度和持续时间
+   - 关系的逐步发展 → 更新relationship记忆的好感度和信任度
+4. **避免记录**:
+   - 日常闲聊（"今天天气真好"）
+   - 重复性对话（已记录过的相同内容）
+   - 临时性信息（"我去倒杯水"）
 
-请严格按照以下JSON格式返回，不要添加任何其他内容：
+【输出格式】
+请严格按照以下JSON格式返回：
 
 {
   "summary": "这里是200-300字的传统摘要，要体现与之前对话的连续性",
   "memories": [
     {
+      "action": "update",
+      "existing_id": "memory_123",
       "type": "character",
-      "title": "人物名称",
-      "content": "详细的人物信息、关系变化、称呼习惯等",
-      "importance": 8,
-      "metadata": {"name": "张三", "relationship": "朋友", "appearance": "高挑", "personality": "温和", "nickname": "小张", "age": "25岁", "occupation": "设计师"}
+      "title": "张三的完整人物画像",
+      "content": "张三，25岁设计师，高挑温和。【新增】今天她透露自己从小在单亲家庭长大，母亲独自抚养她很不容易，这也是她为什么如此独立坚强的原因。她最怀念小时候和妈妈一起做饭的时光。",
+      "importance": 9,
+      "metadata": {"name": "张三", "relationship": "朋友", "appearance": "高挑", "personality": "温和、独立、坚强", "nickname": "小张", "age": "25岁", "occupation": "设计师", "background": "单亲家庭长大", "cherished_memory": "和妈妈做饭"}
+    },
+    {
+      "action": "create",
+      "type": "character",
+      "title": "新角色-李四",
+      "content": "第一次提到的新角色，基本信息...",
+      "importance": 7,
+      "metadata": {"name": "李四", "relationship": "同事"}
     },
     {
       "type": "event",
@@ -302,31 +381,42 @@ ${characterContext ? `${characterContext}\n` : ''}${previousContext ? `${previou
   ]
 }
 
-注意事项：
-- 摘要要体现与之前对话的连续性和发展
-- 只记录新增或有变化的重要信息
-- 避免与已有记忆重复，除非有显著更新
-- 只基于【当前对话内容】和【已提供的之前摘要】，不要参考任何已删除的摘要内容
-- type必须是character/event/setting/emotion/spacetime/relationship/task/item之一
-- importance是1-10的数字，10最重要
-- content要详细具体，便于后续回忆
-- metadata提供额外的结构化信息，根据不同type包含相应字段：
-  * character: name, relationship, appearance, personality, nickname, age, occupation等
-  * event: time, location, participants, impact, event_type, consequences等
-  * setting: location, atmosphere, items, significance等
-  * emotion: emotion_type, intensity, cause, duration, target, trigger等
-  * spacetime: date, time, location, characters, weather, atmosphere等
-  * relationship: character_name, relationship, attitude, affection, trust, last_interaction等
-  * task: assigned_by, assigned_to, task_type, location, scheduled_time, duration, status, priority等
-  * item: item_name, owner, description, importance_reason, location, acquisition_method, emotional_value等
+【记忆操作说明】
+1. **action字段** (必填):
+   - "update": 更新现有记忆（必须提供existing_id）
+   - "create": 创建新记忆（无existing_id）
 
-要求：
-- 【核心】严格基于角色设定信息理解对话，不要脱离角色背景推断
-- 角色的人设、背景、世界观、关系网等都是记忆理解的重要依据
-- 记忆表格的content字段要详细，包含具体的对话细节和情境
-- 重要度评分要准确反映对故事发展的影响程度
-- 摘要要体现角色特色和世界观背景
-- 对于角色设定中已明确的信息（如身份、背景、关系等），优先使用设定信息而非推断
+2. **更新现有记忆时**:
+   - 必须提供existing_id（从上面【现有记忆表格】中获取）
+   - content字段应该整合原有内容+新信息，标注【新增】部分
+   - 重要度可以根据新信息调整（深化理解→提高重要度）
+   - metadata累积更新，不要丢失原有字段
+
+3. **珍贵记忆识别**:
+   重要度8-10应该用于：
+   - 角色的核心背景故事、家庭经历
+   - 影响角色性格形成的关键事件
+   - 角色真心珍视的人/物/记忆
+   - 角色的梦想、遗憾、未了心愿
+   - 双方关系的重要转折点
+
+4. **记忆数量控制**:
+   - 优先更新而非创建新条目
+   - 每次生成不超过5-8个记忆条目
+   - 日常对话可能只需要1-2个update
+
+【格式要求】
+- type: character/event/setting/emotion/spacetime/relationship/task/item
+- importance: 1-10的数字，珍贵记忆8-10，重要内容6-7，一般内容5
+- content: 详细具体，包含对话细节和情感色彩
+- metadata: 结构化信息，根据type包含相应字段
+
+【核心要求】
+- 严格基于角色设定信息理解对话
+- 角色的人设、背景、世界观是记忆理解的依据
+- 优先UPDATE现有记忆，减少碎片化
+- 识别并高亮记录珍贵记忆
+- 避免记录临时性、重复性内容
 
 当前对话内容：
 ${conversationText}
@@ -334,7 +424,7 @@ ${conversationText}
 JSON结果：`
     } else {
       summaryPrompt = `请为以下对话生成一个简洁的摘要，参考角色设定、之前的摘要和重要记忆。
-${characterContext ? `${characterContext}\n` : ''}${previousContext ? `${previousContext}\n` : ''}
+${characterContext ? `${characterContext}\n` : ''}${userPersonaContext ? `${userPersonaContext}\n` : ''}${previousContext ? `${previousContext}\n` : ''}
 摘要要求：
 1. 关键事件和情节发展
 2. 重要的约定、决定或承诺
@@ -497,10 +587,10 @@ ${conversationText}
       summary = newSummary
     }
 
-    // 保存记忆条目到数据库
+    // 保存/更新记忆条目到数据库
     let savedMemories: any[] = []
     if (memoryEntries.length > 0) {
-      console.log('开始保存', memoryEntries.length, '个记忆条目')
+      console.log('开始处理', memoryEntries.length, '个记忆条目')
 
       // 如果是重新生成，先删除与该摘要相关的旧记忆条目
       if (summaryId) {
@@ -511,35 +601,200 @@ ${conversationText}
           .eq('user_id', userId)
       }
 
-      // 准备记忆条目数据
-      const memoriesToInsert = memoryEntries.map((memory, index) => ({
-        id: `${summary.id}_${index}_${Date.now()}`,
-        session_id: sessionId,
-        user_id: userId,
-        type: memory.type,
-        title: memory.title,
-        content: memory.content,
-        importance: Math.max(1, Math.min(10, memory.importance || 5)),
-        metadata: memory.metadata || {},
-        source: 'auto',
-        summary_id: summary.id,
-        start_message_id: startMessageId,
-        end_message_id: endMessageId
-      }))
+      // 分离update和create操作
+      const memoriesToUpdate: any[] = []
+      const memoriesToCreate: any[] = []
 
-      // 批量插入记忆条目
-      const { data: insertedMemories, error: memoriesError } = await supabase
-        .from('chat_memories')
-        .insert(memoriesToInsert)
-        .select()
+      memoryEntries.forEach((memory: any, index: number) => {
+        const action = memory.action || 'create'
+        const existingId = memory.existing_id
 
-      if (memoriesError) {
-        console.error('保存记忆条目失败:', memoriesError)
-        // 记忆保存失败不影响摘要生成，只记录警告
-      } else {
-        savedMemories = insertedMemories || []
-        console.log('成功保存', savedMemories.length, '个记忆条目')
+        console.log(`🔍 处理记忆条目 #${index + 1}:`, {
+          action,
+          existingId,
+          title: memory.title,
+          type: memory.type
+        })
+
+        if (action === 'update' && existingId) {
+          // 更新现有记忆
+          memoriesToUpdate.push({
+            id: existingId,
+            title: memory.title,
+            content: memory.content,
+            importance: Math.max(1, Math.min(10, memory.importance || 5)),
+            metadata: memory.metadata || {},
+            updated_at: new Date().toISOString()
+          })
+          console.log(`📝 准备更新记忆: ${existingId} - ${memory.title}`)
+        } else {
+          // 创建新记忆
+          if (action === 'update' && !existingId) {
+            console.warn(`⚠️ 记忆标记为update但缺少existing_id，将作为新记忆创建: ${memory.title}`)
+          }
+          memoriesToCreate.push({
+            id: `${summary.id}_${index}_${Date.now()}`,
+            session_id: sessionId,
+            user_id: userId,
+            type: memory.type,
+            title: memory.title,
+            content: memory.content,
+            importance: Math.max(1, Math.min(10, memory.importance || 5)),
+            metadata: memory.metadata || {},
+            source: 'auto',
+            summary_id: summary.id,
+            start_message_id: startMessageId,
+            end_message_id: endMessageId
+          })
+          console.log(`➕ 准备创建新记忆: ${memory.title}`)
+        }
+      })
+
+      // 执行更新操作
+      for (const memory of memoriesToUpdate) {
+        // 先获取现有记忆的完整内容
+        const { data: existingMemory } = await supabase
+          .from('chat_memories')
+          .select('*')
+          .eq('id', memory.id)
+          .eq('user_id', userId)
+          .single()
+
+        if (!existingMemory) {
+          console.error(`❌ 找不到要更新的记忆: ${memory.id}`)
+          continue
+        }
+
+        // 智能合并内容：采用保守策略，优先保留旧内容
+        let mergedContent = memory.content
+        const hasNewAddition = memory.content.includes('【新增】') || memory.content.includes('[新增]')
+
+        if (hasNewAddition) {
+          // 情况1：AI 明确标记了新增部分，直接使用AI返回的内容（包含旧+新）
+          mergedContent = memory.content
+          console.log(`📝 检测到【新增】标记，使用AI整合的内容`)
+        } else {
+          // AI 没有标记新增，需要判断如何合并
+
+          // 检查新内容长度是否明显增加（说明AI可能整合了旧内容+新信息）
+          const oldLength = existingMemory.content.length
+          const newLength = memory.content.length
+          const lengthRatio = newLength / oldLength
+
+          // 检查关键词覆盖率
+          const oldContentWords = existingMemory.content.split(/\s+|。|，|、|；/).filter((w: string) => w.length > 2)
+          const significantWords = oldContentWords.filter((w: string) => w.length > 3) // 更有意义的词
+
+          // 计算旧内容有多少比例被新内容包含
+          const matchedWords = significantWords.filter((word: string) => memory.content.includes(word))
+          const coverageRatio = significantWords.length > 0 ? matchedWords.length / significantWords.length : 0
+
+          console.log(`📊 内容分析: 旧=${oldLength}字, 新=${newLength}字, 长度比=${lengthRatio.toFixed(2)}, 覆盖率=${(coverageRatio * 100).toFixed(1)}%`)
+
+          if (lengthRatio >= 1.2 && coverageRatio >= 0.7) {
+            // 情况2：新内容明显更长(+20%)且包含70%以上的关键词 → AI做了完整整合
+            mergedContent = memory.content
+            console.log(`✅ 新内容更长且覆盖率高，使用新内容`)
+          } else if (coverageRatio >= 0.9) {
+            // 情况3：新内容包含90%以上的关键词，即使长度相近 → AI重写了内容
+            mergedContent = memory.content
+            console.log(`✅ 覆盖率很高(${(coverageRatio * 100).toFixed(1)}%)，使用新内容`)
+          } else {
+            // 情况4：保守策略 - 追加到旧内容，不覆盖
+            // 这样可以确保不丢失任何信息，即使格式可能不够完美
+            mergedContent = `${existingMemory.content}\n\n【新增信息】${memory.content}`
+            console.log(`⚠️ 覆盖率较低(${(coverageRatio * 100).toFixed(1)}%)，追加新内容保护旧信息`)
+          }
+        }
+
+        // 合并 metadata（累积，不丢失旧字段）
+        const mergedMetadata = {
+          ...existingMemory.metadata,
+          ...memory.metadata
+        }
+
+        // 【版本控制】先保存当前版本到历史表
+        const currentVersion = existingMemory.current_version || 1
+        const newVersion = currentVersion + 1
+
+        try {
+          const { error: versionError } = await supabase
+            .from('chat_memory_versions')
+            .insert({
+              id: `${memory.id}_v${currentVersion}_${Date.now()}`,
+              memory_id: memory.id,
+              version: currentVersion,
+              title: existingMemory.title,
+              content: existingMemory.content,
+              importance: existingMemory.importance,
+              metadata: existingMemory.metadata,
+              summary_id: existingMemory.summary_id,
+              created_by_summary_id: existingMemory.summary_id,
+              start_message_id: existingMemory.start_message_id,
+              end_message_id: existingMemory.end_message_id,
+              created_at: new Date().toISOString()
+            })
+
+          if (versionError) {
+            console.warn(`⚠️ 保存版本历史失败（将继续更新）:`, versionError)
+          } else {
+            console.log(`📚 已保存版本 v${currentVersion} 到历史表`)
+          }
+        } catch (versionSaveError) {
+          console.warn(`⚠️ 版本保存异常:`, versionSaveError)
+        }
+
+        // 更新主记忆表
+        const { error: updateError } = await supabase
+          .from('chat_memories')
+          .update({
+            title: memory.title,
+            content: mergedContent,
+            importance: memory.importance,
+            metadata: mergedMetadata,
+            summary_id: summary.id, // 更新为当前摘要ID
+            current_version: newVersion, // 增加版本号
+            start_message_id: startMessageId, // 更新消息范围
+            end_message_id: endMessageId,
+            updated_at: memory.updated_at
+          })
+          .eq('id', memory.id)
+          .eq('user_id', userId)
+
+        if (updateError) {
+          console.error(`更新记忆${memory.id}失败:`, updateError)
+        } else {
+          // 获取更新后的记忆
+          const { data: updated } = await supabase
+            .from('chat_memories')
+            .select('*')
+            .eq('id', memory.id)
+            .single()
+
+          if (updated) {
+            savedMemories.push(updated)
+            console.log(`✅ 成功更新记忆: ${memory.id} - ${memory.title}`)
+            console.log(`   旧内容长度: ${existingMemory.content.length}, 新内容长度: ${mergedContent.length}`)
+          }
+        }
       }
+
+      // 批量插入新建的记忆条目
+      if (memoriesToCreate.length > 0) {
+        const { data: insertedMemories, error: memoriesError } = await supabase
+          .from('chat_memories')
+          .insert(memoriesToCreate)
+          .select()
+
+        if (memoriesError) {
+          console.error('保存新记忆条目失败:', memoriesError)
+        } else {
+          savedMemories.push(...(insertedMemories || []))
+          console.log('成功创建', insertedMemories?.length || 0, '个新记忆条目')
+        }
+      }
+
+      console.log(`✅ 记忆处理完成: ${memoriesToUpdate.length}个更新, ${memoriesToCreate.length}个新建, 共${savedMemories.length}个记忆`)
     }
 
     return NextResponse.json({

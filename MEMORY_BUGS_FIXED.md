@@ -7,14 +7,21 @@
 - 消息计数显示不准确（显示1000，实际可能有1500+）
 - 无法为第1000条之后的消息生成摘要
 - 手动范围选择器最大值被限制在1000
+- **智能推荐扫描功能**也只能扫描到前1000条消息
 
 ### 根本原因
 Supabase查询默认有**1000条记录的限制**。在加载消息时，代码没有使用分批加载，导致只获取了前1000条。
 
-**位置**: `src/app/chat/[sessionId]/memory/page.tsx:269-284`
+**影响的函数**:
+1. 初始消息加载 - `page.tsx:269-303`
+2. 智能推荐扫描 - `page.tsx:938-1017`
+
+**位置**: `src/app/chat/[sessionId]/memory/page.tsx`
 
 ### 解决方案
-修改消息加载逻辑，使用分批查询：
+修改消息加载逻辑，使用分批查询。需要修改**两个地方**：
+
+#### 修复1: 初始消息加载
 
 ```typescript
 // 修改前
@@ -42,15 +49,65 @@ for (let i = 0; i < batches; i++) {
     .eq('session_id', sessionId)
     .order('created_at', { ascending: true })
     .range(i * batchSize, (i + 1) * batchSize - 1)
-  // 处理每批数据...
+
+  if (batchData) {
+    allMessages.push(...batchData.map((msg, batchIndex) => ({
+      id: msg.id,
+      index: i * batchSize + batchIndex + 1
+    })))
+  }
 }
 ```
+
+**位置**: `src/app/chat/[sessionId]/memory/page.tsx:269-303`
+
+#### 修复2: 智能推荐扫描功能
+
+```typescript
+// 修改前 (calculateSummaryRanges函数)
+const { data: allMessages } = await supabase
+  .from('chat_messages')
+  .select('id')
+  .eq('session_id', sessionId)
+  .order('created_at', { ascending: true })
+// 只返回1000条
+
+// 修改后
+const { count: totalCount } = await supabase
+  .from('chat_messages')
+  .select('id', { count: 'exact', head: true })
+  .eq('session_id', sessionId)
+
+const allMessages: { id: number }[] = []
+const batchSize = 1000
+const batches = Math.ceil(totalCount / batchSize)
+
+for (let i = 0; i < batches; i++) {
+  const { data: batchData } = await supabase
+    .from('chat_messages')
+    .select('id')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: true })
+    .range(i * batchSize, (i + 1) * batchSize - 1)
+
+  if (batchData) {
+    allMessages.push(...batchData)
+  }
+}
+
+console.log(`📊 扫描范围: 加载了 ${allMessages.length} / ${totalCount} 条消息ID`)
+```
+
+**位置**: `src/app/chat/[sessionId]/memory/page.tsx:938-976`
 
 ### 效果
 - ✅ 准确显示实际的消息总数（1500、2000等）
 - ✅ 可以为任意范围的消息生成摘要
 - ✅ 手动范围选择器支持完整范围
-- ✅ 控制台显示加载进度：`📊 加载了 1500 / 1500 条消息ID`
+- ✅ **智能推荐扫描可以识别1000条以上的未摘要范围**
+- ✅ 控制台显示加载进度：
+  - 初始加载: `📊 加载了 1500 / 1500 条消息ID`
+  - 扫描功能: `📊 扫描范围: 加载了 1500 / 1500 条消息ID`
 
 ---
 

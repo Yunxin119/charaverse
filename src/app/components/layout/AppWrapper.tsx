@@ -10,7 +10,12 @@ import { PWAInstallPrompt, IOSInstallPrompt } from '../pwa/PWAInstallPrompt'
 export function AppWrapper({ children }: { children: React.ReactNode }) {
   const { user } = useAppSelector((state) => state.auth)
   const pathname = usePathname()
-  
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   // 不显示任何布局的页面（登录等）
   const noLayoutPages = ['/login', '/register']
   const shouldShowLayout = user && !noLayoutPages.includes(pathname)
@@ -32,6 +37,15 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
   
   // 聊天页面（特殊的全屏处理）
   const isChatPage = pathname.startsWith('/chat/') && pathname !== '/chat'
+
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!mounted) {
+    return (
+      <>
+        {children}
+      </>
+    )
+  }
 
   if (!shouldShowLayout) {
     return (

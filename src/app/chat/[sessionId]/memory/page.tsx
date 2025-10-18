@@ -261,12 +261,13 @@ export default function MemoryManagePage() {
         const summaryData = await getSummaries(sessionId, user.id)
         setSummaries(summaryData as ChatSummary[])
 
-        // 加载记忆表格数据
+        // 加载记忆表格数据（只加载启用的）
         const { data: memoryData } = await supabase
           .from('chat_memories')
           .select('*')
           .eq('session_id', sessionId)
           .eq('user_id', user.id)
+          .eq('is_enabled', true)
 
         if (memoryData) {
           // 需要根据摘要的聊天范围排序记忆表格
@@ -939,14 +940,38 @@ export default function MemoryManagePage() {
     if (!user) return
 
     try {
-      // 获取所有消息ID
-      const { data: allMessages } = await supabase
+      // 获取消息总数
+      const { count: totalCount } = await supabase
         .from('chat_messages')
-        .select('id')
+        .select('id', { count: 'exact', head: true })
         .eq('session_id', sessionId)
-        .order('created_at', { ascending: true })
 
-      if (!allMessages || allMessages.length === 0) {
+      if (!totalCount || totalCount === 0) {
+        setSummaryRanges([])
+        return
+      }
+
+      // 分批获取所有消息ID（每批1000条）
+      const allMessages: { id: number }[] = []
+      const batchSize = 1000
+      const batches = Math.ceil(totalCount / batchSize)
+
+      for (let i = 0; i < batches; i++) {
+        const { data: batchData } = await supabase
+          .from('chat_messages')
+          .select('id')
+          .eq('session_id', sessionId)
+          .order('created_at', { ascending: true })
+          .range(i * batchSize, (i + 1) * batchSize - 1)
+
+        if (batchData) {
+          allMessages.push(...batchData)
+        }
+      }
+
+      console.log(`📊 扫描范围: 加载了 ${allMessages.length} / ${totalCount} 条消息ID`)
+
+      if (allMessages.length === 0) {
         setSummaryRanges([])
         return
       }
@@ -964,7 +989,7 @@ export default function MemoryManagePage() {
 
       // 找出未被摘要的消息段
       const unsummarizedRanges: {start: number, end: number, count: number}[] = []
-      let currentStart = allMessages[0].id
+      let currentStart: number | null = allMessages[0].id
 
       for (let i = 0; i < allMessages.length; i++) {
         const messageId = allMessages[i].id
@@ -1039,8 +1064,8 @@ export default function MemoryManagePage() {
       return { valid: false, message: `序号范围应在 1-${messageCount} 之间` }
     }
 
-    if (endNum - startNum < 10) {
-      return { valid: false, message: '最少需要选择10条消息' }
+    if (endNum - startNum < 2) {
+      return { valid: false, message: '最少需要选择2条消息' }
     }
 
     // 检查是否与已有摘要范围重叠
@@ -1227,36 +1252,123 @@ export default function MemoryManagePage() {
     }
   }
 
-  // 删除摘要
+  // 删除摘要（软删除 + 版本回退）
   const handleDeleteSummary = async (summaryId: number) => {
-    if (!confirm('确定要删除这个摘要吗？\n\n⚠️ 删除后：\n1. 相关的记忆条目也会被删除\n2. 后续生成的新摘要将不会参考此摘要内容\n3. 智能上下文将重新计算覆盖范围')) return
+    if (!confirm('确定要删除这个摘要吗？\n\n⚠️ 删除后：\n1. 摘要将被隐藏\n2. 被此摘要更新的记忆将回退到上一版本\n3. 智能上下文将重新计算覆盖范围\n\n💡 提示：所有数据都会保留，可以恢复')) return
 
     try {
-      // 删除相关记忆条目
-      await supabase
+      console.log(`🗑️ 开始删除摘要: ${summaryId}`)
+
+      // 1. 查找所有 summary_id = summaryId 的记忆
+      const { data: affectedMemories } = await supabase
         .from('chat_memories')
-        .delete()
+        .select('id, title, current_version, summary_id')
         .eq('summary_id', summaryId)
         .eq('user_id', user!.id)
 
-      // 删除摘要
-      const { error } = await supabase
+      console.log(`📊 找到 ${affectedMemories?.length || 0} 个受影响的记忆`)
+
+      // 2. 对每个记忆进行处理
+      if (affectedMemories && affectedMemories.length > 0) {
+        for (const memory of affectedMemories) {
+          const currentVersion = memory.current_version || 1
+
+          if (currentVersion > 1) {
+            // 情况A：有历史版本，回退到上一版本
+            console.log(`🔄 回退记忆 ${memory.id} 从 v${currentVersion} 到 v${currentVersion - 1}`)
+
+            // 查找上一个版本
+            const { data: previousVersion } = await supabase
+              .from('chat_memory_versions')
+              .select('*')
+              .eq('memory_id', memory.id)
+              .eq('version', currentVersion - 1)
+              .single()
+
+            if (previousVersion) {
+              // 回退到上一版本的内容
+              const { error: revertError } = await supabase
+                .from('chat_memories')
+                .update({
+                  title: previousVersion.title,
+                  content: previousVersion.content,
+                  importance: previousVersion.importance,
+                  metadata: previousVersion.metadata,
+                  summary_id: previousVersion.summary_id,
+                  current_version: currentVersion - 1,
+                  start_message_id: previousVersion.start_message_id,
+                  end_message_id: previousVersion.end_message_id,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', memory.id)
+                .eq('user_id', user!.id)
+
+              if (revertError) {
+                console.error(`回退记忆 ${memory.id} 失败:`, revertError)
+              } else {
+                console.log(`✅ 成功回退记忆: ${memory.title} 到 v${currentVersion - 1}`)
+              }
+
+              // 删除当前版本的历史记录
+              await supabase
+                .from('chat_memory_versions')
+                .delete()
+                .eq('memory_id', memory.id)
+                .eq('version', currentVersion)
+            } else {
+              console.warn(`⚠️ 找不到 ${memory.id} 的 v${currentVersion - 1} 版本，禁用记忆`)
+              // 找不到历史版本，禁用记忆
+              await supabase
+                .from('chat_memories')
+                .update({ is_enabled: false })
+                .eq('id', memory.id)
+                .eq('user_id', user!.id)
+            }
+          } else {
+            // 情况B：这是第一个版本（由此摘要创建），禁用记忆
+            console.log(`🗑️ 禁用记忆 ${memory.id} (v1, 由此摘要创建)`)
+            await supabase
+              .from('chat_memories')
+              .update({ is_enabled: false })
+              .eq('id', memory.id)
+              .eq('user_id', user!.id)
+          }
+        }
+      }
+
+      // 3. 标记摘要为不活跃（软删除）
+      const { error: updateError } = await supabase
         .from('chat_summaries')
-        .delete()
+        .update({ is_active: false })
         .eq('id', summaryId)
         .eq('user_id', user!.id)
 
-      if (error) throw error
+      if (updateError) {
+        console.error('标记摘要失败:', updateError)
+        throw updateError
+      }
 
-      // 更新本地状态
-      setSummaries(prev => prev.filter(s => s.id !== summaryId))
-      setMemories(prev => prev.filter(m => m.summary_id !== summaryId))
+      console.log(`✅ 摘要已标记为不活跃: ${summaryId}`)
 
-      // 重新计算摘要范围和智能上下文状态
+      // 4. 刷新界面
+      const summaryData = await getSummaries(sessionId, user!.id)
+      setSummaries(summaryData as ChatSummary[])
+
+      const { data: memoryData } = await supabase
+        .from('chat_memories')
+        .select('*')
+        .eq('session_id', sessionId)
+        .eq('user_id', user!.id)
+        .eq('is_enabled', true)
+
+      if (memoryData) {
+        setMemories(memoryData)
+      }
+
       await calculateSummaryRanges()
       await calculateContextStatus()
 
-      alert('摘要删除成功！')
+      alert('摘要删除成功！\n\n✨ 记忆已回退到上一版本')
     } catch (error) {
       console.error('删除摘要失败:', error)
       alert('删除失败，请重试')

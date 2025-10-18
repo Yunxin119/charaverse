@@ -35,14 +35,16 @@ import { uploadCharacterAvatar } from '../../lib/avatarUpload'
 import { ScriptCharacter } from '../../lib/supabase'
 
 interface BasicInfo {
-  name: string // 剧本名称
-  description: string // 剧本描述
-  avatar_url: string // 剧本封面
+  name: string // 角色名称
+  description: string // 角色描述
+  avatar_url: string // 角色头像
   is_public: boolean
-  introduction: string // 剧本说明，给其他用户看的介绍
-  script_type: 'single' | 'multi' // 剧本类型
+  introduction: string // 角色说明
+  initialMessage?: string // 初始对话
   age?: string // 角色年龄
   gender?: 'male' | 'female' | 'none' | 'other' // 角色性别
+  keywords?: string[] // 角色关键词
+  script_type?: 'single' | 'multi' // 剧本类型
 }
 
 interface PromptModule {
@@ -68,24 +70,8 @@ export default function NewCharacterPage() {
     avatar_url: '',
     is_public: false,
     introduction: '',
-    script_type: 'single'
+    keywords: []
   })
-
-  // 剧本角色列表
-  const [scriptCharacters, setScriptCharacters] = useState<ScriptCharacter[]>([
-    {
-      id: '1',
-      name: '',
-      description: '',
-      avatar_url: '',
-      personality: {
-        traits: [],
-        speaking_style: '',
-        background: ''
-      },
-      relationships: []
-    }
-  ])
 
   // 默认只有一个用户角色设定模块
   const [modules, setModules] = useState<PromptModule[]>([
@@ -129,53 +115,6 @@ export default function NewCharacterPage() {
       ...prev,
       [field]: value
     }))
-  }
-
-  // 剧本角色管理函数
-  const addScriptCharacter = () => {
-    const newId = Date.now().toString()
-    setScriptCharacters(prev => [...prev, {
-      id: newId,
-      name: '',
-      description: '',
-      avatar_url: '',
-      personality: {
-        traits: [],
-        speaking_style: '',
-        background: ''
-      },
-      relationships: []
-    }])
-  }
-
-  const updateScriptCharacter = (id: string, field: keyof ScriptCharacter, value: any) => {
-    setScriptCharacters(prev => prev.map(char =>
-      char.id === id ? { ...char, [field]: value } : char
-    ))
-  }
-
-  const updateScriptCharacterPersonality = (id: string, field: 'traits' | 'speaking_style' | 'background', value: string[] | string | undefined) => {
-    setScriptCharacters(prev => prev.map(char => {
-      if (char.id === id) {
-        return {
-          ...char,
-          personality: { 
-            traits: char.personality?.traits || [],
-            speaking_style: char.personality?.speaking_style,
-            background: char.personality?.background,
-            ...char.personality,
-            [field]: value 
-          }
-        } as ScriptCharacter
-      }
-      return char
-    }))
-  }
-
-  const removeScriptCharacter = (id: string) => {
-    if (scriptCharacters.length > 1) {
-      setScriptCharacters(prev => prev.filter(char => char.id !== id))
-    }
   }
 
 
@@ -264,11 +203,10 @@ export default function NewCharacterPage() {
         return module
       })
 
-      // 构建完整的 prompt template，包含剧本角色信息
+      // 构建完整的 prompt template
       const promptTemplate = {
         basic_info: basicInfo,
-        modules: processedModules,
-        script_characters: scriptCharacters
+        modules: processedModules
       }
 
       const { data, error } = await supabase
@@ -278,9 +216,7 @@ export default function NewCharacterPage() {
           name: basicInfo.name,
           avatar_url: basicInfo.avatar_url,
           prompt_template: promptTemplate,
-          is_public: basicInfo.is_public,
-          script_type: basicInfo.script_type,
-          script_characters: scriptCharacters
+          is_public: basicInfo.is_public
         })
         .select()
         .single()
@@ -437,9 +373,8 @@ export default function NewCharacterPage() {
         
         <motion.div variants={itemVariants}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="basic">剧本信息</TabsTrigger>
-              <TabsTrigger value="characters">角色设定</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="basic">基本信息</TabsTrigger>
               <TabsTrigger value="settings">其他设定</TabsTrigger>
             </TabsList>
 
@@ -511,6 +446,22 @@ export default function NewCharacterPage() {
                     <p className="text-xs text-slate-500 dark:text-slate-400">此介绍会在剧本列表中显示，帮助其他用户了解剧本</p>
                   </div>
 
+                  {/* Initial Message */}
+                  <div className="space-y-2">
+                    <Label htmlFor="initialMessage" className="flex items-center">
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      初始对话（可选）
+                    </Label>
+                    <Textarea
+                      id="initialMessage"
+                      placeholder="设置角色的开场白，如：你好，我是...。如果不填写，AI将自动生成第一句话。"
+                      value={basicInfo.initialMessage || ''}
+                      onChange={(e) => handleBasicInfoChange('initialMessage', e.target.value)}
+                      className="min-h-[80px] resize-none"
+                    />
+                    <p className="text-xs text-slate-500 dark:text-slate-400">每位用户进入聊天时都会看到这句话，让角色体验更一致</p>
+                  </div>
+
                   {/* Public Setting */}
                   <div className="flex items-center space-x-3">
                     <input
@@ -526,127 +477,6 @@ export default function NewCharacterPage() {
                         <p className="text-sm text-slate-500 dark:text-slate-400">允许其他用户发现和使用你的剧本</p>
                       </div>
                     </Label>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Characters Definition Tab */}
-            <TabsContent value="characters" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>角色设定</CardTitle>
-                      <CardDescription>
-                        {basicInfo.script_type === 'single'
-                          ? '定义剧本中的主要角色'
-                          : '定义剧本中的所有角色，支持多角色互动'
-                        }
-                      </CardDescription>
-                    </div>
-                    {basicInfo.script_type === 'multi' && (
-                      <Button
-                        type="button"
-                        onClick={addScriptCharacter}
-                        size="sm"
-                        variant="outline"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        添加角色
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {scriptCharacters.map((character, index) => (
-                      <motion.div
-                        key={character.id}
-                        variants={itemVariants}
-                        className="border border-slate-200 dark:border-slate-600 rounded-lg p-4 space-y-4 bg-white dark:bg-slate-800"
-                      >
-                        {/* Character Header */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                              <Bot className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                            </div>
-                            <div>
-                              <h3 className="font-medium">
-                                {character.name || `角色 ${index + 1}`}
-                              </h3>
-                              <p className="text-sm text-gray-500">
-                                {basicInfo.script_type === 'single' ? '主角色' : `角色 #${index + 1}`}
-                              </p>
-                            </div>
-                          </div>
-
-                          {basicInfo.script_type === 'multi' && scriptCharacters.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeScriptCharacter(character.id)}
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-
-                        {/* Character Form */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>角色名称 *</Label>
-                            <Input
-                              placeholder="角色名称"
-                              value={character.name}
-                              onChange={(e) => updateScriptCharacter(character.id, 'name', e.target.value)}
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label>角色描述</Label>
-                            <Input
-                              placeholder="简短描述角色特点"
-                              value={character.description || ''}
-                              onChange={(e) => updateScriptCharacter(character.id, 'description', e.target.value)}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>性格特征</Label>
-                          <Textarea
-                            placeholder="描述角色的性格、行为特点、说话风格等..."
-                            value={character.personality?.speaking_style || ''}
-                            onChange={(e) => updateScriptCharacterPersonality(character.id, 'speaking_style', e.target.value)}
-                            className="min-h-[100px] resize-none"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>角色背景</Label>
-                          <Textarea
-                            placeholder="角色的背景故事、经历、身份等..."
-                            value={character.personality?.background || ''}
-                            onChange={(e) => updateScriptCharacterPersonality(character.id, 'background', e.target.value)}
-                            className="min-h-[80px] resize-none"
-                          />
-                        </div>
-
-                        {basicInfo.script_type === 'multi' && scriptCharacters.length > 1 && (
-                          <div className="space-y-2">
-                            <Label>与其他角色的关系</Label>
-                            <Textarea
-                              placeholder="描述该角色与剧本中其他角色的关系、互动方式等..."
-                              className="min-h-[60px] resize-none"
-                            />
-                          </div>
-                        )}
-                      </motion.div>
-                    ))}
                   </div>
                 </CardContent>
               </Card>
