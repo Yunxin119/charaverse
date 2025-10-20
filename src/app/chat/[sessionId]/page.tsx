@@ -158,10 +158,11 @@ export default function ChatSessionPage() {
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<number>>(new Set())
 
   // 用于跟踪消息变化类型的状态
-  const [previousMessageCount, setPreviousMessageCount] = useState(0)
   const [isLazyLoading, setIsLazyLoading] = useState(false)
   const [lastScrollTop, setLastScrollTop] = useState(0)
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isLoadingHistoryRef = useRef(false) // 标记是否正在加载历史消息
+  const lastMessageIdRef = useRef<number | null>(null) // 记录最后一条消息的ID
 
   // API管理弹窗状态
   const [showApiModal, setShowApiModal] = useState(false)
@@ -289,41 +290,43 @@ export default function ChatSessionPage() {
     return processedContent
   }
 
-  // 滚动到底部 - 只有当新增消息时才滚动
+  // 滚动到底部 - 只有当新增消息时才滚动（检查最后一条消息的ID）
   useEffect(() => {
-    if (!isLoadingMoreMessages && !isLazyLoading && hasStarted && messages.length > 0) {
-      // 检查是否是新增消息（消息数量增加且最后一条消息是新的）
-      const isNewMessage = messages.length > previousMessageCount
+    if (!hasStarted || messages.length === 0) return
 
-      if (isNewMessage) {
-        console.log('🔄 检测到新消息，滚动到底部', {
-          current: messages.length,
-          previous: previousMessageCount,
-          isLazyLoading,
-          isLoadingMoreMessages
-        })
-        // 添加一个小延迟确保DOM已经渲染完成
-        setTimeout(() => {
-          scrollToBottom()
-        }, 100)
-      } else {
-        console.log('📜 消息数量变化但非新增，跳过滚动', {
-          current: messages.length,
-          previous: previousMessageCount,
-          isLazyLoading,
-          isLoadingMoreMessages
-        })
-      }
+    const lastMessage = messages[messages.length - 1]
+    const lastMessageId = lastMessage?.id
 
-      // 更新消息数量记录
-      setPreviousMessageCount(messages.length)
-    } else if (isLazyLoading || isLoadingMoreMessages) {
-      console.log('🚫 正在加载状态，完全跳过滚动逻辑', {
+    // 如果是正在加载历史消息，完全跳过滚动逻辑
+    if (isLoadingHistoryRef.current || isLazyLoading || isLoadingMoreMessages) {
+      console.log('🚫 正在加载历史消息，跳过滚动', {
+        isLoadingHistory: isLoadingHistoryRef.current,
         isLazyLoading,
         isLoadingMoreMessages
       })
+      return
     }
-  }, [messages, isLoadingMoreMessages, isLazyLoading, hasStarted, previousMessageCount])
+
+    // 检查是否是真正的新消息（最后一条消息的ID改变了）
+    if (lastMessageId && lastMessageId !== lastMessageIdRef.current) {
+      console.log('🔄 检测到新消息，滚动到底部', {
+        newMessageId: lastMessageId,
+        oldMessageId: lastMessageIdRef.current
+      })
+
+      lastMessageIdRef.current = lastMessageId
+
+      // 添加一个小延迟确保DOM已经渲染完成
+      setTimeout(() => {
+        scrollToBottom()
+      }, 100)
+    } else {
+      console.log('📜 消息列表更新但非新消息，跳过滚动', {
+        lastMessageId,
+        lastMessageIdRef: lastMessageIdRef.current
+      })
+    }
+  }, [messages, isLazyLoading, isLoadingMoreMessages, hasStarted])
 
   // 页面初始化完成后自动滚动到底部
   useEffect(() => {
@@ -331,13 +334,16 @@ export default function ChatSessionPage() {
       // 页面初始化完成，立即滚动到底部
       setTimeout(() => {
         scrollToBottom('instant')
-        // 初始化时设置消息数量基准
-        setPreviousMessageCount(messages.length)
+        // 初始化时设置最后一条消息ID
+        const lastMessage = messages[messages.length - 1]
+        if (lastMessage) {
+          lastMessageIdRef.current = lastMessage.id
+        }
       }, 200)
     }
-  }, [hasStarted, isLoadingMessages, messages.length])
+  }, [hasStarted, isLoadingMessages])
 
-  // 懒加载：监听滚动事件
+  // 懒加载：监听滚动事件 - 改进版本
   useEffect(() => {
     const container = messagesContainerRef.current
     if (!container || !hasStarted) return
@@ -353,17 +359,11 @@ export default function ChatSessionPage() {
       // 防抖处理，避免频繁触发
       scrollTimeoutRef.current = setTimeout(() => {
         // 检查所有必要条件
-        if (!hasMoreMessages || isLoadingMoreMessages || isLazyLoading || messages.length === 0) {
-          console.log('🚫 跳过lazy loading:', {
-            hasMoreMessages,
-            isLoadingMoreMessages,
-            isLazyLoading,
-            messagesLength: messages.length
-          })
+        if (!hasMoreMessages || isLoadingMoreMessages || isLazyLoading || messages.length === 0 || isLoadingHistoryRef.current) {
           return
         }
 
-        // 增加滚动阈值，更容易触发加载
+        // 滚动阈值：距离顶部200px时触发
         const threshold = 200
         const isNearTop = scrollTop < threshold
 
@@ -372,49 +372,70 @@ export default function ChatSessionPage() {
         setLastScrollTop(scrollTop)
 
         if (isNearTop && isScrollingUp) {
-          console.log('📜 触发lazy loading条件:', {
+          console.log('📜 触发lazy loading:', {
             scrollTop,
             threshold,
-            isScrollingUp,
-            hasMoreMessages,
-            isLoadingMoreMessages,
-            isLazyLoading
+            messagesCount: messages.length
           })
 
+          // 设置标记，防止滚动干扰
+          isLoadingHistoryRef.current = true
           setIsLazyLoading(true)
+
+          // 记录当前的滚动位置和容器高度
+          const currentScrollTop = scrollTop
           const currentScrollHeight = scrollHeight
+
+          // 记录第一条可见消息的ID，用于后续定位
+          const firstVisibleMessageId = messages[0]?.id
 
           // 获取最早消息的时间戳
           const earliestMessage = messages[0]
           const beforeTimestamp = earliestMessage?.created_at
 
-          console.log('📜 开始lazy loading历史消息，最早消息时间:', beforeTimestamp)
+          console.log('📜 开始加载历史消息，最早消息:', {
+            id: earliestMessage?.id,
+            timestamp: beforeTimestamp
+          })
 
           dispatch(fetchMoreMessages({
             sessionId,
             beforeTimestamp
           }))
           .unwrap()
-          .then(() => {
-            // 加载完成后，保持滚动位置（防止跳到顶部）
-            setTimeout(() => {
-              const newScrollHeight = container.scrollHeight
-              const scrollDiff = newScrollHeight - currentScrollHeight
-              if (scrollDiff > 0) {
-                container.scrollTop = scrollTop + scrollDiff
-                console.log('✅ lazy loading完成，调整滚动位置:', {
-                  oldScrollTop: scrollTop,
-                  newScrollTop: scrollTop + scrollDiff,
-                  scrollDiff
-                })
-              }
-              setIsLazyLoading(false)
-            }, 100)
+          .then((result) => {
+            // 使用 requestAnimationFrame 确保在 DOM 更新后执行
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                const newScrollHeight = container.scrollHeight
+                const heightDiff = newScrollHeight - currentScrollHeight
+
+                if (heightDiff > 0) {
+                  // 调整滚动位置，保持用户看到的内容不变
+                  container.scrollTop = currentScrollTop + heightDiff
+
+                  console.log('✅ 历史消息加载完成，滚动位置已调整:', {
+                    加载消息数: result?.length || 0,
+                    旧高度: currentScrollHeight,
+                    新高度: newScrollHeight,
+                    高度差: heightDiff,
+                    旧滚动位置: currentScrollTop,
+                    新滚动位置: currentScrollTop + heightDiff
+                  })
+                } else {
+                  console.log('⚠️ 容器高度未变化，可能没有加载到新消息')
+                }
+
+                // 重置加载标记
+                isLoadingHistoryRef.current = false
+                setIsLazyLoading(false)
+              })
+            })
           })
           .catch((error) => {
-            console.error('❌ lazy loading失败:', error)
+            console.error('❌ 加载历史消息失败:', error)
+            isLoadingHistoryRef.current = false
             setIsLazyLoading(false)
-            // 可以在这里添加用户提示
           })
         }
       }, 150) // 150ms防抖延迟

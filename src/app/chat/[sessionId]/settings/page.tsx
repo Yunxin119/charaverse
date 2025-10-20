@@ -408,8 +408,22 @@ export default function ChatSettingsPage() {
           />
         </div>
 
+        {/* Chat History */}
+        <div
+          className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700"
+          onClick={() => router.push(`/chat/${sessionId}/history`)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h4 className="text-sm font-medium text-slate-900 dark:text-white">聊天记录</h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400">查看完整的聊天历史</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+          </div>
+        </div>
+
         {/* Danger Zone */}
-        <div 
+        <div
           className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-50 dark:hover:bg-red-950/20"
           onClick={handleClearChat}
         >
