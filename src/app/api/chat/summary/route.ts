@@ -20,6 +20,23 @@ interface MemoryEntry {
   metadata?: any
 }
 
+// 定义风格示例（One-Shot Example），这是让AI学会你想要风格的关键
+const STYLE_EXAMPLE = `
+【风格参考范例】
+输入对话：
+程冉：(动作)靠在栏杆上，看你没穿鞋 (台词)“快憋死了...还是你聪明。”
+林叙：(动作)看高跟鞋 (台词)“还是脚踏实地好...冠军都溜了，酒会还开吗？”
+程冉：(动作)不在乎 (台词)“对着广告牌干杯就行...带你去吃路边摊？”
+林叙：(动作)扔掉鞋 (台词)“走吧，开溜。”
+(随后两人飙车去吃烧烤，并在车上有一段关于生活态度的对话)
+
+输出故事：
+香槟杯清脆的碰撞声，混杂着人群嗡嗡的低语，像一张无形的网，将程冉的耐心一寸寸勒紧...（省略中间描写）...他毫不犹豫地推门而出，带着凉意的晚风瞬间灌入肺里。
+然后，他看见了她。她背对着他，光着脚，白皙的脚踝在夜色中像一段冷玉...
+“快憋死了。”程冉走过去，靠在冰凉的栏杆上...
+（重点描写了两人飙车时那种宣泄的快感，引擎的轰鸣与心跳的共振，以及最后在烧烤摊那种回归人间烟火的松弛感，保留了“冠军”、“刑具”、“开溜”等核心词汇，将简短的几句“去吃烧烤”扩写成了充满张力的逃离名利场的情节。）
+`
+
 export async function POST(request: NextRequest) {
   try {
     // 创建Supabase客户端
@@ -117,8 +134,14 @@ export async function POST(request: NextRequest) {
     }
 
     const messageCount = messages.length
+    
+    // 格式化对话文本，保留更多细节供AI参考
     const conversationText = messages
-      .map(msg => `${msg.role === 'user' ? '用户' : characterName}: ${msg.content}`)
+      .map(msg => {
+         // 包含时间戳，帮助AI判断时间流逝
+         const timeStr = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''
+         return `[${timeStr}] ${msg.role === 'user' ? '用户' : characterName}: ${msg.content}`
+      })
       .join('\n')
 
     // 构建角色设定信息
@@ -184,14 +207,6 @@ export async function POST(request: NextRequest) {
             if (userPersonaModule.userRoleDetails) {
               userPersonaContext += `用户角色详细设定: ${userPersonaModule.userRoleDetails}\n`
             }
-            console.log('👤 找到用户角色设定:', {
-              name: userPersonaModule.userRoleName,
-              age: userPersonaModule.userRoleAge,
-              gender: userPersonaModule.userRoleGender,
-              hasDetails: !!userPersonaModule.userRoleDetails
-            })
-          } else {
-            console.log('ℹ️ 未找到用户角色设定模块')
           }
         }
       }
@@ -214,13 +229,9 @@ export async function POST(request: NextRequest) {
       // 如果是重新生成摘要，排除当前摘要本身
       if (summaryId) {
         summaryQuery = summaryQuery.neq('id', summaryId)
-        console.log(`🔄 重新生成摘要 ${summaryId}，排除自身`)
       }
 
       const { data: previousSummaries } = await summaryQuery.order('end_message_id', { ascending: true })
-
-      console.log(`🔍 查找之前的摘要: end_message_id < ${startMessageId}`)
-      console.log(`📚 找到${previousSummaries?.length || 0}个之前的摘要`)
 
       // 获取之前的重要记忆 - 只包含来自仍然有效的摘要的记忆
       const previousSummaryIds = previousSummaries?.map(s => s.id) || []
@@ -240,9 +251,6 @@ export async function POST(request: NextRequest) {
           .limit(30) // 增加到30条，让AI有更多上下文来判断是否需要合并
 
         previousMemories = memories
-        console.log(`🧠 找到${previousMemories?.length || 0}个现有记忆用于合并判断`)
-      } else {
-        console.log(`⚠️ 没有之前的摘要，跳过记忆查询`)
       }
 
       if (previousSummaries && previousSummaries.length > 0) {
@@ -250,10 +258,6 @@ export async function POST(request: NextRequest) {
         previousSummaries.forEach((s, i) => {
           previousContext += `摘要${i+1} (消息#${s.start_message_id}-#${s.end_message_id}): ${s.content}\n`
         })
-        console.log(`✅ 将参考${previousSummaries.length}个之前的摘要:`,
-          previousSummaries.map(s => `#${s.start_message_id}-#${s.end_message_id}`))
-      } else {
-        console.log(`ℹ️ 没有之前的摘要可供参考`)
       }
 
       if (previousMemories && previousMemories.length > 0) {
@@ -287,204 +291,106 @@ export async function POST(request: NextRequest) {
 
     let summaryPrompt = ''
     if (useMemoryTable) {
-      summaryPrompt = `你正在为一个角色扮演对话生成/更新记忆表格。务必基于角色设定和现有记忆来理解对话。
+      // ✏️✏️✏️ 核心修改：将故事模式指令注入到记忆表格模式中 ✏️✏️✏️
+      summaryPrompt = `你正在执行双重任务：1. 将对话改写为沉浸式小说（Story Mode）；2. 更新记忆数据库（Memory Table）。
 ${characterContext ? `${characterContext}\n` : ''}${userPersonaContext ? `${userPersonaContext}\n` : ''}${previousContext ? `${previousContext}\n` : ''}
-【核心原则：记忆深化而非碎片化】
-1. **优先更新现有记忆**: 如果当前对话涉及已有记忆的人物/事件，请UPDATE而不是创建新条目
-2. **识别珍贵记忆**: 重点记录以下内容（重要度8-10）：
-   - 角色亲口讲述的过去经历、童年故事、家庭背景
-   - 角色珍视的人、物、地点的深层原因
-   - 角色的梦想、遗憾、创伤、转折点
-   - 角色内心深处的想法、价值观、信念
-   - 双方共同经历的重要时刻（第一次、特殊场合）
-3. **记忆合并策略**:
-   - 同一人物的多次提及 → 合并到一个character记忆，累积细节
-   - 持续的情感状态 → 更新emotion记忆的强度和持续时间
-   - 关系的逐步发展 → 更新relationship记忆的好感度和信任度
-4. **避免记录**:
-   - 日常闲聊（"今天天气真好"）
-   - 重复性对话（已记录过的相同内容）
-   - 临时性信息（"我去倒杯水"）
+
+【任务一：生成故事化摘要 (summary字段)】
+参考以下风格范例，将对话转化为一段极具画面感和文学性的小说片段。
+${STYLE_EXAMPLE}
+
+**写作要求（至关重要）**：
+1. **密度自适应**：高密度对话（情感爆发、冲突、调情）必须大幅扩写（3-5倍字数），描写微表情、环境氛围、心理活动；低密度对话可概括一些。尽量保留所有有意义的对话。
+2. **叙事手法**：第三人称限制视角，"Show, Don't Tell"。保留所有剧情，不要省略。
+3. **内容处理**：保留关键台词（用「」标注）、动作细节。
+4. **篇幅**：2000-3000字（视对话细腻程度而定，宁可详尽不要简略）。
+5. **特殊要求**：如果有性行为，不要过度省略，保留比较详细的描述和剧情。
+
+【任务二：记忆表格更新 (memories字段)】
+基于对话内容和上述故事，更新结构化记忆。
+**核心原则**：记忆深化而非碎片化。优先UPDATE现有记忆。
+**珍贵记忆**（重要度8-10）：核心背景、关键转折、深层情感、未了心愿。
 
 【输出格式】
 请严格按照以下JSON格式返回：
 
 {
-  "summary": "这里是400-800字的故事化叙述摘要，采用小说般的叙事手法，保留重要对话原文（用「」标注），描写场景、情绪、细节，体现与之前对话的连续性。宁可详细也不要遗漏重要信息。",
+  "summary": "（在此处填入任务一要求的完整故事文本。请直接开始叙述，不要写前言。确保这是一篇精彩的小说，而不是枯燥的总结。）",
   "memories": [
     {
       "action": "update",
       "existing_id": "memory_123",
       "type": "character",
-      "title": "张三的完整人物画像",
-      "content": "张三，25岁设计师，高挑温和。【新增】今天她透露自己从小在单亲家庭长大，母亲独自抚养她很不容易，这也是她为什么如此独立坚强的原因。她最怀念小时候和妈妈一起做饭的时光。",
+      "title": "...",
+      "content": "...",
       "importance": 9,
-      "metadata": {"name": "张三", "relationship": "朋友", "appearance": "高挑", "personality": "温和、独立、坚强", "nickname": "小张", "age": "25岁", "occupation": "设计师", "background": "单亲家庭长大", "cherished_memory": "和妈妈做饭"}
+      "metadata": {...}
     },
-    {
-      "action": "create",
-      "type": "character",
-      "title": "新角色-李四",
-      "content": "第一次提到的新角色，基本信息...",
-      "importance": 7,
-      "metadata": {"name": "李四", "relationship": "同事"}
-    },
-    {
-      "type": "event",
-      "title": "事件标题",
-      "content": "事件详细描述，包括时间、地点、参与者、结果",
-      "importance": 7,
-      "metadata": {"time": "今天下午3点", "location": "咖啡厅", "participants": ["用户", "${characterName}"], "impact": "关系更进一步", "event_type": "conversation", "consequences": "约定下次见面"}
-    },
-    {
-      "type": "setting",
-      "title": "场所设定",
-      "content": "地点、物品、规则、背景设定的详细信息",
-      "importance": 6,
-      "metadata": {"location": "星巴克咖啡厅", "atmosphere": "温馨安静", "items": ["特制咖啡", "蛋糕"], "significance": "第一次约会地点"}
-    },
-    {
-      "type": "emotion",
-      "title": "情感变化",
-      "content": "情感状态的变化、原因、强度等",
-      "importance": 5,
-      "metadata": {"emotion_type": "开心", "intensity": 8, "cause": "收到礼物", "duration": "持续", "target": "${characterName}", "trigger": "意外惊喜"}
-    },
-    {
-      "type": "spacetime",
-      "title": "时空场景",
-      "content": "具体的时间地点和当时的环境描述",
-      "importance": 6,
-      "metadata": {"date": "2024年3月15日", "time": "下午3点", "location": "市中心咖啡厅", "characters": ["用户", "${characterName}"], "weather": "晴朗", "atmosphere": "温馨浪漫"}
-    },
-    {
-      "type": "relationship",
-      "title": "关系状态",
-      "content": "角色间关系的发展和变化",
-      "importance": 8,
-      "metadata": {"character_name": "${characterName}", "relationship": "恋人", "attitude": "亲密", "affection": 9, "trust": 8, "last_interaction": "今天的约会"}
-    },
-    {
-      "type": "task",
-      "title": "约定任务",
-      "content": "双方达成的约定、承诺或计划",
-      "importance": 7,
-      "metadata": {"assigned_by": "用户", "assigned_to": "${characterName}", "task_type": "appointment", "location": "电影院", "scheduled_time": "下周六晚上7点", "duration": "3小时", "status": "pending", "priority": "high"}
-    },
-    {
-      "type": "item",
-      "title": "重要物品",
-      "content": "对话中提到的重要物品及其意义",
-      "importance": 6,
-      "metadata": {"item_name": "项链", "owner": "${characterName}", "description": "银质心形项链", "importance_reason": "第一份礼物", "location": "随身佩戴", "acquisition_method": "用户赠送", "emotional_value": 9}
-    }
+    ... (更多记忆条目)
   ]
 }
 
 【记忆操作说明】
-1. **action字段** (必填):
-   - "update": 更新现有记忆（必须提供existing_id）
-   - "create": 创建新记忆（无existing_id）
-
-2. **更新现有记忆时**:
-   - 必须提供existing_id（从上面【现有记忆表格】中获取）
-   - content字段应该整合原有内容+新信息，标注【新增】部分
-   - 重要度可以根据新信息调整（深化理解→提高重要度）
-   - metadata累积更新，不要丢失原有字段
-
-3. **珍贵记忆识别**:
-   重要度8-10应该用于：
-   - 角色的核心背景故事、家庭经历
-   - 影响角色性格形成的关键事件
-   - 角色真心珍视的人/物/记忆
-   - 角色的梦想、遗憾、未了心愿
-   - 双方关系的重要转折点
-
-4. **记忆数量控制**:
-   - 优先更新而非创建新条目
-   - 每次生成不超过5-8个记忆条目
-   - 日常对话可能只需要1-2个update
-
-【格式要求】
-- type: character/event/setting/emotion/spacetime/relationship/task/item
-- importance: 1-10的数字，珍贵记忆8-10，重要内容6-7，一般内容5
-- content: 详细具体，包含对话细节和情感色彩
-- metadata: 结构化信息，根据type包含相应字段
-
-【核心要求】
-- 严格基于角色设定信息理解对话
-- 角色的人设、背景、世界观是记忆理解的依据
-- 优先UPDATE现有记忆，减少碎片化
-- 识别并高亮记录珍贵记忆
-- 避免记录临时性、重复性内容
+1. **action**: "update" (需existing_id) 或 "create"。
+2. **update策略**: 整合原有内容+新信息（标注【新增】），累积metadata。
+3. **数量控制**: 优先更新，每次生成5-8个条目。
 
 当前对话内容：
 ${conversationText}
 
 JSON结果：`
     } else {
-      summaryPrompt = `你是一位专业的故事作家，请将以下对话转化为一段生动的故事叙述。参考角色设定、之前的摘要和重要记忆。
-${characterContext ? `${characterContext}\n` : ''}${userPersonaContext ? `${userPersonaContext}\n` : ''}${previousContext ? `${previousContext}\n` : ''}
-【核心要求：故事化叙述，最大程度保留细节】
+      // =====================================================
+      // 纯故事模式 Prompt (非Memory Table)
+      // =====================================================
+      summaryPrompt = `你是一位擅长细腻情感描写和电影感叙事的畅销小说家。请将以下【对话记录】改写为一段【沉浸式小说片段】。
 
-1. **叙事风格**：
-   - 采用小说般的叙事手法，而不是简单的事实罗列
-   - 用生动的语言描述场景、氛围、人物情绪
-   - 保留对话中的重要台词（用「」标注）
-   - 描写人物的动作、表情、心理活动
+【输入信息】
+1. 角色设定：
+${characterContext || '无详细设定'}
+${userPersonaContext || ''}
 
-2. **必须保留的细节**：
-   - 关键对话的原文或准确意思
-   - 人物的情感变化和细腻心理
-   - 场景描述（地点、环境、氛围）
-   - 事件的前因后果和发展过程
-   - 人物之间的互动细节（称呼、语气、肢体语言）
-   - 重要的约定、承诺、决定的具体内容
-   - 任何对剧情发展有影响的信息
+2. 上文情境（之前的剧情）：
+${previousContext || '这是故事的开始。'}
 
-3. **叙述要点**：
-   - 按时间顺序叙述，体现事件的连贯性
-   - 重点刻画人物的情感和关系变化
-   - 捕捉对话中的转折点和高潮
-   - 记录人物透露的背景信息、过往经历
-   - 保留对话的语气和情感色彩
+3. 写作风格范例（One-Shot Learning）：
+${STYLE_EXAMPLE}
 
-4. **篇幅要求**：
-   - 不要压缩细节，允许充分展开叙述
-   - 建议篇幅：400-800字（根据对话内容复杂度调整）
-   - 重要对话可以更长，简单对话可以适当精简
-   - 宁可详细也不要遗漏重要信息
+【核心写作指令】
+1. **密度自适应（至关重要）**：
+   - **高密度对话**（涉及情感爆发、调情、争吵、重要剧情转折、心理博弈）：必须**大幅扩写**。捕捉每一个眼神、微表情、肢体语言的接触、环境氛围的变化。字数应是对话字数的3-5倍。
+   - **低密度对话**（日常闲聊、无意义的过渡、简单的确认）：可以**适当快进**，用几句精炼的旁白概括带过，不要流水账。
+   - **当前任务**：请分析下面提供的对话记录。如果内容细腻，请生成一篇2000-3000字的详尽故事；如果内容简单，生成500-1000字即可。
 
-5. **格式要求**：
-   - 直接开始故事叙述，不要任何前言
-   - 使用第三人称视角
-   - 自然分段，让阅读更流畅
-   - 重要对话用「」引用原文
-   - 保持文学性和可读性
+2. **叙事视角与手法**：
+   - 采用**第三人称限制视角**（通常聚焦于${characterName}或用户角色的视角，或在两者间流畅切换）。
+   - **Show, Don't Tell**：不要说“他很生气”，要描写“他捏着酒杯的指关节泛白，青筋暴起”。
+   - **感官描写**：调用视觉、听觉、嗅觉、触觉（如风的温度、皮肤的触感、空气中的气味）。
+   - **环境渲染**：环境是角色的心境投射。利用天气、光影、背景音来烘托气氛（如范例中的“香槟杯碰撞声”、“幽静的夜色”）。
 
-【示例风格】：
-不要写成："用户和角色讨论了工作问题，达成了共识。"
-应该写成："阳光透过窗帘洒进房间，${characterName}放下手中的咖啡杯，认真地看着用户。「其实我一直想和你说...」她顿了顿，眼神中闪过一丝犹豫。用户察觉到她的情绪变化，轻声鼓励道：「没关系，你说吧。」${characterName}深吸一口气，开始讲述自己童年的那段经历..."
+3. **内容处理**：
+   - **必须保留**：所有推动剧情的关键台词（用「」标注）、重要的约定、特定的称呼。
+   - **必须转化**：将括号里的动作描写（如 *看着他*）转化为流畅的动作描写段落。
+   - **心理描写**：补充对话中未说出口的潜台词和心理活动。
 
-当前对话内容：
+4. **格式要求**：
+   - **直接输出正文**，不要有“好的，这是故事”、“基于对话...”等前言后语。
+   - 自然分段，长短句结合，营造呼吸感。
+
+【待改写的对话记录】：
 ${conversationText}
 
-故事叙述：`
+【请开始你的创作】：`
     }
 
     // 调用AI API生成摘要
     const serverBaseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
     const requestBody: Record<string, unknown> = {
       messages: [{ role: 'user', content: summaryPrompt }],
-      systemPrompt: `你是一位专业的故事作家和叙事大师。你的任务是将角色扮演对话转化为生动的故事叙述，而不是简单的摘要。你需要：
-1. 采用小说般的文学笔法，保留场景、情绪、对话细节
-2. 最大程度保留重要对话的原文（用「」标注）
-3. 描写人物的心理活动、表情、动作
-4. 用生动的语言营造氛围和画面感
-5. 基于角色设定信息理解对话的深层含义
-6. 宁可详细也不要遗漏重要信息，允许充分展开叙述
-
-你的输出应该像一部连载小说的章节，让读者能够身临其境地感受对话的发展和人物的情感变化。`,
+      // ✏️✏️✏️ 更新System Prompt：混合身份 ✏️✏️✏️
+      systemPrompt: useMemoryTable
+        ? `你拥有双重身份：1. 一位获得文学大奖的畅销小说家，擅长将对话转化为细腻、充满画面感的文学作品；2. 一位精准的记忆数据库管理员。你的任务是同时输出高质量的故事摘要（在JSON的summary字段）和结构化的记忆数据（在JSON的memories字段）。`
+        : `你是一位获得文学大奖的小说家，擅长将平淡的对话转化为充满张力和画面感的文学作品。你的文字风格细腻、动人，善于捕捉人物之间微妙的化学反应，能够根据对话的密度灵活调整叙述的节奏。`,
       apiKey: apiKey || '',
       model: model || 'deepseek-chat'
     }
@@ -500,17 +406,6 @@ ${conversationText}
       requestBody.actualModel = actualModel
     }
 
-    // 添加调试日志
-    // console.log('🎯 Chat API Request:', {
-    //   messages: `${requestBody.messages ? (requestBody.messages as any[]).length : 0} messages`,
-    //   systemPrompt: `${(requestBody.systemPrompt as string)?.length || 0} chars`,
-    //   model: requestBody.model,
-    //   thinkingBudget: requestBody.thinkingBudget,
-    //   hasLegacyApiKey: !!apiKey,
-    //   hasBaseUrl: !!baseUrl,
-    //   actualModel: actualModel || 'undefined'
-    // })
-    
     const response = await fetch(`${serverBaseUrl}/api/chat`, {
       method: 'POST',
       headers: {
@@ -529,6 +424,15 @@ ${conversationText}
     let generatedSummary = aiResult.content || '摘要生成失败'
     let memoryEntries: MemoryEntry[] = []
     let memoryTableData: any = null
+
+    // 💡 针对故事模式的后处理：如果AI还是输出了markdown代码块，去掉它
+    if (!useMemoryTable) {
+      generatedSummary = generatedSummary
+        .replace(/^```markdown\s*/, '')
+        .replace(/^```\s*/, '')
+        .replace(/\s*```$/, '')
+        .trim()
+    }
 
     // 处理记忆表格格式的响应
     if (useMemoryTable) {
@@ -551,8 +455,6 @@ ${conversationText}
           cleanedResponse = cleanedResponse.substring(jsonStart, jsonEnd + 1)
         }
 
-        console.log('清理后的JSON响应:', cleanedResponse)
-
         // 尝试解析JSON格式的响应
         const parsedResult = JSON.parse(cleanedResponse)
         if (parsedResult.summary && parsedResult.memories) {
@@ -563,7 +465,6 @@ ${conversationText}
         }
       } catch (error) {
         console.warn('解析记忆表格JSON失败，使用传统摘要:', error)
-        console.warn('原始响应:', generatedSummary)
         // 如果解析失败，就使用传统的摘要格式
       }
     }
@@ -619,11 +520,9 @@ ${conversationText}
       summary = newSummary
     }
 
-    // 保存/更新记忆条目到数据库
+    // 保存/更新记忆条目到数据库 (仅当useMemoryTable为true且解析成功时)
     let savedMemories: any[] = []
     if (memoryEntries.length > 0) {
-      console.log('开始处理', memoryEntries.length, '个记忆条目')
-
       // 如果是重新生成，先删除与该摘要相关的旧记忆条目
       if (summaryId) {
         await supabase
@@ -641,13 +540,6 @@ ${conversationText}
         const action = memory.action || 'create'
         const existingId = memory.existing_id
 
-        console.log(`🔍 处理记忆条目 #${index + 1}:`, {
-          action,
-          existingId,
-          title: memory.title,
-          type: memory.type
-        })
-
         if (action === 'update' && existingId) {
           // 更新现有记忆
           memoriesToUpdate.push({
@@ -658,12 +550,8 @@ ${conversationText}
             metadata: memory.metadata || {},
             updated_at: new Date().toISOString()
           })
-          console.log(`📝 准备更新记忆: ${existingId} - ${memory.title}`)
         } else {
           // 创建新记忆
-          if (action === 'update' && !existingId) {
-            console.warn(`⚠️ 记忆标记为update但缺少existing_id，将作为新记忆创建: ${memory.title}`)
-          }
           memoriesToCreate.push({
             id: `${summary.id}_${index}_${Date.now()}`,
             session_id: sessionId,
@@ -678,7 +566,6 @@ ${conversationText}
             start_message_id: startMessageId,
             end_message_id: endMessageId
           })
-          console.log(`➕ 准备创建新记忆: ${memory.title}`)
         }
       })
 
@@ -692,89 +579,52 @@ ${conversationText}
           .eq('user_id', userId)
           .single()
 
-        if (!existingMemory) {
-          console.error(`❌ 找不到要更新的记忆: ${memory.id}`)
-          continue
-        }
+        if (!existingMemory) continue
 
         // 智能合并内容：采用保守策略，优先保留旧内容
         let mergedContent = memory.content
         const hasNewAddition = memory.content.includes('【新增】') || memory.content.includes('[新增]')
 
         if (hasNewAddition) {
-          // 情况1：AI 明确标记了新增部分，直接使用AI返回的内容（包含旧+新）
           mergedContent = memory.content
-          console.log(`📝 检测到【新增】标记，使用AI整合的内容`)
         } else {
-          // AI 没有标记新增，需要判断如何合并
-
-          // 检查新内容长度是否明显增加（说明AI可能整合了旧内容+新信息）
+          // 简单的合并逻辑：如果没有明确新增标记，且内容差异巨大，则追加
           const oldLength = existingMemory.content.length
           const newLength = memory.content.length
           const lengthRatio = newLength / oldLength
 
-          // 检查关键词覆盖率
-          const oldContentWords = existingMemory.content.split(/\s+|。|，|、|；/).filter((w: string) => w.length > 2)
-          const significantWords = oldContentWords.filter((w: string) => w.length > 3) // 更有意义的词
-
-          // 计算旧内容有多少比例被新内容包含
-          const matchedWords = significantWords.filter((word: string) => memory.content.includes(word))
-          const coverageRatio = significantWords.length > 0 ? matchedWords.length / significantWords.length : 0
-
-          console.log(`📊 内容分析: 旧=${oldLength}字, 新=${newLength}字, 长度比=${lengthRatio.toFixed(2)}, 覆盖率=${(coverageRatio * 100).toFixed(1)}%`)
-
-          if (lengthRatio >= 1.2 && coverageRatio >= 0.7) {
-            // 情况2：新内容明显更长(+20%)且包含70%以上的关键词 → AI做了完整整合
-            mergedContent = memory.content
-            console.log(`✅ 新内容更长且覆盖率高，使用新内容`)
-          } else if (coverageRatio >= 0.9) {
-            // 情况3：新内容包含90%以上的关键词，即使长度相近 → AI重写了内容
-            mergedContent = memory.content
-            console.log(`✅ 覆盖率很高(${(coverageRatio * 100).toFixed(1)}%)，使用新内容`)
-          } else {
-            // 情况4：保守策略 - 追加到旧内容，不覆盖
-            // 这样可以确保不丢失任何信息，即使格式可能不够完美
-            mergedContent = `${existingMemory.content}\n\n【新增信息】${memory.content}`
-            console.log(`⚠️ 覆盖率较低(${(coverageRatio * 100).toFixed(1)}%)，追加新内容保护旧信息`)
+          // 如果新内容比旧内容短很多，或者看起来是完全重写，则追加以防丢失信息
+          if (lengthRatio < 0.8) {
+             mergedContent = `${existingMemory.content}\n\n【新增信息】${memory.content}`
           }
         }
 
-        // 合并 metadata（累积，不丢失旧字段）
+        // 合并 metadata
         const mergedMetadata = {
           ...existingMemory.metadata,
           ...memory.metadata
         }
 
-        // 【版本控制】先保存当前版本到历史表
+        // 版本控制记录 (简化错误处理)
         const currentVersion = existingMemory.current_version || 1
         const newVersion = currentVersion + 1
-
+        
         try {
-          const { error: versionError } = await supabase
-            .from('chat_memory_versions')
-            .insert({
-              id: `${memory.id}_v${currentVersion}_${Date.now()}`,
-              memory_id: memory.id,
-              version: currentVersion,
-              title: existingMemory.title,
-              content: existingMemory.content,
-              importance: existingMemory.importance,
-              metadata: existingMemory.metadata,
-              summary_id: existingMemory.summary_id,
-              created_by_summary_id: existingMemory.summary_id,
-              start_message_id: existingMemory.start_message_id,
-              end_message_id: existingMemory.end_message_id,
-              created_at: new Date().toISOString()
+            await supabase.from('chat_memory_versions').insert({
+                id: `${memory.id}_v${currentVersion}_${Date.now()}`,
+                memory_id: memory.id,
+                version: currentVersion,
+                title: existingMemory.title,
+                content: existingMemory.content,
+                importance: existingMemory.importance,
+                metadata: existingMemory.metadata,
+                summary_id: existingMemory.summary_id,
+                created_by_summary_id: existingMemory.summary_id,
+                start_message_id: existingMemory.start_message_id,
+                end_message_id: existingMemory.end_message_id,
+                created_at: new Date().toISOString()
             })
-
-          if (versionError) {
-            console.warn(`⚠️ 保存版本历史失败（将继续更新）:`, versionError)
-          } else {
-            console.log(`📚 已保存版本 v${currentVersion} 到历史表`)
-          }
-        } catch (versionSaveError) {
-          console.warn(`⚠️ 版本保存异常:`, versionSaveError)
-        }
+        } catch (e) { console.warn('版本保存失败', e) }
 
         // 更新主记忆表
         const { error: updateError } = await supabase
@@ -784,30 +634,22 @@ ${conversationText}
             content: mergedContent,
             importance: memory.importance,
             metadata: mergedMetadata,
-            summary_id: summary.id, // 更新为当前摘要ID
-            current_version: newVersion, // 增加版本号
-            start_message_id: startMessageId, // 更新消息范围
+            summary_id: summary.id,
+            current_version: newVersion,
+            start_message_id: startMessageId,
             end_message_id: endMessageId,
             updated_at: memory.updated_at
           })
           .eq('id', memory.id)
           .eq('user_id', userId)
 
-        if (updateError) {
-          console.error(`更新记忆${memory.id}失败:`, updateError)
-        } else {
-          // 获取更新后的记忆
+        if (!updateError) {
           const { data: updated } = await supabase
             .from('chat_memories')
             .select('*')
             .eq('id', memory.id)
             .single()
-
-          if (updated) {
-            savedMemories.push(updated)
-            console.log(`✅ 成功更新记忆: ${memory.id} - ${memory.title}`)
-            console.log(`   旧内容长度: ${existingMemory.content.length}, 新内容长度: ${mergedContent.length}`)
-          }
+          if (updated) savedMemories.push(updated)
         }
       }
 
@@ -818,15 +660,10 @@ ${conversationText}
           .insert(memoriesToCreate)
           .select()
 
-        if (memoriesError) {
-          console.error('保存新记忆条目失败:', memoriesError)
-        } else {
+        if (!memoriesError) {
           savedMemories.push(...(insertedMemories || []))
-          console.log('成功创建', insertedMemories?.length || 0, '个新记忆条目')
         }
       }
-
-      console.log(`✅ 记忆处理完成: ${memoriesToUpdate.length}个更新, ${memoriesToCreate.length}个新建, 共${savedMemories.length}个记忆`)
     }
 
     return NextResponse.json({

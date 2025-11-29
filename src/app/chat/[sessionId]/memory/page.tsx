@@ -366,16 +366,21 @@ export default function MemoryManagePage() {
 
   // 重新生成摘要
   const handleRegenerateSummary = async (summaryId: number) => {
+    console.log('🚀 开始重新生成摘要, summaryId:', summaryId)
+    console.log('📊 当前 summaries 数组:', summaries)
+
     if (!availableModels.length) {
       alert('没有可用的AI模型，请检查API配置')
       return
     }
 
     const currentModel = getCurrentModel()
+    console.log('🔧 当前模型:', currentModel)
 
     let modelConfig
     try {
       modelConfig = getModelConfig(currentModel)
+      console.log('✅ 获取到模型配置:', { hasApiKey: !!modelConfig.apiKey, isRelay: modelConfig.isRelay })
     } catch (error) {
       console.error('❌ 获取模型配置失败:', error)
       alert(error instanceof Error ? error.message : '模型配置错误')
@@ -393,7 +398,25 @@ export default function MemoryManagePage() {
 
     try {
       const summary = summaries.find(s => s.id === summaryId)
-      if (!summary) return
+      if (!summary) {
+        console.error('❌ 找不到摘要:', summaryId)
+        alert('找不到要重新生成的摘要')
+        return
+      }
+
+      console.log('🔄 准备重新生成摘要:', {
+        summaryId,
+        startMessageId: summary.start_message_id,
+        endMessageId: summary.end_message_id,
+        hasStartId: !!summary.start_message_id,
+        hasEndId: !!summary.end_message_id
+      })
+
+      if (!summary.start_message_id || !summary.end_message_id) {
+        console.error('❌ 摘要缺少消息ID范围')
+        alert('该摘要缺少消息ID范围，无法重新生成')
+        return
+      }
 
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) throw new Error('用户未登录')
@@ -419,19 +442,32 @@ export default function MemoryManagePage() {
         headers['x-thinking-budget'] = '0' // 使用auto模式
       }
 
+      const requestBody = {
+        sessionId,
+        userId: user!.id,
+        summaryId: summaryId,
+        startMessageId: summary.start_message_id,
+        endMessageId: summary.end_message_id,
+        characterName: currentCharacter?.name || '角色',
+        useMemoryTable: true
+      }
+
+      console.log('📤 发送请求到 /api/chat/summary:', requestBody)
+      console.log('📋 请求头:', headers)
+
       const response = await fetch('/api/chat/summary', {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          sessionId,
-          userId: user!.id,
-          summaryId: summaryId,
-          characterName: currentCharacter?.name || '角色',
-          useMemoryTable: true // 使用记忆表格格式
-        })
+        body: JSON.stringify(requestBody)
       })
 
-      if (!response.ok) throw new Error('重新生成摘要失败')
+      console.log('📥 收到响应:', response.status, response.statusText)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: '未知错误' }))
+        console.error('❌ API 返回错误:', errorData)
+        throw new Error(`重新生成摘要失败: ${errorData.error || response.statusText}`)
+      }
 
       const result = await response.json()
 
@@ -2532,6 +2568,114 @@ export default function MemoryManagePage() {
                   className="w-full"
                 />
               </div>
+
+              {/* 时空记忆的时间地点编辑 */}
+              {(editingMemory.type === 'spacetime' || editingMemory.type === 'event' || editingMemory.type === 'task') && (
+                <div className="space-y-3 border-t pt-3">
+                  <div className="text-sm font-medium text-slate-600">时间与地点</div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">日期</label>
+                      <Input
+                        type="text"
+                        value={(editingMemory.metadata as any)?.date || ''}
+                        onChange={(e) => setEditingMemory(prev => prev ? {
+                          ...prev,
+                          metadata: { ...prev.metadata, date: e.target.value } as any
+                        } : null)}
+                        placeholder="如: 2024年3月15日"
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">时间</label>
+                      <Input
+                        type="text"
+                        value={(editingMemory.metadata as any)?.time || (editingMemory.metadata as any)?.scheduled_time || ''}
+                        onChange={(e) => setEditingMemory(prev => prev ? {
+                          ...prev,
+                          metadata: {
+                            ...prev.metadata,
+                            time: e.target.value,
+                            ...(prev.type === 'task' && { scheduled_time: e.target.value })
+                          } as any
+                        } : null)}
+                        placeholder="如: 下午3点"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">地点</label>
+                    <Input
+                      type="text"
+                      value={(editingMemory.metadata as any)?.location || ''}
+                      onChange={(e) => setEditingMemory(prev => prev ? {
+                        ...prev,
+                        metadata: { ...prev.metadata, location: e.target.value } as any
+                      } : null)}
+                      placeholder="如: 市中心咖啡厅"
+                      className="text-sm"
+                    />
+                  </div>
+
+                  {editingMemory.type === 'spacetime' && (
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">氛围</label>
+                      <Input
+                        type="text"
+                        value={(editingMemory.metadata as any)?.atmosphere || ''}
+                        onChange={(e) => setEditingMemory(prev => prev ? {
+                          ...prev,
+                          metadata: { ...prev.metadata, atmosphere: e.target.value } as any
+                        } : null)}
+                        placeholder="如: 温馨浪漫"
+                        className="text-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 角色记忆的特殊字段 */}
+              {editingMemory.type === 'character' && (
+                <div className="space-y-3 border-t pt-3">
+                  <div className="text-sm font-medium text-slate-600">角色信息</div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">角色名</label>
+                      <Input
+                        type="text"
+                        value={(editingMemory.metadata as any)?.name || ''}
+                        onChange={(e) => setEditingMemory(prev => prev ? {
+                          ...prev,
+                          metadata: { ...prev.metadata, name: e.target.value } as any
+                        } : null)}
+                        placeholder="角色名字"
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">关系</label>
+                      <Input
+                        type="text"
+                        value={(editingMemory.metadata as any)?.relationship || ''}
+                        onChange={(e) => setEditingMemory(prev => prev ? {
+                          ...prev,
+                          metadata: { ...prev.metadata, relationship: e.target.value } as any
+                        } : null)}
+                        placeholder="如: 朋友"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end space-x-2 pt-4">
                 <Button

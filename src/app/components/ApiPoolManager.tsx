@@ -38,7 +38,7 @@ const PROVIDER_INFO = {
   gemini: {
     name: 'Gemini',
     color: 'green',
-    models: ['gemini-2.5-flash', 'gemini-2.5-pro']
+    models: ['gemini-2.5-flash', 'gemini-3-pro-preview']
   },
   openai: {
     name: 'OpenAI',

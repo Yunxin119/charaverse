@@ -780,8 +780,8 @@ export default function ChatSessionPage() {
     }
     
     // 原有的Gemini模型逻辑
-    if (model === 'gemini-2.5-pro') {
-      console.log('✅ Gemini 2.5 Pro: using auto mode')
+    if (model === 'gemini-3-pro-preview') {
+      console.log('✅ Gemini 3 Pro: using auto mode')
       return undefined // Pro版本始终使用auto模式
     } else if (model === 'gemini-2.5-flash') {
       const result = thinkingBudgetMode === 'auto' ? undefined : thinkingBudget

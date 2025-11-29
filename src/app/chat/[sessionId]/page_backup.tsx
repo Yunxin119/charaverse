@@ -199,7 +199,7 @@ export default function ChatSessionPage() {
         models.push('deepseek-chat', 'deepseek-coder')
       }
       if (gemini) {
-        models.push('gemini-2.5-flash', 'gemini-2.5-pro')
+        models.push('gemini-2.5-flash', 'gemini-3-pro-preview')
       }
       if (openai) {
         models.push('gpt-4o', 'gpt-4o-mini')
@@ -425,8 +425,8 @@ export default function ChatSessionPage() {
     }
     
     // 原有的Gemini模型逻辑
-    if (model === 'gemini-2.5-pro') {
-      console.log('✅ Gemini 2.5 Pro: using auto mode')
+    if (model === 'gemini-3-pro-preview') {
+      console.log('✅ Gemini 3 Pro: using auto mode')
       return undefined // Pro版本始终使用auto模式
     } else if (model === 'gemini-2.5-flash') {
       const result = thinkingBudgetMode === 'auto' ? undefined : thinkingBudget
@@ -699,7 +699,7 @@ export default function ChatSessionPage() {
       'deepseek-chat': 'DeepSeek Chat',
       'deepseek-reasoner': 'DeepSeek Reasoner',
       'gemini-2.5-flash': 'Gemini 2.5 Flash',
-      'gemini-2.5-pro': 'Gemini 2.5 Pro',
+      'gemini-3-pro-preview': 'Gemini 3 Pro',
       'gpt-4o': 'GPT-4o',
       'gpt-4o-mini': 'GPT-4o Mini'
     }

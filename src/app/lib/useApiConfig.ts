@@ -61,7 +61,7 @@ export function useApiConfig() {
             models.push('deepseek-chat', 'deepseek-reasoner');
             break;
           case 'gemini':
-            models.push('gemini-2.5-flash', 'gemini-2.5-pro');
+            models.push('gemini-2.5-flash', 'gemini-3-pro-preview');
             break;
           case 'openai':
             models.push('gpt-4o', 'gpt-4o-mini');
@@ -180,7 +180,7 @@ export function useApiConfig() {
       'deepseek-chat': 'DeepSeek Chat (V3.1)',
       'deepseek-reasoner': 'DeepSeek Reasoner (V3.1)',
       'gemini-2.5-flash': 'Gemini 2.5 Flash',
-      'gemini-2.5-pro': 'Gemini 2.5 Pro',
+      'gemini-3-pro-preview': 'Gemini 3 Pro',
       'gpt-4o': 'GPT-4o',
       'gpt-4o-mini': 'GPT-4o Mini'
     };

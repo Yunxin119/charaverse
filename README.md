@@ -67,6 +67,7 @@ Step 2.1: 设置页面 UI 改造
 const ApiPoolManager = ({ provider }: { provider: string }) => {
 return (
 <Card className="space-y-4">
+
 <div className="flex items-center justify-between">
 <h3 className="text-lg font-semibold">{provider.toUpperCase()} API 池</h3>
 
@@ -277,7 +278,7 @@ try {
 const { model, systemPrompt, messages, sessionId, userMessage } = await request.json();
 
       // 解析provider
-      const provider = model.split('-')[0]; // 如 'gemini-2.5-pro' -> 'gemini'
+      const provider = model.split('-')[0]; // 如 'gemini-3-pro-preview' -> 'gemini'
 
       // 选择API
       const selectedApi = apiSelector.selectApi(provider);

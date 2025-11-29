@@ -239,7 +239,7 @@ export function RelayServiceManager() {
                           <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">配置名称 *</Label>
                           <Input
                             type="text"
-                            placeholder="例如: Gemini 2.5 Pro 中转"
+                            placeholder="例如: Gemini 3 Pro 中转"
                             value={editRelayConfig.name || ''}
                             onChange={(e) => handleEditRelayConfigChange('name', e.target.value)}
                             className="text-sm"
@@ -446,7 +446,7 @@ export function RelayServiceManager() {
                 <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">配置名称 *</Label>
                 <Input
                   type="text"
-                  placeholder="例如: Gemini 2.5 Pro 中转"
+                  placeholder="例如: Gemini 3 Pro 中转"
                   value={newRelayConfig.name || ''}
                   onChange={(e) => handleNewRelayConfigChange('name', e.target.value)}
                   className="text-sm"

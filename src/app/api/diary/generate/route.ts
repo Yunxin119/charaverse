@@ -315,7 +315,7 @@ async function callRelayAPI(prompt: string, apiKey: string, actualModel: string,
   // 如果actualModel是Gemini 2.5系列，添加thinking配置
   if (actualModel.includes('gemini-2.5')) {
     console.log('📝 Adding thinking config for Gemini 2.5 model:', actualModel)
-    if (actualModel === 'gemini-2.5-pro') {
+    if (actualModel === 'gemini-3-pro-preview') {
       // Pro版本使用auto模式
       requestBody.thinkingConfig = {}
       console.log('📝 Using auto thinking mode for Pro')

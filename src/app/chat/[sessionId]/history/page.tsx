@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ChevronLeft, ChevronRight, Calendar, User, Bot } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Calendar, User, Bot, Edit3, Save, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '../../../lib/supabase'
 import { useAppSelector } from '../../../store/hooks'
 import { format } from 'date-fns'
@@ -33,6 +35,10 @@ export default function ChatHistoryPage() {
   const [totalMessages, setTotalMessages] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [sessionTitle, setSessionTitle] = useState('')
+  const [selectedMessageId, setSelectedMessageId] = useState<number | null>(null)
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [editContent, setEditContent] = useState('')
 
   const totalPages = Math.ceil(totalMessages / MESSAGES_PER_PAGE)
 
@@ -114,6 +120,54 @@ export default function ChatHistoryPage() {
     }
   }
 
+  // 处理消息点击
+  const handleMessageClick = (message: Message) => {
+    setSelectedMessageId(message.id === selectedMessageId ? null : message.id)
+  }
+
+  // 开始编辑消息
+  const handleEditMessage = (message: Message) => {
+    setEditingMessage(message)
+    setEditContent(message.content)
+    setShowEditDialog(true)
+    setSelectedMessageId(null)
+  }
+
+  // 保存编辑的消息
+  const handleSaveEdit = async () => {
+    if (!editingMessage || !editContent.trim()) {
+      alert('消息内容不能为空')
+      return
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) throw new Error('用户未登录')
+
+      const { error } = await supabase
+        .from('chat_messages')
+        .update({ content: editContent })
+        .eq('id', editingMessage.id)
+        .eq('session_id', sessionId)
+
+      if (error) throw error
+
+      // 更新本地消息列表
+      setMessages(prev => prev.map(msg =>
+        msg.id === editingMessage.id
+          ? { ...msg, content: editContent }
+          : msg
+      ))
+
+      setShowEditDialog(false)
+      setEditingMessage(null)
+      setEditContent('')
+    } catch (error) {
+      console.error('保存消息失败:', error)
+      alert('保存失败，请重试')
+    }
+  }
+
   const pageVariants = {
     initial: { opacity: 0, x: 20 },
     in: { opacity: 1, x: 0 },
@@ -178,9 +232,9 @@ export default function ChatHistoryPage() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.02 }}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} group`}
                 >
-                  <div className={`flex max-w-[85%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'} gap-2`}>
+                  <div className={`flex max-w-[85%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'} gap-2 relative`}>
                     {/* Avatar */}
                     <Avatar className="w-8 h-8 flex-shrink-0">
                       {message.role === 'user' ? (
@@ -203,14 +257,38 @@ export default function ChatHistoryPage() {
                     {/* Message Bubble */}
                     <div className="flex flex-col">
                       <div
-                        className={`rounded-2xl px-4 py-2 ${
+                        onClick={() => handleMessageClick(message)}
+                        className={`rounded-2xl px-4 py-2 cursor-pointer transition-all ${
                           message.role === 'user'
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700'
-                        }`}
+                            ? 'bg-blue-500 text-white hover:bg-blue-600'
+                            : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                        } ${selectedMessageId === message.id ? 'ring-2 ring-blue-400' : ''}`}
                       >
                         <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
                       </div>
+
+                      {/* 编辑按钮 */}
+                      <AnimatePresence>
+                        {selectedMessageId === message.id && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className={`flex gap-2 mt-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditMessage(message)}
+                              className="h-7 text-xs"
+                            >
+                              <Edit3 className="w-3 h-3 mr-1" />
+                              编辑
+                            </Button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
                       <span className={`text-xs text-slate-400 dark:text-slate-500 mt-1 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
                         {formatMessageTime(message.created_at)}
                       </span>
@@ -255,6 +333,54 @@ export default function ChatHistoryPage() {
           </div>
         </div>
       )}
+
+      {/* 编辑消息对话框 */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Edit3 className="w-5 h-5" />
+              <span>编辑消息</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block text-slate-700 dark:text-slate-300">
+                {editingMessage?.role === 'user' ? '用户消息' : '角色消息'}
+              </label>
+              <Textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                placeholder="输入消息内容..."
+                rows={6}
+                className="resize-none"
+              />
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowEditDialog(false)
+                  setEditingMessage(null)
+                  setEditContent('')
+                }}
+              >
+                <X className="w-4 h-4 mr-1" />
+                取消
+              </Button>
+              <Button
+                onClick={handleSaveEdit}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Save className="w-4 h-4 mr-1" />
+                保存
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   )
 }

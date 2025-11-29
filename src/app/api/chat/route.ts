@@ -33,7 +33,7 @@ async function callDeepSeek(messages: ChatMessage[], systemPrompt: string, apiKe
         ...messages
       ],
       temperature: 1,
-      max_tokens: 8000,
+      max_tokens: 10000,
     }),
   })
 
@@ -144,7 +144,7 @@ async function callGemini(messages: ChatMessage[], systemPrompt: string, apiKey:
     contents: contents,
     generationConfig: {
       temperature: 1.0,
-      maxOutputTokens: 8000,
+      maxOutputTokens: 10000,
       topP: 0.95,
     },
     safetySettings: safetySettings,
@@ -152,10 +152,10 @@ async function callGemini(messages: ChatMessage[], systemPrompt: string, apiKey:
 
   // 只有2.5系列模型才支持thinking配置
   if (model.includes('2.5')) {
-    if (model === 'gemini-2.5-pro') {
+    if (model === 'gemini-3-pro-preview') {
       // 2.5 Pro 启用thinking（修复了角色交替问题后应该正常工作）
       requestBody.generationConfig.thinkingConfig = {}
-      console.log('Gemini 2.5 Pro: thinking enabled')
+      console.log('Gemini 3 Pro: thinking enabled')
     } else if (model === 'gemini-2.5-flash' && thinkingBudget !== undefined && thinkingBudget >= 0) {
       // 2.5 Flash 根据用户设置
       requestBody.generationConfig.thinkingConfig = {
@@ -357,7 +357,7 @@ async function callOpenAI(messages: ChatMessage[], systemPrompt: string, apiKey:
         ...messages
       ],
       temperature: 1,
-      max_tokens: 8000,
+      max_tokens: 10000,
     }),
   })
 
@@ -426,13 +426,13 @@ async function callRelayAPI(messages: ChatMessage[], systemPrompt: string, apiKe
     model: actualModel,
     messages: apiMessages,
     temperature: 1,
-    max_tokens: 8000,
+    max_tokens: 10000,
   }
 
   // 如果actualModel是Gemini 2.5系列且有thinking budget，添加相应配置
   if (actualModel.includes('gemini-2.5') && thinkingBudget !== undefined) {
     console.log(`Relay API: Adding thinking budget ${thinkingBudget} for model ${actualModel}`)
-    if (actualModel === 'gemini-2.5-pro') {
+    if (actualModel === 'gemini-3-pro-preview') {
       // Pro版本使用auto模式
       requestBody.thinkingConfig = {}
     } else if (actualModel.includes('gemini-2.5-flash')) {
