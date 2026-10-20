@@ -95,9 +95,9 @@ function LoginForm() {
               创建人设、导入预设与皮肤，用你自己的模型和 API Key 开始一段不会被遗忘的对话。
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              <Chip tone="glass" className="text-cv-cream-200/90 border-white/15">BYOK · 密钥只在你的浏览器</Chip>
-              <Chip tone="glass" className="text-cv-cream-200/90 border-white/15">长期记忆</Chip>
-              <Chip tone="glass" className="text-cv-cream-200/90 border-white/15">可导入主题 / 预设</Chip>
+              <Chip tone="outline" className="border-white/20 bg-white/10 text-[var(--cv-cream-200)]">BYOK · 密钥只在你的浏览器</Chip>
+              <Chip tone="outline" className="border-white/20 bg-white/10 text-[var(--cv-cream-200)]">长期记忆</Chip>
+              <Chip tone="outline" className="border-white/20 bg-white/10 text-[var(--cv-cream-200)]">可导入主题 / 预设</Chip>
             </div>
           </div>
         </PosterCard>
