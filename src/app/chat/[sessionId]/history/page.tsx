@@ -9,7 +9,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '../../../lib/supabase'
-import { useAppSelector } from '../../../store/hooks'
+import { useCharacter, useSession } from '@/queries'
 import { useAuth } from '@/providers/AuthProvider'
 import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
@@ -28,7 +28,8 @@ export default function ChatHistoryPage() {
   const params = useParams()
   const sessionId = params.sessionId as string
 
-  const { currentCharacter } = useAppSelector((state) => state.chat)
+  const { data: session } = useSession(sessionId)
+  const { data: currentCharacter } = useCharacter(session?.character_id)
   const { user } = useAuth()
 
   const [messages, setMessages] = useState<Message[]>([])

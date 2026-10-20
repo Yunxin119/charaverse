@@ -1,302 +1,176 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { streamText, type ModelMessage } from 'ai'
+import { z } from 'zod'
 import { requireUser } from '@/lib/server/auth'
-import {
-  GuardError,
-  MAX_BODY_BYTES,
-  assertSafeBaseUrl,
-  assertSafeModel,
-  summarizeUpstreamError,
-} from '@/lib/server/llmGuards'
+import { GuardError, summarizeUpstreamError } from '@/lib/server/llmGuards'
+import { CONNECTION_HEADER, decodeConnection } from '@/lib/llm/connection'
+import { needsUserLast, resolveModel } from '@/lib/llm/providers'
+import { loadChatContext, ContextError } from '@/lib/chat/loadContext'
+import { assemble, trimHistory } from '@/lib/prompt/assemble'
 
 /**
- * LLM proxy (P0 hardened version; will be replaced by an AI SDK streaming route in P2).
+ * Streaming chat endpoint (AI SDK UI message stream).
  *
- * Contract (unchanged for existing clients):
- *   POST { messages, systemPrompt, apiKey, model, thinkingBudget?, baseUrl?, actualModel?, customUserMessage? }
- *   -> { content, apiUsed }
- *
- * Security:
- *   - caller must be a signed-in Supabase user (Bearer token)
- *   - relay baseUrl must be a public https host (no IPs / private names / query / creds)
- *   - upstream error bodies are summarized, never echoed
- *   - nothing about keys, prompts or responses is logged
+ * Headers: Authorization: Bearer <supabase jwt>; x-cv-connection: base64url(JSON Connection)
+ * Body:    { sessionId, action, text?, messageId? }
+ *   send       – persist `text` as a user message, stream the reply, persist it
+ *   opening    – no user text; the character speaks first; persist the reply
+ *   regenerate – re-roll the last assistant message; the reply is appended as a new swipe
+ *   continue   – extend the last assistant message
+ *   inspire    – suggest what the user could say next (not persisted)
+ * History, card, memories, summaries and the preset are loaded server-side; the
+ * client never sends the conversation.
  */
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 120
 
-const UPSTREAM_TIMEOUT_MS = 55_000
-const MAX_OUTPUT_TOKENS = 8192
+const bodySchema = z.object({
+  sessionId: z.string().uuid(),
+  action: z.enum(['send', 'opening', 'regenerate', 'continue', 'inspire']),
+  text: z.string().max(20000).optional(),
+  messageId: z.number().int().positive().optional(),
+})
 
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'system'
-  content: string
-}
+const CONTINUE_MSG = '【请直接接着你上一条回复继续写，不要重复已有内容，不要加开场白。】'
+const inspireMsg = (charName: string, userName: string) =>
+  `现在请你跳出"${charName}"的角色。如果你是"${userName}"，面对上一条消息你会怎么回复？用第一人称直接写出这句回复本身，不要解释，不要开场白。`
 
-interface ChatRequest {
-  messages: ChatMessage[]
-  systemPrompt: string
-  apiKey?: string
-  model: string
-  thinkingBudget?: number
-  baseUrl?: string
-  actualModel?: string
-  customUserMessage?: string
-}
-
-class UpstreamError extends Error {
-  constructor(public provider: string, public status: number, message: string) {
-    super(message)
-  }
-}
-
-function withTimeout(): AbortSignal {
-  return AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
-}
-
-async function readUpstreamError(provider: string, res: Response): Promise<never> {
-  const text = await res.text().catch(() => '')
-  throw new UpstreamError(provider, res.status, summarizeUpstreamError(res.status, text))
-}
-
-function buildOpenAiMessages(messages: ChatMessage[], systemPrompt: string, customUserMessage?: string) {
-  const out: ChatMessage[] = [{ role: 'system', content: systemPrompt }, ...messages]
-  if (customUserMessage) out.push({ role: 'user', content: customUserMessage })
-  return out
-}
-
-// ---------- OpenAI-compatible (OpenAI, DeepSeek, relays) ----------
-async function callOpenAiCompatible(opts: {
-  provider: string
-  endpoint: string
-  apiKey: string
-  model: string
-  messages: ChatMessage[]
-  systemPrompt: string
-  customUserMessage?: string
-  thinkingBudget?: number
-}): Promise<string> {
-  const body: Record<string, unknown> = {
-    model: opts.model,
-    messages: buildOpenAiMessages(opts.messages, opts.systemPrompt, opts.customUserMessage),
-    temperature: 1,
-    max_tokens: MAX_OUTPUT_TOKENS,
-  }
-  // Relays that front Gemini 2.5 accept a thinkingConfig passthrough
-  if (opts.model.includes('gemini-2.5') && opts.thinkingBudget !== undefined) {
-    body.thinkingConfig = opts.thinkingBudget > 0 ? { thinkingBudget: opts.thinkingBudget } : {}
-  }
-
-  const res = await fetch(opts.endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${opts.apiKey}`,
-      'User-Agent': 'Charaverse/2.0',
-    },
-    body: JSON.stringify(body),
-    signal: withTimeout(),
-  })
-  if (!res.ok) await readUpstreamError(opts.provider, res)
-
-  const data = await res.json()
-  const content = data?.choices?.[0]?.message?.content
-  if (typeof content !== 'string' || !content.trim()) {
-    throw new UpstreamError(opts.provider, 502, 'AI 返回了空响应，可能是内容被过滤')
-  }
-  return content
-}
-
-// ---------- Gemini (native REST) ----------
-const GEMINI_SAFETY = [
-  'HARM_CATEGORY_HARASSMENT',
-  'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-  'HARM_CATEGORY_DANGEROUS_CONTENT',
-  'HARM_CATEGORY_HATE_SPEECH',
-].map((category) => ({ category, threshold: 'BLOCK_ONLY_HIGH' }))
-
-function buildGeminiContents(messages: ChatMessage[], systemPrompt: string, customUserMessage?: string) {
-  const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = []
-
-  // Gemini wants strict user/model alternation; the system prompt goes in as the first user turn.
-  if (systemPrompt) {
-    contents.push({ role: 'user', parts: [{ text: systemPrompt }] })
-    const first = messages[0]
-    const ack = first?.role === 'assistant' ? first.content : '我明白了，我会按照这些设定来扮演角色。'
-    contents.push({ role: 'model', parts: [{ text: ack }] })
-  }
-  const rest = systemPrompt && messages[0]?.role === 'assistant' ? messages.slice(1) : messages
-  for (const m of rest) {
-    if (m.role === 'user') contents.push({ role: 'user', parts: [{ text: m.content }] })
-    else if (m.role === 'assistant') contents.push({ role: 'model', parts: [{ text: m.content }] })
-  }
-  if (contents.length === 0) throw new GuardError('没有可发送的消息')
-  if (contents[contents.length - 1].role !== 'user') {
-    contents.push({ role: 'user', parts: [{ text: customUserMessage || '【请继续。】' }] })
-  }
-  return contents
-}
-
-async function callGemini(opts: {
-  apiKey: string
-  model: string
-  messages: ChatMessage[]
-  systemPrompt: string
-  thinkingBudget?: number
-  customUserMessage?: string
-}): Promise<string> {
-  const generationConfig: Record<string, unknown> = {
-    temperature: 1.0,
-    maxOutputTokens: MAX_OUTPUT_TOKENS,
-    topP: 0.95,
-  }
-  if (opts.model.includes('2.5') || opts.model.startsWith('gemini-3')) {
-    if (opts.model.includes('pro')) generationConfig.thinkingConfig = {}
-    else if (opts.thinkingBudget !== undefined && opts.thinkingBudget >= 0) {
-      generationConfig.thinkingConfig = { thinkingBudget: opts.thinkingBudget }
-    }
-  }
-  const body = {
-    contents: buildGeminiContents(opts.messages, opts.systemPrompt, opts.customUserMessage),
-    generationConfig,
-    safetySettings: GEMINI_SAFETY,
-  }
-
-  const maxRetries = 2
-  for (let attempt = 0; ; attempt++) {
-    let res: Response
-    try {
-      res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(opts.model)}:generateContent`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': opts.apiKey },
-          body: JSON.stringify(body),
-          signal: withTimeout(),
-        }
-      )
-    } catch (err) {
-      if (attempt < maxRetries) {
-        await new Promise((r) => setTimeout(r, (attempt + 1) * 1000))
-        continue
-      }
-      throw err
-    }
-
-    if (!res.ok) {
-      if (res.status >= 500 && attempt < maxRetries) {
-        await new Promise((r) => setTimeout(r, (attempt + 1) * 1000))
-        continue
-      }
-      await readUpstreamError('Gemini', res)
-    }
-
-    const data = await res.json()
-    if (data?.promptFeedback?.blockReason) {
-      throw new UpstreamError('Gemini', 422, `请求被 Gemini 拦截：${data.promptFeedback.blockReason}`)
-    }
-    const candidate = data?.candidates?.[0]
-    if (!candidate) throw new UpstreamError('Gemini', 502, 'Gemini 没有返回候选回复')
-    if (candidate.finishReason === 'SAFETY' || candidate.finishReason === 'BLOCKED_REASON_UNSPECIFIED') {
-      throw new UpstreamError('Gemini', 422, '回复被 Gemini 安全过滤拦截')
-    }
-    if (candidate.finishReason === 'RECITATION') {
-      throw new UpstreamError('Gemini', 422, '回复因版权复述问题被拦截')
-    }
-    const text = (candidate.content?.parts ?? [])
-      .map((p: { text?: string }) => p.text ?? '')
-      .join('')
-    if (!text.trim()) {
-      const reason = candidate.finishReason || 'unknown'
-      if (reason === 'MAX_TOKENS') throw new UpstreamError('Gemini', 502, '回复超出长度限制且没有内容返回')
-      throw new UpstreamError('Gemini', 502, `Gemini 返回了空内容（${reason}）`)
-    }
-    return text
-  }
-}
-
-// ---------- handler ----------
 export async function POST(request: NextRequest) {
   const auth = await requireUser(request)
   if (!auth) return NextResponse.json({ error: '请先登录' }, { status: 401 })
+  const { user, supabase } = auth
 
-  const contentLength = Number(request.headers.get('content-length') ?? 0)
-  if (contentLength > MAX_BODY_BYTES) {
-    return NextResponse.json({ error: '请求体过大' }, { status: 413 })
+  const conn = decodeConnection(request.headers.get(CONNECTION_HEADER))
+  if (!conn) return NextResponse.json({ error: '没有可用的模型连接，请先在设置里配置 API' }, { status: 400 })
+
+  let body: z.infer<typeof bodySchema>
+  try {
+    body = bodySchema.parse(await request.json())
+  } catch {
+    return NextResponse.json({ error: '请求参数不合法' }, { status: 400 })
+  }
+  if (body.action === 'send' && !body.text?.trim()) {
+    return NextResponse.json({ error: '消息不能为空' }, { status: 400 })
   }
 
   try {
-    const body = (await request.json()) as ChatRequest
-    const { messages, systemPrompt, customUserMessage } = body
-    const apiKey = body.apiKey?.trim()
-    const thinkingBudget = body.thinkingBudget
-    let model = body.model?.trim() ?? ''
+    const { model, label } = resolveModel(conn)
+    const ctx = await loadChatContext(supabase, body.sessionId, user.id)
+    const { card, preset, session } = ctx
+    const userName = session.settings.userName || card.userName
 
-    if (!Array.isArray(messages) || !systemPrompt?.trim() || !model) {
-      return NextResponse.json({ error: '缺少必要参数：messages / systemPrompt / model' }, { status: 400 })
-    }
-    for (const m of messages) {
-      if (!m || typeof m.content !== 'string' || !['user', 'assistant', 'system'].includes(m.role)) {
-        return NextResponse.json({ error: 'messages 格式不合法' }, { status: 400 })
-      }
-    }
-    if (!apiKey) {
-      return NextResponse.json({ error: '没有可用的 API Key，请在设置中添加' }, { status: 400 })
+    // ---- figure out the history slice for this action ----
+    let history = ctx.history.filter((m) => m.role !== 'system')
+    let userMessageId: number | undefined
+    let targetId: number | undefined // regenerate / continue target
+
+    if (body.action === 'send') {
+      const { data: inserted, error } = await supabase
+        .from('chat_messages')
+        .insert({ session_id: session.id, role: 'user', content: body.text!.trim(), type: 'message' })
+        .select('id, role, content, created_at')
+        .single()
+      if (error || !inserted) throw new ContextError(500, '保存消息失败')
+      userMessageId = inserted.id
+      history = [...history, inserted]
+    } else if (body.action === 'regenerate') {
+      const last = [...history].reverse().find((m) => m.role === 'assistant')
+      if (!last) throw new ContextError(400, '没有可以重新生成的回复')
+      if (body.messageId && body.messageId !== last.id) throw new ContextError(400, '只能重新生成最后一条回复')
+      targetId = last.id
+      history = history.filter((m) => m.id !== last.id)
+    } else if (body.action === 'continue') {
+      const last = history[history.length - 1]
+      if (!last || last.role !== 'assistant') throw new ContextError(400, '只能续写最后一条 AI 回复')
+      targetId = last.id
     }
 
-    let content: string
-    let apiUsed: string
+    const { kept } = trimHistory(
+      history.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      { maxTokens: session.settings.context.maxTokens, keepRecent: session.settings.context.keepRecent }
+    )
 
-    if (model.startsWith('named-relay-')) {
-      if (!body.baseUrl || !body.actualModel) {
-        return NextResponse.json({ error: '中转配置缺少 baseUrl 或模型名' }, { status: 400 })
-      }
-      const base = assertSafeBaseUrl(body.baseUrl)
-      const actualModel = assertSafeModel(body.actualModel)
-      const endpoint = `${base.endsWith('/v1') ? base : `${base}/v1`}/chat/completions`
-      content = await callOpenAiCompatible({
-        provider: '中转API', endpoint, apiKey, model: actualModel,
-        messages, systemPrompt, customUserMessage, thinkingBudget,
-      })
-      apiUsed = `中转API (${actualModel})`
-    } else {
-      model = assertSafeModel(model)
-      if (model.startsWith('deepseek')) {
-        content = await callOpenAiCompatible({
-          provider: 'DeepSeek', endpoint: 'https://api.deepseek.com/v1/chat/completions',
-          apiKey, model, messages, systemPrompt, customUserMessage,
-        })
-      } else if (model.startsWith('gemini')) {
-        content = await callGemini({ apiKey, model, messages, systemPrompt, thinkingBudget, customUserMessage })
-      } else if (model.startsWith('gpt') || model.startsWith('o')) {
-        content = await callOpenAiCompatible({
-          provider: 'OpenAI', endpoint: 'https://api.openai.com/v1/chat/completions',
-          apiKey, model, messages, systemPrompt, customUserMessage,
-        })
+    const extraUserMessage =
+      body.action === 'continue' ? CONTINUE_MSG : body.action === 'inspire' ? inspireMsg(card.name, userName) : undefined
+
+    const assembled = assemble({
+      preset,
+      character: {
+        name: card.name, description: card.description, personality: card.personality,
+        age: card.age, gender: card.gender, scenario: card.scenario, modules: card.modules,
+      },
+      user: { name: userName, persona: card.persona },
+      memoryTable: ctx.memoryTable,
+      summaries: ctx.summaries,
+      history: kept,
+      ensureUserLast: !!extraUserMessage || needsUserLast(conn) || body.action === 'opening',
+      continueUserMessage:
+        extraUserMessage ?? (body.action === 'opening' ? '【现在请你作为角色主动开始对话，根据设定和初始情景开场。】' : undefined),
+    })
+
+    // ---- stream ----
+    let partial = ''
+    const persist = async (text: string, finishReason: string, aborted: boolean) => {
+      const content = text.trim()
+      if (!content || body.action === 'inspire') return
+      const meta = { model: label, finishReason, aborted, presetName: preset.name, at: new Date().toISOString() }
+      if (body.action === 'regenerate' && targetId) {
+        await supabase.rpc('append_message_swipe', { p_message_id: targetId, p_content: content, p_meta: meta })
+      } else if (body.action === 'continue' && targetId) {
+        const prev = ctx.history.find((m) => m.id === targetId)?.content ?? ''
+        const joined = prev.endsWith('\n') || content.startsWith('\n') ? prev + content : `${prev}\n${content}`
+        await supabase.from('chat_messages').update({ content: joined, meta }).eq('id', targetId)
       } else {
-        return NextResponse.json({ error: `不支持的模型：${model}` }, { status: 400 })
+        await supabase.from('chat_messages').insert({ session_id: session.id, role: 'assistant', content, type: 'message', meta })
       }
-      apiUsed = model
+      await supabase.from('chat_sessions').update({ updated_at: new Date().toISOString() }).eq('id', session.id)
     }
 
-    return NextResponse.json({ content, apiUsed })
+    const result = streamText({
+      model,
+      instructions: assembled.instructions || undefined,
+      messages: assembled.messages as ModelMessage[],
+      allowSystemInMessages: true,
+      temperature: assembled.sampling.temperature ?? 1,
+      topP: assembled.sampling.top_p,
+      topK: assembled.sampling.top_k,
+      frequencyPenalty: assembled.sampling.frequency_penalty,
+      presencePenalty: assembled.sampling.presence_penalty,
+      maxOutputTokens: assembled.sampling.max_tokens ?? 4096,
+      abortSignal: request.signal,
+      maxRetries: 1,
+      onChunk({ chunk }) {
+        if (chunk.type === 'text-delta') partial += chunk.text
+      },
+      async onEnd({ text, finishReason }) {
+        await persist(text || partial, finishReason, false)
+      },
+      async onAbort() {
+        await persist(partial, 'aborted', true)
+      },
+    })
+
+    return result.toUIMessageStreamResponse({
+      headers: userMessageId ? { 'x-cv-user-message-id': String(userMessageId) } : undefined,
+      onError: (err) => describeError(err),
+      sendReasoning: false,
+    })
   } catch (error) {
-    if (error instanceof GuardError) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
-    }
-    if (error instanceof UpstreamError) {
-      console.warn(`[api/chat] upstream ${error.provider} failed: ${error.status}`)
-      const status = error.status === 401 || error.status === 403 ? 401 : error.status >= 500 ? 502 : error.status
-      return NextResponse.json(
-        { error: `${error.provider} 调用失败：${error.message}` },
-        { status: status >= 400 && status < 600 ? status : 502 }
-      )
-    }
-    const isTimeout = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
-    if (isTimeout) {
-      return NextResponse.json({ error: 'AI 响应超时，请重试' }, { status: 504 })
-    }
-    console.error('[api/chat] unexpected error:', error instanceof Error ? error.name : 'unknown')
+    if (error instanceof GuardError) return NextResponse.json({ error: error.message }, { status: error.status })
+    if (error instanceof ContextError) return NextResponse.json({ error: error.message }, { status: error.status })
+    console.error('[api/chat] unexpected:', error instanceof Error ? error.name : 'unknown')
     return NextResponse.json({ error: '服务器内部错误' }, { status: 500 })
   }
+}
+
+/** Short, safe error text for the stream (never the raw upstream body). */
+function describeError(err: unknown): string {
+  const e = err as { name?: string; statusCode?: number; responseBody?: string; message?: string }
+  if (e?.name === 'AbortError' || e?.name === 'TimeoutError') return '生成已停止'
+  if (typeof e?.statusCode === 'number') return summarizeUpstreamError(e.statusCode, e.responseBody ?? '')
+  const msg = typeof e?.message === 'string' ? e.message : ''
+  if (/api key|unauthorized|401/i.test(msg)) return 'API Key 无效或已过期'
+  if (/rate|429/i.test(msg)) return '请求过于频繁，请稍后再试'
+  return 'AI 调用失败，请检查连接设置后重试'
 }

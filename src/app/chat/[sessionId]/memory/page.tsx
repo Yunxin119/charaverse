@@ -40,10 +40,10 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useAppSelector } from '../../../store/hooks'
 import { useAuth } from '@/providers/AuthProvider'
 import { supabase } from '../../../lib/supabase'
-import { getSummaries } from '../../../lib/enhancedChatSlice'
+import { fetchSummaries, useCharacter, useSession } from '@/queries'
+import { parseSessionSettings } from '@/lib/chat/settings'
 import { useApiConfig } from '../../../lib/useApiConfig'
 
 // 基础记忆表格接口定义
@@ -204,7 +204,9 @@ export default function MemoryManagePage() {
   const sessionId = params.sessionId as string
 
   const { user } = useAuth()
-  const { currentCharacter, selectedModel } = useAppSelector((state) => state.chat)
+  const { data: session } = useSession(sessionId)
+  const { data: currentCharacter } = useCharacter(session?.character_id)
+  const selectedModel = parseSessionSettings(session?.settings).model ?? null
   const { getModelConfig, availableModels } = useApiConfig()
 
   const [summaries, setSummaries] = useState<ChatSummary[]>([])
@@ -259,7 +261,7 @@ export default function MemoryManagePage() {
       setIsLoading(true)
       try {
         // 加载摘要
-        const summaryData = await getSummaries(sessionId, user.id)
+        const summaryData = await fetchSummaries(sessionId, user.id)
         setSummaries(summaryData as ChatSummary[])
 
         // 加载记忆表格数据（只加载启用的）
@@ -1147,7 +1149,7 @@ export default function MemoryManagePage() {
     if (savedModel && availableModels.includes(savedModel)) {
       return savedModel
     }
-    // 其次使用Redux store中的选择
+    // 其次使用会话设置中的选择
     if (selectedModel && availableModels.includes(selectedModel)) {
       return selectedModel
     }
@@ -1387,7 +1389,7 @@ export default function MemoryManagePage() {
       console.log(`✅ 摘要已标记为不活跃: ${summaryId}`)
 
       // 4. 刷新界面
-      const summaryData = await getSummaries(sessionId, user!.id)
+      const summaryData = await fetchSummaries(sessionId, user!.id)
       setSummaries(summaryData as ChatSummary[])
 
       const { data: memoryData } = await supabase

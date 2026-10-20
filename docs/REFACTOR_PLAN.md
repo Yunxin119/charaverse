@@ -8,7 +8,7 @@
 |---|---|---|---|
 | P0 | 止血：删死代码、堵安全洞、升级依赖 | 0.5 天 | ✅ 2026-10-20（hotfix SQL 待在 dashboard 执行） |
 | P1 | 地基：设计 token、App 壳、鉴权中间件、数据层 | 1 天 | 🟡 2026-10-20 基本完成（baseline 迁移 + gen types 待你跑 CLI） |
-| P2 | 聊天核心重写：流式、预设驱动的 prompt 组装、消息组件 | 1.5 天 | ⬜ 下一步 |
+| P2 | 聊天核心重写：流式、预设驱动的 prompt 组装、消息组件 | 1.5 天 | 🟡 2026-10-20 代码完成，待你跑 0002 迁移 + 登录实测 |
 | P3 | 可定制化：预设导入/管理、主题导入、作者皮肤、HTML 块沙箱 | 1.5 天 | ⬜ |
 | P4 | 其余页面换皮 + API 连接管理合并 | 1 天 | ⬜ |
 | P5 | 记忆 / 摘要 / 日记：schema 驱动重建 | 1 天 | ⬜ |
@@ -254,21 +254,23 @@ docs/                       # 本文件 + design/
 
 ### P2 · 聊天核心（1.5 天）
 目标：一个干净的、流式的、可扩展的聊天视图。
-- [ ] 安装 `ai` + providers；`lib/llm/providers.ts` 根据连接类型（openai-compatible / google / deepseek / anthropic）返回 model；`guards.ts` 做 A6
-- [ ] `api/chat/route.ts` 重写：鉴权 → 读 `x-cv-connection` header（key/baseUrl/model）→ `streamText` → `toUIMessageStreamResponse()`；`maxDuration=60`、`AbortSignal`、body ≤ 256KB
-- [ ] `lib/prompt/assemble.ts`：**预设驱动**的 messages 组装（§5.6）：输入 preset + 角色卡 + 用户人设 + 记忆表 + 摘要 + 历史 → 输出 `{ messages, sampling }`；纯函数 + 单测；各段用分隔符包裹（防注入边界）
-- [ ] `lib/prompt/presets.ts`：zod schema、内置默认预设（把现在 `buildSystemPrompt` 的逻辑翻译成一个预设）、酒馆预设导入转换器 + 单测（用 1–2 个真实 ST 预设 JSON 当 fixture）
-- [ ] `user_presets` 表 + `useBuiltinOrUserPreset()`；会话设置里可选预设
-- [ ] `lib/prompt/context.ts`：ContextManager 收口（token 估算、截断、摘要注入）
-- [ ] `components/chat/ChatView`：`useChat` 驱动；`MessageList`（虚拟滚动 or 分页）、`MessageBubble`（glass AI / primary user）、`MessageActions`（重生成、编辑、删除、续写、分支、复制）、`Composer`（neu 输入框，Enter/Shift+Enter，粘贴图片占位）、`TypingIndicator`
-- [ ] **Swipe / 多候选**：`chat_messages` 增加 `swipes jsonb + swipe_index`；左右滑或箭头切换；regenerate = 新增 swipe 而不是覆盖
-- [ ] 消息持久化改到服务端：`onFinish` 写 `chat_messages`（用户消息乐观插入）
-- [ ] 每会话设置统一成 `chat_sessions.settings jsonb`（model、context、background、skin 开关），不再散落 localStorage
-- [ ] 背景图上传到 storage（`chat-backgrounds/<uid>/…`），不再 base64 进 localStorage
-- [ ] 自动摘要触发：未摘要消息 ≥ N 条时后台调用 `/api/chat/summary`（P5 再优化 prompt）
-- [ ] 删 `chatSlice` / `enhancedChatSlice` / Redux 依赖
-- [ ] 删多角色代码：`multiCharacterManager.ts`、`MultiCharacterMessage.tsx`、`ChatCharacterSelector.tsx` 及 chat 页里的 speaker 逻辑（A15）
-- 验收：流式打字可见；断网/超时有提示且可重试；刷新后 swipe 还在；`assemble` 与 ST 预设导入有测试
+- [x] 安装 `ai` + providers；`lib/llm/providers.ts` 根据连接类型（openai-compatible / google / deepseek / anthropic）返回 model；`guards.ts` 做 A6
+- [x] `api/chat/route.ts` 重写：鉴权 → 读 `x-cv-connection` header（base64url JSON：kind/apiKey/baseUrl/model）→ 服务端加载会话/角色卡/记忆/摘要/预设 → `streamText` → `toUIMessageStreamResponse()`；actions：send / opening / regenerate / continue / inspire；客户端不再发送对话历史
+- [x] `lib/prompt/assemble.ts`：**预设驱动**的 messages 组装（§5.6）：输入 preset + 角色卡 + 用户人设 + 记忆表 + 摘要 + 历史 → 输出 `{ messages, sampling }`；纯函数 + 单测；各段用分隔符包裹（防注入边界）
+- [x] `lib/prompt/presets.ts`：zod schema、内置默认预设（把现在 `buildSystemPrompt` 的逻辑翻译成一个预设）、酒馆预设导入转换器 + 单测（用 1–2 个真实 ST 预设 JSON 当 fixture）
+- [x] `user_presets` 表 + `useBuiltinOrUserPreset()`；会话设置里可选预设
+- [x] `lib/prompt/tokens.ts` + `assemble.trimHistory`：token 估算与截断；`lib/chat/loadContext.ts` 服务端统一加载上下文（旧 ContextManager 已删）
+- [x] `components/chat/ChatView`：自写 `useChatStream`（解析 UI message stream，DB 为唯一真相源，流结束后 refetch）；`MessageList`（虚拟滚动 or 分页）、`MessageBubble`（glass AI / primary user）、`MessageActions`（重生成、编辑、删除、续写、分支、复制）、`Composer`（neu 输入框，Enter/Shift+Enter，粘贴图片占位）、`TypingIndicator`
+- [x] **Swipe / 多候选**：`chat_messages` 增加 `swipes jsonb + swipe_index`；左右滑或箭头切换；regenerate = 新增 swipe 而不是覆盖
+- [x] 消息持久化改到服务端：用户消息先入库再流式，`onEnd`/`onAbort` 写回复（中断也保留已生成部分）；regenerate 走 `append_message_swipe` RPC
+- [x] 每会话设置统一成 `chat_sessions.settings jsonb`（model、context、background、skin 开关），不再散落 localStorage
+- [x] 背景图上传到 storage（`chat-backgrounds/<uid>/…`），不再 base64 进 localStorage
+- [x] 自动摘要触发：未摘要消息 ≥ N 条时后台调用 `/api/chat/summary`（P5 再优化 prompt）
+- [x] 删 `chatSlice` / `enhancedChatSlice` / Redux 依赖
+- [x] 删多角色代码：`multiCharacterManager.ts`、`MultiCharacterMessage.tsx`、`ChatCharacterSelector.tsx` 及 chat 页里的 speaker 逻辑（A15）
+- [ ] **需要你手动执行**：在 Supabase SQL editor 跑 `supabase/migrations/0002_chat_v2.sql`（swipes/meta 列、`chat_sessions.settings`、`user_presets` 表、`chat-backgrounds` bucket、两个 swipe RPC）。不跑的话新聊天页会报错
+- 验收：`tsc` / `eslint` / `next build` 全绿 ✅；`vitest` 47 个用例通过（macros / tokens / presets 含酒馆导入 / assemble）✅；流式打字、swipe、分支、续写、灵感、设置面板 —— **待你登录实测**
+- 已知遗留（P4/P5 处理）：模型/连接仍由旧的 `useApiConfig` 解析（设置页三套 UI 未合并）；日记路由仍用自己的 provider 代码；memory 页仍 4k 行
 
 ### P3 · 可定制化（1.5 天）
 目标：用户能导入预设和主题，作者能做皮肤，且安全。

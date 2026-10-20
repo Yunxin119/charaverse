@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { completeText } from '@/lib/llm/complete'
+import { connectionFromRequest } from '@/lib/llm/legacyHeaders'
 import { createClient } from '@supabase/supabase-js'
 
 interface SummaryGenerateRequest {
@@ -58,15 +60,8 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // 获取API密钥和模型（从header中）
-    const apiKey = request.headers.get('x-api-key')
-    const model = request.headers.get('x-model') || 'deepseek-chat'
-    const baseUrl = request.headers.get('x-base-url') || ''
-    const actualModel = request.headers.get('x-actual-model') || ''
-    const thinkingBudget = request.headers.get('x-thinking-budget') ? parseInt(request.headers.get('x-thinking-budget')!) : undefined
-    
-    if (!apiKey) {
-      return NextResponse.json({ error: '缺少API密钥' }, { status: 400 })
+    if (!connectionFromRequest(request.headers)) {
+      return NextResponse.json({ error: '缺少模型连接信息（API Key）' }, { status: 400 })
     }
 
     // 验证用户身份
@@ -383,45 +378,20 @@ ${conversationText}
 【请开始你的创作】：`
     }
 
-    // 调用AI API生成摘要
-    const serverBaseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
-    const requestBody: Record<string, unknown> = {
-      messages: [{ role: 'user', content: summaryPrompt }],
-      // ✏️✏️✏️ 更新System Prompt：混合身份 ✏️✏️✏️
-      systemPrompt: useMemoryTable
+    // 调用模型生成摘要（直接走 lib/llm，不再 HTTP 回调自己）
+    const connection = connectionFromRequest(request.headers)
+    if (!connection) {
+      return NextResponse.json({ error: '缺少模型连接信息' }, { status: 400 })
+    }
+    const completion = await completeText({
+      connection,
+      instructions: useMemoryTable
         ? `你拥有双重身份：1. 一位获得文学大奖的畅销小说家，擅长将对话转化为细腻、充满画面感的文学作品；2. 一位精准的记忆数据库管理员。你的任务是同时输出高质量的故事摘要（在JSON的summary字段）和结构化的记忆数据（在JSON的memories字段）。`
         : `你是一位获得文学大奖的小说家，擅长将平淡的对话转化为充满张力和画面感的文学作品。你的文字风格细腻、动人，善于捕捉人物之间微妙的化学反应，能够根据对话的密度灵活调整叙述的节奏。`,
-      apiKey: apiKey || '',
-      model: model || 'deepseek-chat'
-    }
-    
-    // 添加thinking budget参数（如果有）
-    if (thinkingBudget !== undefined) {
-      requestBody.thinkingBudget = thinkingBudget
-    }
-    
-    // 如果有中转API参数，添加到请求体中
-    if (baseUrl && actualModel) {
-      requestBody.baseUrl = baseUrl
-      requestBody.actualModel = actualModel
-    }
-
-    const response = await fetch(`${serverBaseUrl}/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(requestBody),
+      messages: [{ role: 'user', content: summaryPrompt }],
+      sampling: { temperature: 1, max_tokens: 8192 },
     })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('AI API调用失败:', response.status, errorText)
-      throw new Error(`摘要生成失败: ${response.status} ${errorText}`)
-    }
-
-    const aiResult = await response.json()
+    const aiResult = { content: completion.text }
     let generatedSummary = aiResult.content || '摘要生成失败'
     let memoryEntries: MemoryEntry[] = []
     let memoryTableData: any = null

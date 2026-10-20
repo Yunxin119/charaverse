@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
-import { ReduxProvider } from "./components/providers/ReduxProvider";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ThemeProvider, ThemeScript } from "./contexts/ThemeContext";
@@ -49,11 +48,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} antialiased`}>
         <ThemeProvider>
           <QueryProvider>
-            <ReduxProvider>
-              <AuthProvider>
-                <AppShell>{children}</AppShell>
-              </AuthProvider>
-            </ReduxProvider>
+            <AuthProvider>
+              <AppShell>{children}</AppShell>
+            </AuthProvider>
           </QueryProvider>
         </ThemeProvider>
       </body>

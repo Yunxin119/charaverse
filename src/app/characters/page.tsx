@@ -27,13 +27,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/providers/AuthProvider'
 import { supabase } from '../lib/supabase'
-import { Character } from '../store/chatSlice'
-import { useAppDispatch } from '../store/hooks'
-import { getExistingSession } from '../store/chatSlice'
+import type { Character } from '../lib/supabase'
 
 export default function CharactersPage() {
   const { user } = useAuth()
-  const dispatch = useAppDispatch()
   const router = useRouter()
   
   const [characters, setCharacters] = useState<Character[]>([])
@@ -111,28 +108,10 @@ export default function CharactersPage() {
   }
 
   // 处理聊天按钮点击
-  const handleChatClick = async (characterId: number) => {
+  const handleChatClick = (characterId: number) => {
     if (!user) return
-    
-    try {
-      // 检查是否已有该角色的会话
-      const existingSession = await dispatch(getExistingSession({ 
-        characterId, 
-        userId: user.id 
-      })).unwrap()
-      
-      if (existingSession) {
-        // 如果已有会话，跳转到现有会话
-        router.push(`/chat/${existingSession.id}`)
-      } else {
-        // 如果没有会话，创建新会话
-        router.push(`/chat/new?characterId=${characterId}`)
-      }
-    } catch (error) {
-      console.error('检查会话失败:', error)
-      // 如果检查失败，默认创建新会话
-      router.push(`/chat/new?characterId=${characterId}`)
-    }
+    // /chat/new 会复用该角色最近的会话，没有则创建
+    router.push(`/chat/new?characterId=${characterId}`)
   }
 
   // 过滤和搜索角色

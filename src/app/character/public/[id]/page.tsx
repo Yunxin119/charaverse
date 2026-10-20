@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Textarea } from '@/components/ui/textarea'
-import { supabase, type ScriptCharacter } from '../../../lib/supabase'
+import { supabase } from '../../../lib/supabase'
 import { useAuth } from '@/providers/AuthProvider'
 import ImageUpload from '../../../components/ImageUpload'
 import ImageViewer from '../../../components/ImageViewer'
@@ -38,8 +38,6 @@ interface Script {
   likes_count: number
   created_at: string
   user_id: string
-  script_type: 'single' | 'multi'
-  script_characters?: ScriptCharacter[]
   profiles?: {
     username?: string
   }
@@ -193,8 +191,6 @@ export default function PublicScriptPage() {
           name: `${script.name} (副本)`,
           avatar_url: script.avatar_url,
           prompt_template: script.prompt_template,
-          script_type: script.script_type,
-          script_characters: script.script_characters,
           is_public: false,
           likes_count: 0
         })
@@ -222,9 +218,7 @@ export default function PublicScriptPage() {
         .insert({
           user_id: user!.id,
           character_id: script.id,
-          title: script.script_type === 'multi'
-            ? `${script.name} 多角色对话`
-            : `与 ${script.name} 的对话`
+          title: `与 ${script.name} 的对话`
         })
         .select()
         .single()
@@ -476,16 +470,6 @@ export default function PublicScriptPage() {
                 <h1 className="text-4xl font-bold drop-shadow-lg mb-2">
                   {script.name}
                 </h1>
-                <div className="flex items-center space-x-4 text-lg drop-shadow mb-2">
-                  <span className="px-3 py-1 bg-white/20 rounded-full text-sm">
-                    {script.script_type === 'single' ? '单角色剧本' : '多角色剧本'}
-                  </span>
-                  {script.script_characters && (
-                    <span className="px-3 py-1 bg-white/20 rounded-full text-sm">
-                      {script.script_characters.length} 个角色
-                    </span>
-                  )}
-                </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-6 h-6 rounded-full overflow-hidden border border-white/30">
                     <div className="w-full h-full bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center">
@@ -528,64 +512,6 @@ export default function PublicScriptPage() {
                     <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-base">
                       {script.prompt_template.basic_info.introduction}
                     </p>
-                  </div>
-                )}
-
-                {/* Script Characters List */}
-                {script.script_characters && script.script_characters.length > 1 && (
-                  <div className="mb-6">
-                    <h3 className="font-semibold text-slate-900 dark:text-white mb-3 flex items-center">
-                      <User className="w-5 h-5 mr-2" />
-                      剧本角色
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {script.script_characters.map((scriptChar, index) => (
-                        <div key={scriptChar.id} className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 dark:bg-slate-800/30">
-                          <div className="flex items-start space-x-3">
-                            <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                              {scriptChar.avatar_url ? (
-                                <img
-                                  src={scriptChar.avatar_url}
-                                  alt={scriptChar.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <span className="text-white text-lg font-bold">
-                                  {scriptChar.name.charAt(0)}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-slate-900 dark:text-white mb-1">
-                                {scriptChar.name}
-                              </h4>
-                              {scriptChar.description && (
-                                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                                  {scriptChar.description}
-                                </p>
-                              )}
-                              {scriptChar.personality?.traits && scriptChar.personality.traits.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                  {scriptChar.personality.traits.slice(0, 3).map((trait, traitIndex) => (
-                                    <span
-                                      key={traitIndex}
-                                      className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                                    >
-                                      {trait}
-                                    </span>
-                                  ))}
-                                  {scriptChar.personality.traits.length > 3 && (
-                                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                                      +{scriptChar.personality.traits.length - 3}个特征
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 )}
 
@@ -711,7 +637,7 @@ export default function PublicScriptPage() {
                     className="h-12 bg-blue-600 hover:bg-blue-700"
                   >
                     <MessageCircle className="w-4 h-4 mr-2" />
-                    {script.script_type === 'multi' ? '开始多角色对话' : '开始聊天'}
+                    开始聊天
                   </Button>
                 </div>
 

@@ -1,0 +1,257 @@
+'use client'
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Loader2, Sparkles, AlertCircle, X } from 'lucide-react'
+import { useAuth } from '@/providers/AuthProvider'
+import { useCharacter, useMessages, useProfile, useSession, usePresets } from '@/queries'
+import {
+  useBranchSession, useDeleteFrom, useDeleteMessages, useEditMessage, useSelectSwipe,
+  useUpdateSessionSettings, useUpdateSessionTitle,
+} from '@/queries/useChatMutations'
+import { useChatStream } from '@/hooks/useChatStream'
+import { useAutoSummary } from '@/hooks/useAutoSummary'
+import { useConnection } from '@/lib/llm/useConnection'
+import { parseSessionSettings, type SessionSettings } from '@/lib/chat/settings'
+import { parseCharacterCard } from '@/lib/chat/characterCard'
+import { BUILTIN_DEFAULT_PRESET } from '@/lib/prompt/presets'
+import { CharacterStyleInjector } from '@/app/components/CharacterStyleInjector'
+import { Button } from '@/components/ui/button'
+import { PosterCard, PosterTitle } from '@/components/glass'
+import type { ChatMessage } from '@/app/lib/supabase'
+import { ChatHeader } from './ChatHeader'
+import { MessageList } from './MessageList'
+import { Composer } from './Composer'
+import { ChatSettingsSheet } from './ChatSettingsSheet'
+import type { MessageActionHandlers } from './MessageActions'
+
+export function ChatView({ sessionId }: { sessionId: string }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { user } = useAuth()
+  const userId = user?.id
+
+  const sessionQ = useSession(sessionId)
+  const session = sessionQ.data
+  const characterQ = useCharacter(session?.character_id)
+  const character = characterQ.data
+  const profileQ = useProfile(userId)
+  const presetsQ = usePresets(userId)
+  const messagesQ = useMessages(sessionId)
+
+  const settings: SessionSettings = useMemo(() => parseSessionSettings(session?.settings), [session?.settings])
+  const card = useMemo(() => (character ? parseCharacterCard(character) : null), [character])
+
+  const messages: ChatMessage[] = useMemo(() => {
+    const all = (messagesQ.data?.pages ?? []).flat()
+    return all.filter((m) => m.role !== 'system').sort((a, b) => a.id - b.id)
+  }, [messagesQ.data])
+
+  const conn = useConnection()
+  const modelId = settings.model ?? conn.availableModels[0]
+  const headers = useMemo(() => conn.headersFor(modelId), [conn, modelId])
+
+  const stream = useChatStream(sessionId)
+  const editMessage = useEditMessage(sessionId)
+  const deleteMessages = useDeleteMessages(sessionId)
+  const deleteFrom = useDeleteFrom(sessionId)
+  const selectSwipe = useSelectSwipe(sessionId)
+  const updateSettings = useUpdateSessionSettings(sessionId)
+  const updateTitle = useUpdateSessionTitle(sessionId)
+  const branch = useBranchSession()
+
+  const [input, setInput] = useState('')
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [inspiring, setInspiring] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+
+  const autoSummary = useAutoSummary({
+    sessionId, userId, characterName: card?.name ?? '角色', every: settings.context.autoSummaryEvery, headers,
+    onDone: (ok) => { if (ok) { setToast('已自动整理剧情摘要与记忆'); setTimeout(() => setToast(null), 3500) } },
+  })
+
+  const busy = stream.isStreaming || editMessage.isPending || deleteMessages.isPending || deleteFrom.isPending || selectSwipe.isPending || branch.isPending
+
+  const requireHeaders = useCallback((): Record<string, string> | null => {
+    if (!headers) {
+      setNotice(conn.availableModels.length ? '请先在会话设置里选择一个模型' : '还没有配置任何 API Key，去「我的 → API」添加')
+      setSettingsOpen(true)
+      return null
+    }
+    return headers
+  }, [headers, conn.availableModels.length])
+
+  const runSafe = useCallback(async (opts: Parameters<typeof stream.run>[0]) => {
+    try { return await stream.run(opts) } catch { return '' }
+  }, [stream])
+
+  // --- opening line when the character has none and the session was just created ---
+  const openingTried = useRef(false)
+  useEffect(() => {
+    if (openingTried.current) return
+    if (searchParams.get('opening') !== '1') return
+    if (!session || messagesQ.isLoading || messages.length > 0 || !headers) return
+    openingTried.current = true
+    router.replace(`/chat/${sessionId}`)
+    void runSafe({ action: 'opening', headers })
+  }, [searchParams, session, messagesQ.isLoading, messages.length, headers, router, sessionId, runSafe])
+
+  // --- actions ---
+  const send = async () => {
+    const text = input.trim()
+    const h = requireHeaders()
+    if (!text || !h) return
+    setInput('')
+    await runSafe({ action: 'send', text, headers: h })
+    void autoSummary.maybeRun(messagesRef.current)
+  }
+
+  // latest messages for callbacks that run after a stream finishes
+  const messagesRef = useRef(messages)
+  useEffect(() => { messagesRef.current = messages }, [messages])
+
+  const inspire = async () => {
+    const h = requireHeaders()
+    if (!h) return
+    setInspiring(true)
+    try {
+      const text = await stream.run({ action: 'inspire', headers: h, render: false })
+      if (text.trim()) setInput(text.trim())
+    } catch { /* error surfaced by stream.error */ } finally {
+      setInspiring(false)
+    }
+  }
+
+  const handlersFor = useCallback((m: ChatMessage, isLast: boolean): MessageActionHandlers => {
+    const h = () => requireHeaders()
+    return {
+      onEdit: () => { setEditingId(m.id); setSelectedId(m.id) },
+      onDelete: () => { if (confirm('删除这条消息？')) deleteMessages.mutate([m.id]) },
+      onBranch: () => branch.mutate({ sessionId, messageId: m.id }, { onSuccess: (id) => router.push(`/chat/${id}`) }),
+      onRegenerate: isLast && m.role === 'assistant' ? () => { const hh = h(); if (hh) void runSafe({ action: 'regenerate', messageId: m.id, headers: hh }) } : undefined,
+      onContinue: isLast && m.role === 'assistant' ? () => { const hh = h(); if (hh) void runSafe({ action: 'continue', headers: hh }) } : undefined,
+      onResend: isLast && m.role === 'user' ? async () => {
+        const hh = h(); if (!hh) return
+        await deleteFrom.mutateAsync(m.id)
+        await runSafe({ action: 'send', text: m.content, headers: hh })
+      } : undefined,
+    }
+  }, [requireHeaders, deleteMessages, branch, sessionId, router, runSafe, deleteFrom])
+
+  const saveSettings = async (patch: { title?: string; settings: Partial<SessionSettings> }) => {
+    if (patch.title !== undefined) await updateTitle.mutateAsync(patch.title)
+    await updateSettings.mutateAsync(patch.settings)
+    setNotice(null)
+  }
+
+  const clearMessages = async () => {
+    if (!messages.length) return
+    await deleteFrom.mutateAsync(messages[0].id)
+  }
+
+  // --- render ---
+  if (sessionQ.isLoading || (session && characterQ.isLoading)) {
+    return <div className="flex h-dvh items-center justify-center text-cv-fg-muted"><Loader2 className="mr-2 size-5 animate-spin" />加载对话…</div>
+  }
+  if (sessionQ.isError || !session || !character || !card || !userId) {
+    return (
+      <div className="flex h-dvh items-center justify-center p-6">
+        <PosterCard tone="ink" className="max-w-md"><PosterTitle>找不到这个对话</PosterTitle><p className="mt-2 text-sm opacity-80">它可能已被删除，或者不属于当前账号。</p>
+          <Button className="mt-5" variant="accent" onClick={() => router.push('/chat')}>返回对话列表</Button></PosterCard>
+      </div>
+    )
+  }
+
+  const characterSpeaker = { name: card.name, avatarUrl: character.avatar_url }
+  const userSpeaker = { name: settings.userName || profileQ.data?.username || card.userName, avatarUrl: profileQ.data?.avatar_url }
+  const bg = settings.background
+  const presetLabel = settings.presetId ? presetsQ.data?.find((p) => p.id === settings.presetId)?.name : (presetsQ.data?.find((p) => p.is_default)?.name ?? BUILTIN_DEFAULT_PRESET.name)
+
+  return (
+    <div id="cv_chat_root" className="relative flex h-dvh flex-col overflow-hidden">
+      <CharacterStyleInjector customCss={card.customCss} />
+      {bg.url && (
+        <>
+          <div id="cv_background_image" aria-hidden className="pointer-events-none absolute inset-0 -z-20 bg-cover bg-center" style={{ backgroundImage: `url(${bg.url})`, opacity: bg.opacity, filter: bg.blur ? `blur(${bg.blur}px)` : undefined, transform: bg.blur ? 'scale(1.05)' : undefined }} />
+          <div id="cv_background_overlay" aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-cv-bg/40 via-transparent to-cv-bg/60" />
+        </>
+      )}
+
+      <ChatHeader
+        sessionId={sessionId}
+        character={{ id: character.id, ...characterSpeaker }}
+        title={session.title}
+        modelLabel={modelId ? conn.displayName(modelId) : undefined}
+        presetLabel={presetLabel}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onNewBranchFromEnd={messages.length ? () => branch.mutate({ sessionId, messageId: messages[messages.length - 1].id }, { onSuccess: (id) => router.push(`/chat/${id}`) }) : undefined}
+      />
+
+      <MessageList
+        messages={messages}
+        character={characterSpeaker}
+        user={userSpeaker}
+        streamingText={stream.isStreaming && stream.streamingAction !== 'inspire' ? stream.streamingText : null}
+        busy={busy}
+        selectedId={selectedId}
+        editingId={editingId}
+        onSelect={setSelectedId}
+        handlersFor={handlersFor}
+        onEditSave={(m, content) => editMessage.mutate({ message: m, content }, { onSuccess: () => setEditingId(null) })}
+        onEditCancel={() => setEditingId(null)}
+        onSwipe={(m, index) => selectSwipe.mutate({ messageId: m.id, index })}
+        hasOlder={!!messagesQ.hasNextPage}
+        loadingOlder={messagesQ.isFetchingNextPage}
+        onLoadOlder={() => void messagesQ.fetchNextPage()}
+        emptyState={
+          <div className="mx-auto mt-10 max-w-sm text-center">
+            <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-cv-md bg-cv-accent text-white shadow-[0_10px_24px_-10px_var(--cv-accent)]"><Sparkles className="size-5" /></div>
+            <h2 className="font-display text-xl font-semibold">和 {card.name} 的故事还没开始</h2>
+            <p className="mt-1 text-sm text-cv-fg-muted">{card.introduction || '发一句话，或者让角色先开口。'}</p>
+            {headers && <Button className="mt-4" variant="neu" size="sm" onClick={() => void runSafe({ action: 'opening', headers })}>让 {card.name} 先说</Button>}
+          </div>
+        }
+      />
+
+      {toast && (
+        <div className="pointer-events-none absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-full glass-strong px-4 py-1.5 text-xs text-cv-fg-muted">{toast}</div>
+      )}
+      {(stream.error || notice) && (
+        <div className="mx-auto mb-1 flex w-[min(100%-1.5rem,48rem)] items-center gap-2 rounded-cv-md border border-cv-danger/30 bg-[color-mix(in_oklab,var(--cv-danger)_10%,var(--cv-bg-elevated))] px-3 py-2 text-sm text-cv-danger">
+          <AlertCircle className="size-4 shrink-0" />
+          <span className="flex-1">{stream.error ?? notice}</span>
+          <button type="button" aria-label="关闭" onClick={() => { stream.clearError(); setNotice(null) }} className="rounded-full p-1 hover:bg-cv-danger/10"><X className="size-4" /></button>
+        </div>
+      )}
+
+      <Composer
+        value={input}
+        onChange={setInput}
+        onSend={send}
+        onStop={stream.stop}
+        onInspire={inspire}
+        streaming={stream.isStreaming && stream.streamingAction !== 'inspire'}
+        inspiring={inspiring}
+        placeholder={`对 ${card.name} 说点什么…`}
+      />
+
+      <ChatSettingsSheet
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        sessionId={sessionId}
+        userId={userId}
+        title={session.title ?? ''}
+        settings={settings}
+        models={conn.availableModels.map((id) => ({ id, label: conn.displayName(id) }))}
+        presets={presetsQ.data ?? []}
+        builtinPresetName={BUILTIN_DEFAULT_PRESET.name}
+        saving={updateSettings.isPending || updateTitle.isPending}
+        onSave={saveSettings}
+        onClearMessages={clearMessages}
+      />
+    </div>
+  )
+}

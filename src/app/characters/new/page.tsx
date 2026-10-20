@@ -32,7 +32,6 @@ import { useAuth } from '@/providers/AuthProvider'
 import { TemplateManager } from '../../components/TemplateManager'
 import { SimpleAvatarUpload } from '../../components/AvatarUpload'
 import { uploadCharacterAvatar } from '../../lib/avatarUpload'
-import { ScriptCharacter } from '../../lib/supabase'
 
 interface BasicInfo {
   name: string // 角色名称
@@ -44,7 +43,6 @@ interface BasicInfo {
   age?: string // 角色年龄
   gender?: 'male' | 'female' | 'none' | 'other' // 角色性别
   keywords?: string[] // 角色关键词
-  script_type?: 'single' | 'multi' // 剧本类型
 }
 
 interface PromptModule {
@@ -397,26 +395,6 @@ export default function NewCharacterPage() {
                         onChange={(e) => handleBasicInfoChange('name', e.target.value)}
                         required
                       />
-                    </div>
-
-                    {/* Script Type */}
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="script_type">剧本类型</Label>
-                      <Select value={basicInfo.script_type} onValueChange={(value: 'single' | 'multi') => handleBasicInfoChange('script_type', value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="选择剧本类型" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="single">单角色剧本</SelectItem>
-                          <SelectItem value="multi">多角色剧本</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {basicInfo.script_type === 'single'
-                          ? '单角色剧本：只包含一个角色，适合单人对话'
-                          : '多角色剧本：包含多个角色，支持角色之间的互动对话'
-                        }
-                      </p>
                     </div>
                   </div>
 

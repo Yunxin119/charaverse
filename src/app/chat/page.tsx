@@ -20,8 +20,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/providers/AuthProvider'
 import { supabase } from '../lib/supabase'
-import { useAppDispatch } from '../store/hooks'
-import { getExistingSession } from '../store/chatSlice'
 
 interface ChatSessionWithCharacter {
   id: string
@@ -40,7 +38,6 @@ interface ChatSessionWithCharacter {
 
 export default function ChatPage() {
   const { user } = useAuth()
-  const dispatch = useAppDispatch()
   const router = useRouter()
   
   const [sessions, setSessions] = useState<ChatSessionWithCharacter[]>([])
