@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
 import { supabase } from '../lib/supabase'
+import { authedFetch } from '@/lib/authedFetch'
 import { sendMessageWithContext, regenerateMessageWithContext } from '../lib/enhancedChatSlice'
 
 export interface ChatMessage {
@@ -316,12 +317,11 @@ export const sendMessage = createAsyncThunk(
     console.log('发送到API的请求体:', {
       messages: messageHistory.length,
       systemPrompt: systemPrompt ? `${systemPrompt.length} chars` : 'undefined',
-      apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'undefined',
       model,
       thinkingBudget: requestBody.thinkingBudget
     })
 
-    const response = await fetch('/api/chat', {
+    const response = await authedFetch('/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -426,7 +426,7 @@ export const regenerateLastMessage = createAsyncThunk(
       requestBody.actualModel = actualModel
     }
 
-    const response = await fetch('/api/chat', {
+    const response = await authedFetch('/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -568,7 +568,7 @@ export const resendUserMessage = createAsyncThunk(
       requestBody.actualModel = actualModel
     }
 
-    const response = await fetch('/api/chat', {
+    const response = await authedFetch('/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -669,7 +669,7 @@ export const sendNewMessageFrom = createAsyncThunk(
       requestBody.actualModel = actualModel
     }
 
-    const response = await fetch('/api/chat', {
+    const response = await authedFetch('/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -775,7 +775,7 @@ export const clearChatHistory = createAsyncThunk(
         model
       }
 
-      const response = await fetch('/api/chat', {
+      const response = await authedFetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -822,7 +822,7 @@ export const branchChatSession = createAsyncThunk(
       throw new Error('用户未登录')
     }
 
-    const response = await fetch('/api/chat/branch', {
+    const response = await authedFetch('/api/chat/branch', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -1,4 +1,5 @@
 import { ChatMessage } from './supabase'
+import { authedFetch } from '@/lib/authedFetch'
 
 // 上下文配置接口
 export interface ContextConfig {
@@ -176,7 +177,7 @@ ${conversationText}
 
     try {
       // 调用AI API生成摘要
-      const response = await fetch('/api/chat', {
+      const response = await authedFetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

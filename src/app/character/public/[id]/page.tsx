@@ -170,14 +170,12 @@ export default function PublicScriptPage() {
 
     setIsLiking(true)
     try {
-      const { error } = await supabase
-        .from('characters')
-        .update({ likes_count: script.likes_count + 1 })
-        .eq('id', script.id)
+      // 点赞走 RPC（supabase/hotfix/p0_rls_storage.sql），客户端不能直接改别人的 characters 行
+      const { data: newCount, error } = await supabase.rpc('toggle_character_like', { p_character_id: script.id })
 
       if (error) throw error
 
-      setScript(prev => prev ? { ...prev, likes_count: prev.likes_count + 1 } : null)
+      setScript(prev => prev ? { ...prev, likes_count: typeof newCount === 'number' ? newCount : prev.likes_count + 1 } : null)
     } catch (error) {
       console.error('点赞失败:', error)
     } finally {

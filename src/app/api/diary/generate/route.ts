@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { assertSafeBaseUrl } from '@/lib/server/llmGuards'
 import { createClient } from '@supabase/supabase-js'
 import { Character, ChatMessage } from '@/app/types/character'
 
@@ -21,8 +22,7 @@ async function generateDiaryContent(
     messageCount: conversationMessages.length,
     model,
     actualModel,
-    baseUrl: baseUrl ? baseUrl.substring(0, 30) + '...' : 'none',
-    apiKeyPrefix: apiKey.substring(0, 10) + '...'
+    baseUrl: baseUrl ? baseUrl.substring(0, 30) + '...' : 'none'
   })
   // 构建角色信息
   const characterInfo = character.prompt_template?.basic_info
@@ -149,10 +149,11 @@ async function callGemini(prompt: string, apiKey: string, model: string): Promis
     }
   }
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
     },
     body: JSON.stringify(requestBody),
   })
@@ -165,14 +166,12 @@ async function callGemini(prompt: string, apiKey: string, model: string): Promis
   const data = await response.json()
   
   // 添加详细日志
-  console.log('Gemini API Response:', JSON.stringify(data, null, 2))
   
   if (data.error) {
     throw new Error(`Gemini API Error: ${data.error.message}`)
   }
   
   if (!data.candidates || data.candidates.length === 0) {
-    console.error('No candidates in response:', data)
     throw new Error('Gemini API没有返回有效内容')
   }
   
@@ -291,7 +290,8 @@ async function callOpenAI(prompt: string, apiKey: string, model: string): Promis
 // 中转API调用（支持OpenAI格式的中转服务）
 async function callRelayAPI(prompt: string, apiKey: string, actualModel: string, baseUrl: string): Promise<string> {
   // 确保baseUrl以/v1结尾
-  const apiUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`
+  const safeBase = assertSafeBaseUrl(baseUrl)
+  const apiUrl = safeBase.endsWith('/v1') ? safeBase : `${safeBase}/v1`
   const maxTokens = 10000
   
   console.log('📊 Relay API Call Settings:', {
@@ -299,8 +299,7 @@ async function callRelayAPI(prompt: string, apiKey: string, actualModel: string,
     actualModel,
     inputLength: prompt.length,
     maxTokensSet: maxTokens,
-    temperature: 1.2,
-    apiKeyPrefix: apiKey.substring(0, 10) + '...'
+    temperature: 1.2
   })
   
   const requestBody: Record<string, unknown> = {
@@ -325,8 +324,6 @@ async function callRelayAPI(prompt: string, apiKey: string, actualModel: string,
       console.log('📝 Using auto thinking mode for Flash')
     }
   }
-
-  console.log('📝 Diary Relay Request Body:', JSON.stringify(requestBody, null, 2))
   
   const response = await fetch(`${apiUrl}/chat/completions`, {
     method: 'POST',
@@ -342,12 +339,10 @@ async function callRelayAPI(prompt: string, apiKey: string, actualModel: string,
 
   if (!response.ok) {
     const errorText = await response.text()
-    console.error('📝 Diary Relay API Error Response:', errorText)
     throw new Error(`Relay API error: ${response.statusText} - ${errorText}`)
   }
 
   const data = await response.json()
-  console.log('📝 Diary Relay Response Data:', JSON.stringify(data, null, 2))
   
   if (!data.choices || data.choices.length === 0) {
     console.error('📝 Diary Relay API returned no choices:', data)
@@ -501,8 +496,7 @@ export async function POST(request: NextRequest) {
     console.log('📝 Generated diary content:', {
       length: diaryContent?.length || 0,
       preview: diaryContent?.substring(0, 100) + '...',
-      lastChars: diaryContent?.slice(-50) || '',
-      fullContent: diaryContent // 临时调试：输出完整内容
+      lastChars: diaryContent?.slice(-50) || ''
     })
 
     // 7. 保存日记到数据库

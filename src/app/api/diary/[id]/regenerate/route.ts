@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { assertSafeBaseUrl } from '@/lib/server/llmGuards'
 import { createClient } from '@supabase/supabase-js'
 import { Character, ChatMessage } from '@/app/types/character'
 
@@ -127,10 +128,11 @@ async function callGemini(prompt: string, apiKey: string, model: string): Promis
     }
   }
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
     },
     body: JSON.stringify(requestBody),
   })
@@ -213,13 +215,13 @@ async function callOpenAI(prompt: string, apiKey: string, model: string): Promis
 // 中转API调用（支持OpenAI格式的中转服务）
 async function callRelayAPI(prompt: string, apiKey: string, actualModel: string, baseUrl: string): Promise<string> {
   // 确保baseUrl以/v1结尾
-  const apiUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`
+  const safeBase = assertSafeBaseUrl(baseUrl)
+  const apiUrl = safeBase.endsWith('/v1') ? safeBase : `${safeBase}/v1`
   
   console.log('📝 Diary Regenerate Relay API Call:', {
     apiUrl: `${apiUrl}/chat/completions`,
     actualModel,
-    promptLength: prompt.length,
-    apiKeyPrefix: apiKey.substring(0, 10) + '...'
+    promptLength: prompt.length
   })
   
   const requestBody: Record<string, unknown> = {
@@ -244,8 +246,6 @@ async function callRelayAPI(prompt: string, apiKey: string, actualModel: string,
       console.log('📝 Using auto thinking mode for Flash')
     }
   }
-
-  console.log('📝 Diary Regenerate Request Body:', JSON.stringify(requestBody, null, 2))
   
   const response = await fetch(`${apiUrl}/chat/completions`, {
     method: 'POST',
@@ -261,12 +261,10 @@ async function callRelayAPI(prompt: string, apiKey: string, actualModel: string,
 
   if (!response.ok) {
     const errorText = await response.text()
-    console.error('📝 Diary Regenerate API Error Response:', errorText)
     throw new Error(`Relay API error: ${response.statusText} - ${errorText}`)
   }
 
   const data = await response.json()
-  console.log('📝 Diary Regenerate Response Data:', JSON.stringify(data, null, 2))
   
   if (!data.choices || data.choices.length === 0) {
     console.error('📝 Diary Regenerate API returned no choices:', data)

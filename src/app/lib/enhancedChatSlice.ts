@@ -1,6 +1,7 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import { supabase, type ChatMessage, type ChatSummary } from './supabase'
 import { ContextManager, ContextConfig } from './contextManager'
+import { authedFetch } from '@/lib/authedFetch'
 
 
 // 获取摘要覆盖的消息范围
@@ -521,12 +522,11 @@ export const sendMessageWithContext = createAsyncThunk(
     console.log('发送到API的请求体:', {
       messages: context.messages.length,
       systemPrompt: context.systemPrompt ? `${context.systemPrompt.length} chars` : 'undefined',
-      apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'undefined',
       model,
       contextStats: context.stats
     })
 
-    const response = await fetch('/api/chat', {
+    const response = await authedFetch('/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -662,12 +662,11 @@ export const regenerateMessageWithContext = createAsyncThunk(
     console.log('重新生成API请求体:', {
       messages: context.messages.length,
       systemPrompt: context.systemPrompt ? `${context.systemPrompt.length} chars` : 'undefined',
-      apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'undefined',
       model,
       contextStats: context.stats
     })
 
-    const response = await fetch('/api/chat', {
+    const response = await authedFetch('/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

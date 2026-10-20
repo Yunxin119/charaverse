@@ -6,8 +6,8 @@
 
 | Phase | 内容 | 预计 | 状态 |
 |---|---|---|---|
-| P0 | 止血：删死代码、堵安全洞、升级依赖 | 0.5 天 | ⬜ 未开始 |
-| P1 | 地基：设计 token、App 壳、鉴权中间件、数据层 | 1 天 | ⬜ |
+| P0 | 止血：删死代码、堵安全洞、升级依赖 | 0.5 天 | ✅ 2026-10-20（hotfix SQL 待在 dashboard 执行） |
+| P1 | 地基：设计 token、App 壳、鉴权中间件、数据层 | 1 天 | ⬜ 下一步 |
 | P2 | 聊天核心重写：流式、预设驱动的 prompt 组装、消息组件 | 1.5 天 | ⬜ |
 | P3 | 可定制化：预设导入/管理、主题导入、作者皮肤、HTML 块沙箱 | 1.5 天 | ⬜ |
 | P4 | 其余页面换皮 + API 连接管理合并 | 1 天 | ⬜ |
@@ -220,17 +220,18 @@ docs/                       # 本文件 + design/
 
 ### P0 · 止血（0.5 天）
 目标：仓库干净、没有 P0 安全洞、依赖不带 critical。
-- [ ] 新建分支 `v2` from `multichars`；先把当前 WIP（branch API、custom_css tab、memory 表单）commit 保存
-- [ ] 删除 §1.1 列出的全部死代码（页面、API、组件、hooks、lib、types、`ui/sheet`）
-- [ ] 删除未用依赖：`next-intl`、`rehype-raw`、`rehype-highlight`、`next-pwa`/`@types/next-pwa`（A13）；删 `public/sw.js`、`workbox-*.js`、`PWAInstallPrompt`、`generate-icons.html`、`scripts/generate-placeholder-icons.js`
-- [ ] 根目录清理：`*.sql` → `docs/legacy-sql/`；`*_FIX.md` 等 → `docs/legacy-notes/`；`html.html / mobile.html / multiverse.html / rancheng.md / fix.html` → `docs/skin-samples/`（P3 要用）；删 `style.html`、`_mv_head.txt`、`replace.py`
-- [ ] `npm i next@latest react@latest react-dom@latest`，修编译错误（`metadata.viewport/themeColor` 改为 `export const viewport`）
-- [ ] `/api/chat`：加 Supabase JWT 校验；`baseUrl` 按 A6 校验；错误体不再回显；Gemini key 改 header
-- [ ] 删掉所有打印 key / headers / 对话全文的 `console.log`（至少：`page.tsx` getThinkingBudget、`memory/page.tsx` L456、`api/chat`、`api/diary/*`）
-- [ ] 去 Supabase dashboard 导出 `pg_policies`，对照 §1.4 #5 #6 #8 修：`chat_memory_versions`、`session_characters` 开 RLS；storage 策略改为 owner-only；`get_incremental_messages` 删或加归属校验；点赞改成 RPC
-- [ ] 多角色：P0 只删无人引用的 `CharacterSelector.tsx`；`multiCharacterManager` / `MultiCharacterMessage` / `ChatCharacterSelector` 随 P2 聊天页重写一起删（A15）
-- [ ] 新建 `CLAUDE.md`（指向本文档 + 约定）
-- 验收：`tsc` ✅ `next build` ✅ `npm audit --omit=dev` 无 critical；现有聊天仍可用
+- [x] 新建分支 `v2` from `multichars`；先把当前 WIP（branch API、custom_css tab、memory 表单）commit 保存
+- [x] 删除 §1.1 列出的全部死代码（页面、API、组件、hooks、lib、types、`ui/sheet`）
+- [x] 删除未用依赖：`next-intl`、`rehype-raw`、`rehype-highlight`、`next-pwa`/`@types/next-pwa`（A13）；删 `public/sw.js`、`workbox-*.js`、`PWAInstallPrompt`、`generate-icons.html`、`scripts/generate-placeholder-icons.js`
+- [x] 根目录清理：`*.sql` → `docs/legacy-sql/`；`*_FIX.md` 等 → `docs/legacy-notes/`；`html.html / mobile.html / multiverse.html / rancheng.md / fix.html` → `docs/skin-samples/`（P3 要用）；删 `style.html`、`_mv_head.txt`、`replace.py`
+- [x] `npm i next@latest react@latest react-dom@latest`，修编译错误（`metadata.viewport/themeColor` 改为 `export const viewport`）
+- [x] `/api/chat`：加 Supabase JWT 校验；`baseUrl` 按 A6 校验；错误体不再回显；Gemini key 改 header
+- [x] 删掉所有打印 key / headers / 对话全文的 `console.log`（至少：`page.tsx` getThinkingBudget、`memory/page.tsx` L456、`api/chat`、`api/diary/*`）
+- [ ] **需要你手动执行**：在 Supabase SQL editor 跑 `supabase/hotfix/p0_rls_storage.sql`（开 RLS、storage owner-only、删 `get_incremental_messages`、新增 `toggle_character_like` RPC；代码已改为调用该 RPC，不跑 SQL 点赞会报错）。跑之前先 `select * from pg_policies` 存一份对照
+- [x] 多角色：P0 只删无人引用的 `CharacterSelector.tsx`；`multiCharacterManager` / `MultiCharacterMessage` / `ChatCharacterSelector` 随 P2 聊天页重写一起删（A15）
+- [x] 新建 `CLAUDE.md`（指向本文档 + 约定）
+- 验收：`tsc` ✅ `next build` ✅ `eslint` 0 error ✅ `npm audit --omit=dev` 0 critical / 0 high ✅（剩 2 个 moderate 传递依赖）；现有聊天仍可用（待你手动验证）
+- P0 新增文件：`src/lib/server/auth.ts`（`requireUser`）、`src/lib/server/llmGuards.ts`（`assertSafeBaseUrl` / `assertSafeModel` / `summarizeUpstreamError`）、`src/lib/authedFetch.ts`、`supabase/hotfix/p0_rls_storage.sql`、`CLAUDE.md`
 
 ### P1 · 地基（1 天）
 目标：新壳立起来，后续页面能往里搬。

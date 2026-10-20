@@ -384,7 +384,7 @@ ${conversationText}
     }
 
     // 调用AI API生成摘要
-    const serverBaseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+    const serverBaseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
     const requestBody: Record<string, unknown> = {
       messages: [{ role: 'user', content: summaryPrompt }],
       // ✏️✏️✏️ 更新System Prompt：混合身份 ✏️✏️✏️
@@ -410,6 +410,7 @@ ${conversationText}
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify(requestBody),
     })

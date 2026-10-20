@@ -453,7 +453,6 @@ export default function MemoryManagePage() {
       }
 
       console.log('📤 发送请求到 /api/chat/summary:', requestBody)
-      console.log('📋 请求头:', headers)
 
       const response = await fetch('/api/chat/summary', {
         method: 'POST',

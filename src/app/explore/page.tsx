@@ -131,18 +131,16 @@ export default function ExplorePage() {
   // 点赞功能
   const handleLike = async (characterId: number, currentLikes: number) => {
     try {
-      const { error } = await supabase
-        .from('characters')
-        .update({ likes_count: currentLikes + 1 })
-        .eq('id', characterId)
+      // 点赞走 RPC（supabase/hotfix/p0_rls_storage.sql），客户端不能直接改别人的 characters 行
+      const { data: newCount, error } = await supabase.rpc('toggle_character_like', { p_character_id: characterId })
 
       if (error) throw error
-      
+
       // 更新本地状态
-      setCharacters(prev => 
-        prev.map(char => 
-          char.id === characterId 
-            ? { ...char, likes_count: currentLikes + 1 }
+      setCharacters(prev =>
+        prev.map(char =>
+          char.id === characterId
+            ? { ...char, likes_count: typeof newCount === 'number' ? newCount : currentLikes + 1 }
             : char
         )
       )

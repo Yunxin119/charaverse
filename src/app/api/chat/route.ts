@@ -1,6 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { apiManager } from '../../lib/apiManager'
-import { ApiConfig } from '../../types/apiConfig'
+import { requireUser } from '@/lib/server/auth'
+import {
+  GuardError,
+  MAX_BODY_BYTES,
+  assertSafeBaseUrl,
+  assertSafeModel,
+  summarizeUpstreamError,
+} from '@/lib/server/llmGuards'
+
+/**
+ * LLM proxy (P0 hardened version; will be replaced by an AI SDK streaming route in P2).
+ *
+ * Contract (unchanged for existing clients):
+ *   POST { messages, systemPrompt, apiKey, model, thinkingBudget?, baseUrl?, actualModel?, customUserMessage? }
+ *   -> { content, apiUsed }
+ *
+ * Security:
+ *   - caller must be a signed-in Supabase user (Bearer token)
+ *   - relay baseUrl must be a public https host (no IPs / private names / query / creds)
+ *   - upstream error bodies are summarized, never echoed
+ *   - nothing about keys, prompts or responses is logged
+ */
+
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
+const UPSTREAM_TIMEOUT_MS = 55_000
+const MAX_OUTPUT_TOKENS = 8192
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -10,703 +36,267 @@ interface ChatMessage {
 interface ChatRequest {
   messages: ChatMessage[]
   systemPrompt: string
+  apiKey?: string
+  model: string
+  thinkingBudget?: number
+  baseUrl?: string
+  actualModel?: string
+  customUserMessage?: string
+}
+
+class UpstreamError extends Error {
+  constructor(public provider: string, public status: number, message: string) {
+    super(message)
+  }
+}
+
+function withTimeout(): AbortSignal {
+  return AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+}
+
+async function readUpstreamError(provider: string, res: Response): Promise<never> {
+  const text = await res.text().catch(() => '')
+  throw new UpstreamError(provider, res.status, summarizeUpstreamError(res.status, text))
+}
+
+function buildOpenAiMessages(messages: ChatMessage[], systemPrompt: string, customUserMessage?: string) {
+  const out: ChatMessage[] = [{ role: 'system', content: systemPrompt }, ...messages]
+  if (customUserMessage) out.push({ role: 'user', content: customUserMessage })
+  return out
+}
+
+// ---------- OpenAI-compatible (OpenAI, DeepSeek, relays) ----------
+async function callOpenAiCompatible(opts: {
+  provider: string
+  endpoint: string
   apiKey: string
   model: string
-  thinkingBudget?: number // 新增thinking budget参数
-  baseUrl?: string // 中转API的base URL
-  actualModel?: string // 中转API的实际模型名称
-  customUserMessage?: string // 自定义用户消息，用于灵感功能等特殊场景
-}
-
-// DeepSeek API 调用
-async function callDeepSeek(messages: ChatMessage[], systemPrompt: string, apiKey: string, model: string) {
-  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages
-      ],
-      temperature: 1,
-      max_tokens: 10000,
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`DeepSeek API error: ${response.statusText}`)
-  }
-
-  const data = await response.json()
-  return data.choices[0].message.content
-}
-
-// Gemini API 调用 - 使用正确的REST API格式，带重试机制
-async function callGemini(messages: ChatMessage[], systemPrompt: string, apiKey: string, model: string, thinkingBudget = 0, retryCount = 0, customUserMessage?: string) {
-  const maxRetries = 2
-  // 构建Gemini格式的contents数组
-  const contents = []
-  
-  // 添加系统提示作为第一条用户消息
-  if (systemPrompt) {
-    contents.push({
-      role: 'user',
-      parts: [{ text: systemPrompt }]
-    })
-    
-    // 检查是否有初始对话（第一条assistant消息）
-    const firstAssistantMessage = messages.find(msg => msg.role === 'assistant')
-    let modelResponse = '我明白了，我会按照这些设定来扮演角色。'
-    
-    // 如果有初始对话且它是第一条消息，则使用初始对话内容
-    if (firstAssistantMessage && messages.indexOf(firstAssistantMessage) === 0) {
-      modelResponse = firstAssistantMessage.content
-      console.log('Using initial dialogue as model response:', modelResponse.substring(0, 50) + '...')
-    }
-    
-    contents.push({
-      role: 'model',
-      parts: [{ text: modelResponse }]
-    })
-  }
-  
-  // 添加对话历史，跳过已经处理的初始对话
-  const messagesToProcess = systemPrompt && messages.length > 0 && messages[0].role === 'assistant' 
-    ? messages.slice(1)  // 跳过第一条assistant消息（已作为初始回复处理）
-    : messages
-    
-  messagesToProcess.forEach(msg => {
-    if (msg.role === 'user') {
-      contents.push({
-        role: 'user',
-        parts: [{ text: msg.content }]
-      })
-    } else if (msg.role === 'assistant') {
-      contents.push({
-        role: 'model',
-        parts: [{ text: msg.content }]
-      })
-    }
-  })
-
-  // 确保contents数组不为空，且最后一条是用户消息
-  if (contents.length === 0) {
-    throw new Error('No content to send to Gemini API')
-  }
-  
-  // 检查最后一条消息是否为用户消息，如果不是，添加一个用户消息
-  const lastContent = contents[contents.length - 1]
-  if (lastContent.role !== 'user') {
-    // 使用自定义用户消息（如灵感功能）或默认的"请继续"
-    const userMessage = customUserMessage || '【请继续。】'
-    contents.push({
-      role: 'user',
-      parts: [{ text: userMessage }]
-    })
-  }
-  const safetySettings = [
-    {
-      category: "HARM_CATEGORY_HARASSMENT",
-      threshold: "BLOCK_ONLY_HIGH",
-    },
-    {
-      category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-      threshold: "BLOCK_ONLY_HIGH",
-    },
-    {
-      category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-      threshold: "BLOCK_ONLY_HIGH",
-    },
-    {
-      category: "HARM_CATEGORY_HATE_SPEECH",
-      threshold: "BLOCK_ONLY_HIGH",
-    },
-  ];
-
-  // 构建请求体
-  const requestBody: {
-    contents: Array<{
-      role: string
-      parts: Array<{ text: string }>
-    }>
-    generationConfig: {
-      temperature: number
-      maxOutputTokens: number
-      topP: number
-      thinkingConfig?: { thinkingBudget?: number } | Record<string, never>
-    }
-    safetySettings: Array<{ category: string, threshold: string }>
-  } = {
-    contents: contents,
-    generationConfig: {
-      temperature: 1.0,
-      maxOutputTokens: 10000,
-      topP: 0.95,
-    },
-    safetySettings: safetySettings,
-  }
-
-  // 只有2.5系列模型才支持thinking配置
-  if (model.includes('2.5')) {
-    if (model === 'gemini-3-pro-preview') {
-      // 2.5 Pro 启用thinking（修复了角色交替问题后应该正常工作）
-      requestBody.generationConfig.thinkingConfig = {}
-      console.log('Gemini 3 Pro: thinking enabled')
-    } else if (model === 'gemini-2.5-flash' && thinkingBudget !== undefined && thinkingBudget >= 0) {
-      // 2.5 Flash 根据用户设置
-      requestBody.generationConfig.thinkingConfig = {
-        thinkingBudget: thinkingBudget
-      }
-      console.log(`Gemini 2.5 Flash: thinking enabled with budget ${thinkingBudget}`)
-    }
-  }
-
-  console.log('Gemini API Request (attempt', retryCount + 1, '):', JSON.stringify(requestBody, null, 2))
-
-  try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    })
-
-    if (!response.ok) {
-      const errorData = await response.text()
-      console.error('Gemini API Error Response:', errorData)
-      
-      // 如果是服务器错误且还有重试次数，则重试
-      if (response.status >= 500 && retryCount < maxRetries) {
-        console.log(`Server error ${response.status}, retrying in ${(retryCount + 1) * 1000}ms...`)
-        await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 1000))
-        return callGemini(messages, systemPrompt, apiKey, model, thinkingBudget, retryCount + 1)
-      }
-      
-      throw new Error(`Gemini API error: ${response.statusText} - ${errorData}`)
-    }
-
-    const data = await response.json()
-    console.log('Gemini API Response:', JSON.stringify(data, null, 2))
-  
-  // 检查是否有错误
-  if (data.error) {
-    console.error('Gemini API returned error:', data.error)
-    throw new Error(`Gemini API Error: ${data.error.message || JSON.stringify(data.error)}`)
-  }
-  
-  // 检查响应结构
-  if (!data.candidates || data.candidates.length === 0) {
-    console.error('No candidates in Gemini response. Full response:', JSON.stringify(data, null, 2))
-    console.error('Request body was:', JSON.stringify(requestBody, null, 2))
-    
-    // 检查是否有其他可能的错误信息
-    if (data.promptFeedback) {
-      console.error('Prompt feedback:', data.promptFeedback)
-      if (data.promptFeedback.blockReason) {
-        throw new Error(`Request blocked by Gemini: ${data.promptFeedback.blockReason}`)
-      }
-    }
-    
-    throw new Error('No candidates returned from Gemini API - check console for full response')
-  }
-  
-  const candidate = data.candidates[0]
-  
-  // 检查候选响应是否被阻止
-  if (candidate.finishReason === 'SAFETY' || candidate.finishReason === 'BLOCKED_REASON_UNSPECIFIED') {
-    throw new Error('Response was blocked by Gemini safety filters')
-  }
-  
-  // 处理其他finish reasons
-  if (candidate.finishReason === 'RECITATION') {
-    throw new Error('Response was blocked due to recitation concerns')
-  }
-  
-  if (candidate.finishReason === 'OTHER') {
-    console.warn('Gemini finished with reason: OTHER')
-  }
-  
-  // 检查是否因为MAX_TOKENS而截断
-  if (candidate.finishReason === 'MAX_TOKENS') {
-    console.warn('Gemini response was truncated due to MAX_TOKENS. Consider increasing maxOutputTokens.')
-  }
-  
-  if (!candidate.content) {
-    console.error('No content in candidate:', candidate)
-    console.error('Full response data:', JSON.stringify(data, null, 2))
-    throw new Error(`No content in Gemini API response. Finish reason: ${candidate.finishReason || 'unknown'}`)
-  }
-
-  // 特殊处理：如果content只有role属性，可能是API返回了空响应
-  if (candidate.content.role && !candidate.content.parts) {
-    console.error('Content object only contains role, missing parts array:', candidate.content)
-    console.error('Full candidate:', JSON.stringify(candidate, null, 2))
-    console.error('Full response data:', JSON.stringify(data, null, 2))
-    
-    // 尝试从其他可能的地方获取文本内容
-    let fallbackText = ''
-    
-    // 检查是否有思考过程的输出
-    if (data.usageMetadata?.thoughtsTokenCount > 0) {
-      console.warn('Model used thinking tokens but produced no output content')
-      fallbackText = '抱歉，我正在思考但无法生成合适的回复。这可能是由于内容安全过滤。请尝试重新表述您的问题。'
-    } else {
-      fallbackText = '抱歉，我无法生成回复。这可能是由于内容安全过滤或其他限制。请尝试不同的问题。'
-    }
-    
-    // 如果完成原因是STOP，返回友好的错误消息而不是抛出异常
-    if (candidate.finishReason === 'STOP') {
-      return fallbackText
-    } else {
-      // 对于其他finish reason，记录详细信息但仍返回友好消息
-      console.error(`Unexpected finish reason with empty content: ${candidate.finishReason}`)
-      return fallbackText + ` (状态: ${candidate.finishReason})`
-    }
-  }
-
-  // 处理响应 - 改进的内容提取逻辑
-  let responseText = ''
-  
-  if (candidate.content) {
-    // 检查是否有 parts 数组
-    if (candidate.content.parts && Array.isArray(candidate.content.parts)) {
-      for (const part of candidate.content.parts) {
-        if (part.text) {
-          responseText += part.text
-        }
-      }
-    } else {
-      // 如果没有 parts 数组，检查是否有直接的文本内容
-      console.warn('Content object missing parts array:', candidate.content)
-      
-      // 尝试其他可能的文本字段
-      if (typeof candidate.content === 'string') {
-        responseText = candidate.content
-      } else if (candidate.content.text) {
-        responseText = candidate.content.text
-      } else {
-        console.error('Unable to extract text from content:', candidate.content)
-        console.error('Full candidate object:', JSON.stringify(candidate, null, 2))
-        
-        // 如果是MAX_TOKENS但没有内容，可能是API问题
-        if (candidate.finishReason === 'MAX_TOKENS') {
-          throw new Error('Response was truncated by MAX_TOKENS and no content was returned. This may be an API issue or the response was completely filtered.')
-        }
-      }
-    }
-  }
-
-  // 如果仍然没有内容
-  if (!responseText || responseText.trim() === '') {
-    console.error('No text content extracted from response')
-    console.error('Candidate:', JSON.stringify(candidate, null, 2))
-    console.error('Full response:', JSON.stringify(data, null, 2))
-    
-    // 根据不同的finish reason提供更具体的错误信息
-    switch (candidate.finishReason) {
-      case 'MAX_TOKENS':
-        return 'Response was truncated due to length limits. Please try a shorter prompt or increase the token limit.'
-      case 'SAFETY':
-        return 'Response was blocked by safety filters. Please modify your prompt and try again.'
-      case 'RECITATION':
-        return 'Response was blocked due to recitation concerns. Please rephrase your prompt.'
-      case 'STOP':
-        return 'API completed successfully but returned empty content. This may be due to content restrictions or model limitations.'
-      case 'OTHER':
-        return 'Response generation stopped due to unknown reasons. Please try again.'
-      default:
-        return `No response generated - the API returned empty content. Finish reason: ${candidate.finishReason || 'unknown'}`
-    }
-  }
-
-  return responseText
-  
-  } catch (fetchError) {
-    // 处理网络错误和其他异常
-    console.error('Gemini API fetch error:', fetchError)
-    
-    // 如果是网络错误且还有重试次数，则重试
-    if (retryCount < maxRetries) {
-      console.log(`Network error, retrying in ${(retryCount + 1) * 1000}ms...`)
-      await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 1000))
-      return callGemini(messages, systemPrompt, apiKey, model, thinkingBudget, retryCount + 1)
-    }
-    
-    // 如果重试次数用完，抛出原始错误
-    throw fetchError
-  }
-}
-
-// OpenAI API 调用
-async function callOpenAI(messages: ChatMessage[], systemPrompt: string, apiKey: string, model: string) {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages
-      ],
-      temperature: 1,
-      max_tokens: 10000,
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.statusText}`)
-  }
-
-  const data = await response.json()
-  return data.choices[0].message.content
-}
-
-// 通用API调用函数 - 使用ApiConfig调用对应的API
-async function callApiWithConfig(
-  apiConfig: ApiConfig, 
-  messages: ChatMessage[], 
-  systemPrompt: string, 
-  model: string, 
-  thinkingBudget?: number, 
+  messages: ChatMessage[]
+  systemPrompt: string
   customUserMessage?: string
-): Promise<string> {
-  console.log(`🔄 调用API: ${apiConfig.name} (${apiConfig.provider})`);
-
-  const { provider, apiKey, baseUrl, model: configModel } = apiConfig;
-
-  // 根据provider类型调用对应的API
-  switch (provider) {
-    case 'deepseek':
-      return callDeepSeek(messages, systemPrompt, apiKey, model);
-    
-    case 'gemini':
-      return callGemini(messages, systemPrompt, apiKey, model, thinkingBudget, 0, customUserMessage);
-    
-    case 'openai':
-      return callOpenAI(messages, systemPrompt, apiKey, model);
-    
-    case 'custom':
-      if (!baseUrl) {
-        throw new Error('Custom API configuration missing baseUrl');
-      }
-      const actualModel = configModel || model;
-      return callRelayAPI(messages, systemPrompt, apiKey, actualModel, baseUrl, thinkingBudget, customUserMessage);
-    
-    default:
-      throw new Error(`Unsupported API provider: ${provider}`);
-  }
-}
-
-// 中转API调用（支持OpenAI格式的中转服务）
-async function callRelayAPI(messages: ChatMessage[], systemPrompt: string, apiKey: string, actualModel: string, baseUrl: string, thinkingBudget?: number, customUserMessage?: string) {
-  // 确保baseUrl以/v1结尾
-  const apiUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`
-  
-  // 构建消息数组
-  const apiMessages = [
-    { role: 'system', content: systemPrompt },
-    ...messages
-  ]
-  
-  // 如果有自定义用户消息（如灵感功能），添加到最后
-  if (customUserMessage) {
-    apiMessages.push({ role: 'user', content: customUserMessage })
-  }
-
-  // 构建请求体
-  const requestBody: Record<string, unknown> = {
-    model: actualModel,
-    messages: apiMessages,
+  thinkingBudget?: number
+}): Promise<string> {
+  const body: Record<string, unknown> = {
+    model: opts.model,
+    messages: buildOpenAiMessages(opts.messages, opts.systemPrompt, opts.customUserMessage),
     temperature: 1,
-    max_tokens: 10000,
+    max_tokens: MAX_OUTPUT_TOKENS,
+  }
+  // Relays that front Gemini 2.5 accept a thinkingConfig passthrough
+  if (opts.model.includes('gemini-2.5') && opts.thinkingBudget !== undefined) {
+    body.thinkingConfig = opts.thinkingBudget > 0 ? { thinkingBudget: opts.thinkingBudget } : {}
   }
 
-  // 如果actualModel是Gemini 2.5系列且有thinking budget，添加相应配置
-  if (actualModel.includes('gemini-2.5') && thinkingBudget !== undefined) {
-    console.log(`Relay API: Adding thinking budget ${thinkingBudget} for model ${actualModel}`)
-    if (actualModel === 'gemini-3-pro-preview') {
-      // Pro版本使用auto模式
-      requestBody.thinkingConfig = {}
-    } else if (actualModel.includes('gemini-2.5-flash')) {
-      // Flash版本根据budget设置
-      if (thinkingBudget > 0) {
-        requestBody.thinkingConfig = { thinkingBudget: thinkingBudget }
-      } else {
-        requestBody.thinkingConfig = {}
-      }
-    }
-  }
-
-  console.log('Relay API Request Body:', JSON.stringify(requestBody, null, 2))
-
-  const response = await fetch(`${apiUrl}/chat/completions`, {
+  const res = await fetch(opts.endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'User-Agent': 'Charaverse/1.0.0',
+      Authorization: `Bearer ${opts.apiKey}`,
+      'User-Agent': 'Charaverse/2.0',
     },
-    body: JSON.stringify(requestBody),
+    body: JSON.stringify(body),
+    signal: withTimeout(),
   })
+  if (!res.ok) await readUpstreamError(opts.provider, res)
 
-  if (!response.ok) {
-    const errorText = await response.text()
-    console.error('Relay API Error Response:', errorText)
-    throw new Error(`Relay API error: ${response.statusText} - ${errorText}`)
+  const data = await res.json()
+  const content = data?.choices?.[0]?.message?.content
+  if (typeof content !== 'string' || !content.trim()) {
+    throw new UpstreamError(opts.provider, 502, 'AI 返回了空响应，可能是内容被过滤')
   }
-
-  const data = await response.json()
-  
-  if (!data.choices || data.choices.length === 0) {
-    throw new Error('Relay API returned no choices')
-  }
-  
-  return data.choices[0].message.content
+  return content
 }
 
-export async function POST(request: NextRequest) {
-  let model: string | undefined
-  let messages: ChatMessage[] | undefined
-  let selectedApiId: string | undefined
-  
-  try {
-    const body: ChatRequest = await request.json()
-    const parsedBody = body
-    messages = parsedBody.messages
-    const systemPrompt = parsedBody.systemPrompt
-    const apiKey = parsedBody.apiKey
-    model = parsedBody.model
-    const thinkingBudget = parsedBody.thinkingBudget || 0
-    const baseUrl = parsedBody.baseUrl
-    const actualModel = parsedBody.actualModel
-    const customUserMessage = parsedBody.customUserMessage
+// ---------- Gemini (native REST) ----------
+const GEMINI_SAFETY = [
+  'HARM_CATEGORY_HARASSMENT',
+  'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+  'HARM_CATEGORY_DANGEROUS_CONTENT',
+  'HARM_CATEGORY_HATE_SPEECH',
+].map((category) => ({ category, threshold: 'BLOCK_ONLY_HIGH' }))
 
-    // 添加详细的调试信息
-    console.log('🎯 Chat API Request:', {
-      messages: messages ? `${messages.length} messages` : 'undefined',
-      systemPrompt: systemPrompt ? `${systemPrompt.length} chars` : 'undefined',
-      model: model || 'undefined',
-      thinkingBudget,
-      hasLegacyApiKey: !!apiKey,
-      hasBaseUrl: !!baseUrl,
-      actualModel: actualModel || 'undefined'
-    })
+function buildGeminiContents(messages: ChatMessage[], systemPrompt: string, customUserMessage?: string) {
+  const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = []
 
-    // 检查必需参数
-    const missingParams = []
-    if (!Array.isArray(messages)) missingParams.push('messages')
-    if (!systemPrompt || systemPrompt.trim() === '') missingParams.push('systemPrompt')
-    if (!model || model.trim() === '') missingParams.push('model')
+  // Gemini wants strict user/model alternation; the system prompt goes in as the first user turn.
+  if (systemPrompt) {
+    contents.push({ role: 'user', parts: [{ text: systemPrompt }] })
+    const first = messages[0]
+    const ack = first?.role === 'assistant' ? first.content : '我明白了，我会按照这些设定来扮演角色。'
+    contents.push({ role: 'model', parts: [{ text: ack }] })
+  }
+  const rest = systemPrompt && messages[0]?.role === 'assistant' ? messages.slice(1) : messages
+  for (const m of rest) {
+    if (m.role === 'user') contents.push({ role: 'user', parts: [{ text: m.content }] })
+    else if (m.role === 'assistant') contents.push({ role: 'model', parts: [{ text: m.content }] })
+  }
+  if (contents.length === 0) throw new GuardError('没有可发送的消息')
+  if (contents[contents.length - 1].role !== 'user') {
+    contents.push({ role: 'user', parts: [{ text: customUserMessage || '【请继续。】' }] })
+  }
+  return contents
+}
 
-    if (missingParams.length > 0) {
-      console.error('Missing parameters:', missingParams)
-      return NextResponse.json(
-        { error: `Missing required parameters: ${missingParams.join(', ')}` },
-        { status: 400 }
+async function callGemini(opts: {
+  apiKey: string
+  model: string
+  messages: ChatMessage[]
+  systemPrompt: string
+  thinkingBudget?: number
+  customUserMessage?: string
+}): Promise<string> {
+  const generationConfig: Record<string, unknown> = {
+    temperature: 1.0,
+    maxOutputTokens: MAX_OUTPUT_TOKENS,
+    topP: 0.95,
+  }
+  if (opts.model.includes('2.5') || opts.model.startsWith('gemini-3')) {
+    if (opts.model.includes('pro')) generationConfig.thinkingConfig = {}
+    else if (opts.thinkingBudget !== undefined && opts.thinkingBudget >= 0) {
+      generationConfig.thinkingConfig = { thinkingBudget: opts.thinkingBudget }
+    }
+  }
+  const body = {
+    contents: buildGeminiContents(opts.messages, opts.systemPrompt, opts.customUserMessage),
+    generationConfig,
+    safetySettings: GEMINI_SAFETY,
+  }
+
+  const maxRetries = 2
+  for (let attempt = 0; ; attempt++) {
+    let res: Response
+    try {
+      res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(opts.model)}:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': opts.apiKey },
+          body: JSON.stringify(body),
+          signal: withTimeout(),
+        }
       )
+    } catch (err) {
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, (attempt + 1) * 1000))
+        continue
+      }
+      throw err
+    }
+
+    if (!res.ok) {
+      if (res.status >= 500 && attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, (attempt + 1) * 1000))
+        continue
+      }
+      await readUpstreamError('Gemini', res)
+    }
+
+    const data = await res.json()
+    if (data?.promptFeedback?.blockReason) {
+      throw new UpstreamError('Gemini', 422, `请求被 Gemini 拦截：${data.promptFeedback.blockReason}`)
+    }
+    const candidate = data?.candidates?.[0]
+    if (!candidate) throw new UpstreamError('Gemini', 502, 'Gemini 没有返回候选回复')
+    if (candidate.finishReason === 'SAFETY' || candidate.finishReason === 'BLOCKED_REASON_UNSPECIFIED') {
+      throw new UpstreamError('Gemini', 422, '回复被 Gemini 安全过滤拦截')
+    }
+    if (candidate.finishReason === 'RECITATION') {
+      throw new UpstreamError('Gemini', 422, '回复因版权复述问题被拦截')
+    }
+    const text = (candidate.content?.parts ?? [])
+      .map((p: { text?: string }) => p.text ?? '')
+      .join('')
+    if (!text.trim()) {
+      const reason = candidate.finishReason || 'unknown'
+      if (reason === 'MAX_TOKENS') throw new UpstreamError('Gemini', 502, '回复超出长度限制且没有内容返回')
+      throw new UpstreamError('Gemini', 502, `Gemini 返回了空内容（${reason}）`)
+    }
+    return text
+  }
+}
+
+// ---------- handler ----------
+export async function POST(request: NextRequest) {
+  const auth = await requireUser(request)
+  if (!auth) return NextResponse.json({ error: '请先登录' }, { status: 401 })
+
+  const contentLength = Number(request.headers.get('content-length') ?? 0)
+  if (contentLength > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: '请求体过大' }, { status: 413 })
+  }
+
+  try {
+    const body = (await request.json()) as ChatRequest
+    const { messages, systemPrompt, customUserMessage } = body
+    const apiKey = body.apiKey?.trim()
+    const thinkingBudget = body.thinkingBudget
+    let model = body.model?.trim() ?? ''
+
+    if (!Array.isArray(messages) || !systemPrompt?.trim() || !model) {
+      return NextResponse.json({ error: '缺少必要参数：messages / systemPrompt / model' }, { status: 400 })
+    }
+    for (const m of messages) {
+      if (!m || typeof m.content !== 'string' || !['user', 'assistant', 'system'].includes(m.role)) {
+        return NextResponse.json({ error: 'messages 格式不合法' }, { status: 400 })
+      }
+    }
+    if (!apiKey) {
+      return NextResponse.json({ error: '没有可用的 API Key，请在设置中添加' }, { status: 400 })
     }
 
     let content: string
-    let usedApiName: string
-    let fallbackUsed = false
+    let apiUsed: string
 
-    // 检查是否是命名中转API（向后兼容）
     if (model.startsWith('named-relay-')) {
-      console.log('🔄 使用命名中转API（兼容模式）');
-      if (!baseUrl || !actualModel || !apiKey) {
-        return NextResponse.json(
-          { error: 'Named relay API requires baseUrl, actualModel, and apiKey parameters' },
-          { status: 400 }
-        )
+      if (!body.baseUrl || !body.actualModel) {
+        return NextResponse.json({ error: '中转配置缺少 baseUrl 或模型名' }, { status: 400 })
       }
-      content = await callRelayAPI(messages, systemPrompt, apiKey, actualModel, baseUrl, thinkingBudget, customUserMessage)
-      usedApiName = `中转API (${actualModel})`
-    }
-    // 检查是否有传统API Key（向后兼容）
-    else if (apiKey && apiKey.trim()) {
-      console.log('🔄 使用传统API Key（兼容模式）');
-      // 使用传统API调用方式（向后兼容）
-      if (model.startsWith('deepseek')) {
-        content = await callDeepSeek(messages, systemPrompt, apiKey, model)
-      } else if (model.startsWith('gemini')) {
-        content = await callGemini(messages, systemPrompt, apiKey, model, thinkingBudget, 0, customUserMessage)
-      } else if (model.startsWith('gpt')) {
-        content = await callOpenAI(messages, systemPrompt, apiKey, model)
-      } else {
-        return NextResponse.json(
-          { error: 'Unsupported model for legacy API' },
-          { status: 400 }
-        )
-      }
-      usedApiName = `传统API (${model})`
-    }
-    // 使用新的API池系统
-    else {
-      console.log('🚀 使用API池系统');
-      
-      // 解析provider
-      let provider: string
-      if (model.startsWith('deepseek')) provider = 'deepseek'
-      else if (model.startsWith('gemini')) provider = 'gemini'
-      else if (model.startsWith('gpt')) provider = 'openai'
-      else provider = 'custom'
-
-      // 从API池选择API
-      const selectedApi = apiManager.selectApi(provider)
-      
-      if (!selectedApi) {
-        return NextResponse.json(
-          { error: `没有可用的 ${provider} API，请在设置中添加API密钥` },
-          { status: 400 }
-        )
-      }
-
-      selectedApiId = selectedApi.id
-      console.log(`🎯 选中API: ${selectedApi.name} (优先级: ${selectedApi.priority})`);
-
-      try {
-        // 使用选中的API调用
-        content = await callApiWithConfig(
-          selectedApi, 
-          messages, 
-          systemPrompt, 
-          model, 
-          thinkingBudget, 
-          customUserMessage
-        )
-
-        // 标记API调用成功
-        apiManager.markApiSuccess(selectedApi.id)
-        usedApiName = selectedApi.name
-
-      } catch (apiError) {
-        console.error(`❌ API ${selectedApi.name} 调用失败:`, apiError);
-
-        // 标记API调用失败
-        apiManager.markApiError(selectedApi.id)
-
-        // 检查是否支持故障切换
-        const providerMode = apiManager.getProviderMode(provider)
-        console.log(`🔍 Provider模式: ${providerMode}`);
-        
-        if (providerMode === 'round_robin' || providerMode === 'active_only') {
-          console.log('🔄 尝试故障切换...');
-          
-          // 尝试获取另一个API
-          const fallbackApi = apiManager.selectApi(provider)
-          
-          if (fallbackApi && fallbackApi.id !== selectedApi.id) {
-            console.log(`🔄 切换到备用API: ${fallbackApi.name}`);
-            
-            try {
-              content = await callApiWithConfig(
-                fallbackApi,
-                messages,
-                systemPrompt,
-                model,
-                thinkingBudget,
-                customUserMessage
-              )
-
-              // 标记备用API成功
-              apiManager.markApiSuccess(fallbackApi.id)
-              usedApiName = fallbackApi.name
-              fallbackUsed = true
-              
-            } catch (fallbackError) {
-              console.error(`❌ 备用API ${fallbackApi.name} 也失败:`, fallbackError);
-              apiManager.markApiError(fallbackApi.id)
-              throw apiError // 抛出原始错误
-            }
-          } else {
-            console.log('❌ 没有可用的备用API');
-            throw apiError
-          }
-        } else {
-          console.log('❌ 单API模式，不进行故障切换');
-          throw apiError
-        }
-      }
-    }
-
-    // 构建响应
-    const response: any = { content }
-    
-    if (usedApiName) {
-      response.apiUsed = usedApiName
-    }
-    
-    if (fallbackUsed) {
-      response.fallbackUsed = true
-    }
-
-    if (selectedApiId) {
-      response.apiId = selectedApiId
-    }
-
-    console.log(`✅ API调用成功: ${usedApiName}${fallbackUsed ? ' (故障切换)' : ''}`);
-
-    return NextResponse.json(response)
-
-  } catch (error) {
-    console.error('❌ Chat API error:', error)
-    
-    // 如果有选中的API ID，标记为失败
-    if (selectedApiId) {
-      apiManager.markApiError(selectedApiId)
-      console.log(`🔄 已标记API ${selectedApiId} 为失败状态`);
-    }
-    
-    // 提供更详细的错误信息
-    let errorMessage = 'Internal server error'
-    let errorDetails = ''
-    
-    if (error instanceof Error) {
-      errorMessage = error.message
-      errorDetails = error.stack || ''
-      
-      // 特殊处理一些常见的API错误
-      if (error.message.includes('Gemini API Error')) {
-        errorMessage = 'Gemini API 调用失败: ' + error.message
-      } else if (error.message.includes('DeepSeek API error')) {
-        errorMessage = 'DeepSeek API 调用失败: ' + error.message
-      } else if (error.message.includes('OpenAI API error')) {
-        errorMessage = 'OpenAI API 调用失败: ' + error.message
-      } else if (error.message.includes('Relay API error')) {
-        errorMessage = '中转API 调用失败: ' + error.message
-      } else if (error.message.includes('API returned empty response')) {
-        errorMessage = 'AI模型返回空响应，可能是内容被过滤'
-      } else if (error.message.includes('Malformed API response')) {
-        errorMessage = 'AI模型响应格式错误，请重试'
-      }
-    }
-    
-    // 记录详细错误信息到控制台（仅开发环境）
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Detailed error info:', {
-        message: errorMessage,
-        details: errorDetails,
-        requestBody: { model, messagesCount: messages?.length, selectedApiId },
-        apiPoolStatus: selectedApiId ? 'API池调用失败' : '传统模式调用失败'
+      const base = assertSafeBaseUrl(body.baseUrl)
+      const actualModel = assertSafeModel(body.actualModel)
+      const endpoint = `${base.endsWith('/v1') ? base : `${base}/v1`}/chat/completions`
+      content = await callOpenAiCompatible({
+        provider: '中转API', endpoint, apiKey, model: actualModel,
+        messages, systemPrompt, customUserMessage, thinkingBudget,
       })
+      apiUsed = `中转API (${actualModel})`
+    } else {
+      model = assertSafeModel(model)
+      if (model.startsWith('deepseek')) {
+        content = await callOpenAiCompatible({
+          provider: 'DeepSeek', endpoint: 'https://api.deepseek.com/v1/chat/completions',
+          apiKey, model, messages, systemPrompt, customUserMessage,
+        })
+      } else if (model.startsWith('gemini')) {
+        content = await callGemini({ apiKey, model, messages, systemPrompt, thinkingBudget, customUserMessage })
+      } else if (model.startsWith('gpt') || model.startsWith('o')) {
+        content = await callOpenAiCompatible({
+          provider: 'OpenAI', endpoint: 'https://api.openai.com/v1/chat/completions',
+          apiKey, model, messages, systemPrompt, customUserMessage,
+        })
+      } else {
+        return NextResponse.json({ error: `不支持的模型：${model}` }, { status: 400 })
+      }
+      apiUsed = model
     }
-    
-    return NextResponse.json(
-      { 
-        error: errorMessage,
-        ...(selectedApiId && { apiId: selectedApiId }),
-        ...(process.env.NODE_ENV === 'development' && { details: errorDetails })
-      },
-      { status: 500 }
-    )
-  }
-} 
 
+    return NextResponse.json({ content, apiUsed })
+  } catch (error) {
+    if (error instanceof GuardError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    if (error instanceof UpstreamError) {
+      console.warn(`[api/chat] upstream ${error.provider} failed: ${error.status}`)
+      const status = error.status === 401 || error.status === 403 ? 401 : error.status >= 500 ? 502 : error.status
+      return NextResponse.json(
+        { error: `${error.provider} 调用失败：${error.message}` },
+        { status: status >= 400 && status < 600 ? status : 502 }
+      )
+    }
+    const isTimeout = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
+    if (isTimeout) {
+      return NextResponse.json({ error: 'AI 响应超时，请重试' }, { status: 504 })
+    }
+    console.error('[api/chat] unexpected error:', error instanceof Error ? error.name : 'unknown')
+    return NextResponse.json({ error: '服务器内部错误' }, { status: 500 })
+  }
+}

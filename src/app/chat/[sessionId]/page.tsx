@@ -56,6 +56,7 @@ import { ApiManagerModal } from '../../../components/ApiManagerModal'
 import { MultiCharacterManager } from '../../lib/multiCharacterManager'
 import { ChatCharacterSelector } from '../../components/ChatCharacterSelector'
 import { MultiCharacterMessage } from '../../components/MultiCharacterMessage'
+import { authedFetch } from '@/lib/authedFetch'
 import { CharacterStyleInjector } from '../../components/CharacterStyleInjector'
 
 // 保留命名中转配置接口以兼容现有功能
@@ -727,7 +728,6 @@ export default function ChatSessionPage() {
   // 预览系统提示词
   const previewSystemPrompt = () => {
     const prompt = buildSystemPrompt()
-    console.log('系统提示词:', prompt)
     alert('系统提示词已输出到控制台，请按F12查看')
   }
 
@@ -741,15 +741,12 @@ export default function ChatSessionPage() {
       console.log('🔍 Looking for config ID:', configId)
       
       const savedNamedConfigs = localStorage.getItem('named_relay_configs')
-      console.log('💾 Raw localStorage data:', savedNamedConfigs)
       
       if (savedNamedConfigs) {
         try {
           const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs)
-          console.log('📋 Parsed configs:', namedConfigs)
           
           const config = namedConfigs.find(c => c.id === configId)
-          console.log('🎯 Found matching config:', config)
           
           if (config) {
             console.log('📊 Config details:')
@@ -1473,7 +1470,7 @@ export default function ChatSessionPage() {
         requestBody.actualModel = modelConfig.modelName
       }
 
-      const response = await fetch('/api/chat', {
+      const response = await authedFetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
