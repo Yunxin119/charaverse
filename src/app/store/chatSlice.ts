@@ -77,21 +77,21 @@ export const createChatSession = createAsyncThunk(
   'chat/createSession',
   async ({ characterId, title, userId }: { characterId: number, title: string, userId: string }) => {
     // 首先检查是否已存在该角色的会话
-    const { data: existingSession, error: checkError } = await supabase
+    const { data: existingSessions, error: checkError } = await supabase
       .from('chat_sessions')
       .select('*')
       .eq('user_id', userId)
       .eq('character_id', characterId)
-      .single()
+      .order('updated_at', { ascending: false })
+      .limit(1)
 
-    if (checkError && checkError.code !== 'PGRST116') {
-      // PGRST116 是"没有找到行"的错误，这是正常的
+    if (checkError) {
       throw checkError
     }
 
-    // 如果已存在会话，返回现有会话
-    if (existingSession) {
-      return existingSession
+    // 如果已存在会话，返回最新的会话
+    if (existingSessions && existingSessions.length > 0) {
+      return existingSessions[0]
     }
 
     // 如果不存在，创建新会话
@@ -114,18 +114,19 @@ export const createChatSession = createAsyncThunk(
 export const getExistingSession = createAsyncThunk(
   'chat/getExistingSession',
   async ({ characterId, userId }: { characterId: number, userId: string }) => {
-    const { data, error } = await supabase
+    const { data: sessions, error } = await supabase
       .from('chat_sessions')
       .select('*')
       .eq('user_id', userId)
       .eq('character_id', characterId)
-      .single()
+      .order('updated_at', { ascending: false })
+      .limit(1)
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       throw error
     }
 
-    return data || null
+    return sessions && sessions.length > 0 ? sessions[0] : null
   }
 )
 
@@ -805,6 +806,44 @@ export const clearChatHistory = createAsyncThunk(
   }
 )
 
+// 创建分支会话
+export const branchChatSession = createAsyncThunk(
+  'chat/branchSession',
+  async ({ 
+    sessionId, 
+    messageId
+  }: { 
+    sessionId: string
+    messageId: number
+  }) => {
+    // 获取当前的 access token
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      throw new Error('用户未登录')
+    }
+
+    const response = await fetch('/api/chat/branch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({
+        sessionId,
+        messageId
+      }),
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to branch session')
+    }
+
+    const result = await response.json()
+    return result.newSessionId
+  }
+)
+
 const chatSlice = createSlice({
   name: 'chat',
   initialState,
@@ -1119,6 +1158,19 @@ const chatSlice = createSlice({
       .addCase(clearChatHistory.rejected, (state, action) => {
         state.isLoading = false
         state.error = action.error.message || 'Failed to clear chat history'
+      })
+
+      // Branch Session
+      .addCase(branchChatSession.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(branchChatSession.fulfilled, (state) => {
+        state.isLoading = false
+      })
+      .addCase(branchChatSession.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.error.message || 'Failed to branch session'
       })
   }
 })

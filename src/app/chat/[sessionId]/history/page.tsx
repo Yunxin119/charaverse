@@ -336,7 +336,7 @@ export default function ChatHistoryPage() {
 
       {/* 编辑消息对话框 */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <Edit3 className="w-5 h-5" />
@@ -344,7 +344,7 @@ export default function ChatHistoryPage() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto min-h-0 py-2">
             <div>
               <label className="text-sm font-medium mb-2 block text-slate-700 dark:text-slate-300">
                 {editingMessage?.role === 'user' ? '用户消息' : '角色消息'}
@@ -357,27 +357,27 @@ export default function ChatHistoryPage() {
                 className="resize-none"
               />
             </div>
+          </div>
 
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setShowEditDialog(false)
-                  setEditingMessage(null)
-                  setEditContent('')
-                }}
-              >
-                <X className="w-4 h-4 mr-1" />
-                取消
-              </Button>
-              <Button
-                onClick={handleSaveEdit}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Save className="w-4 h-4 mr-1" />
-                保存
-              </Button>
-            </div>
+          <div className="flex justify-end space-x-2 pt-2 flex-shrink-0">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowEditDialog(false)
+                setEditingMessage(null)
+                setEditContent('')
+              }}
+            >
+              <X className="w-4 h-4 mr-1" />
+              取消
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Save className="w-4 h-4 mr-1" />
+              保存
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

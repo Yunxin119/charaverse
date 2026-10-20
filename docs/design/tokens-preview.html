@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CharaVerse Design Tokens</title>
+<style>
+  /* ============================================================
+     CharaVerse v2 design tokens — "Warm Glass"
+     Base palette (user-provided):
+       ink      #33251b  espresso brown   → text / dark surfaces
+       mist     #adbcc3  dusty steel blue → secondary, cool accent
+       oxblood  #41140e  deep red-brown   → primary action
+       cream    #f2dece  warm cream       → light surfaces
+     ============================================================ */
+  :root {
+    /* --- raw palette ramps --- */
+    --cream-50:  #fbf6f1;
+    --cream-100: #f7ebe0;
+    --cream-200: #f2dece;   /* base */
+    --cream-300: #e6cbb6;
+    --cream-400: #d6b396;
+
+    --ink-900: #1c1410;
+    --ink-800: #261b15;
+    --ink-700: #33251b;     /* base */
+    --ink-600: #4a3729;
+    --ink-500: #6b5342;
+    --ink-400: #8f7663;
+
+    --mist-200: #d7e0e4;
+    --mist-300: #c3cfd5;
+    --mist-400: #adbcc3;    /* base */
+    --mist-500: #8ea0a9;
+    --mist-600: #6f838d;
+
+    --ox-700: #41140e;      /* base */
+    --ox-600: #5a1f16;
+    --ox-500: #7a2d21;
+    --ox-400: #9c4233;
+
+    /* --- accent & status (added) --- */
+    --accent-sienna: #c9643b;   /* 亮眼 accent：按钮高亮 / 链接 / 进度 */
+    --accent-amber:  #d99a2b;
+    --accent-sage:   #6f8f7a;
+    --status-success: #4f8a6a;
+    --status-warning: #d08a1f;
+    --status-danger:  #b8322d;
+    --status-info:    #4f7fa3;
+
+    /* --- semantic (light) --- */
+    --bg:            var(--cream-200);
+    --bg-elevated:   var(--cream-50);
+    --fg:            var(--ink-700);
+    --fg-muted:      var(--ink-500);
+    --fg-subtle:     var(--ink-400);
+    --primary:       var(--ox-700);
+    --primary-fg:    var(--cream-50);
+    --secondary:     var(--mist-400);
+    --secondary-fg:  var(--ink-700);
+    --accent:        var(--accent-sienna);
+    --border:        rgba(51, 37, 27, 0.10);
+
+    /* glass */
+    --glass-bg:      rgba(251, 246, 241, 0.55);
+    --glass-bg-strong: rgba(251, 246, 241, 0.78);
+    --glass-border:  rgba(255, 255, 255, 0.55);
+    --glass-blur:    18px;
+    --glass-saturate: 160%;
+
+    /* neumorphic shadows (dual-light) */
+    --neu-light:     rgba(255, 255, 255, 0.70);
+    --neu-dark:      rgba(51, 37, 27, 0.16);
+    --neu-out: -6px -6px 14px var(--neu-light), 6px 6px 14px var(--neu-dark);
+    --neu-in: inset -4px -4px 10px var(--neu-light), inset 4px 4px 10px var(--neu-dark);
+
+    --radius-sm: 10px; --radius-md: 16px; --radius-lg: 24px; --radius-xl: 32px;
+    --font-sans: -apple-system, "SF Pro", "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif;
+    --font-display: "Fraunces", "Playfair Display", Georgia, serif;
+    --font-mono: "SF Mono", Menlo, monospace;
+  }
+
+  [data-theme="dark"] {
+    --bg:            var(--ink-900);
+    --bg-elevated:   var(--ink-800);
+    --fg:            var(--cream-200);
+    --fg-muted:      var(--cream-300);
+    --fg-subtle:     var(--mist-500);
+    --primary:       var(--ox-400);
+    --primary-fg:    var(--cream-50);
+    --secondary:     var(--mist-500);
+    --secondary-fg:  var(--ink-900);
+    --accent:        #e07a4c;
+    --border:        rgba(242, 222, 206, 0.10);
+    --glass-bg:      rgba(38, 27, 21, 0.50);
+    --glass-bg-strong: rgba(38, 27, 21, 0.78);
+    --glass-border:  rgba(242, 222, 206, 0.14);
+    --neu-light:     rgba(255, 255, 255, 0.05);
+    --neu-dark:      rgba(0, 0, 0, 0.55);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: var(--font-sans); color: var(--fg);
+    background:
+      radial-gradient(900px 500px at 10% -10%, color-mix(in oklab, var(--secondary) 45%, transparent), transparent 60%),
+      radial-gradient(700px 500px at 110% 20%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 60%),
+      var(--bg);
+    min-height: 100vh; padding: 32px 16px 80px; transition: background .3s, color .3s;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: 40px; letter-spacing: -0.02em; margin: 0 0 6px; }
+  .sub { color: var(--fg-muted); margin: 0 0 28px; }
+  h2 { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--fg-subtle); margin: 36px 0 14px; }
+
+  /* glass panel */
+  .glass {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 1px 0 rgba(255,255,255,.4) inset, 0 20px 50px -20px rgba(51,37,27,.35);
+    padding: 22px;
+  }
+  /* neumorphic surface */
+  .neu { background: var(--bg); border-radius: var(--radius-lg); box-shadow: var(--neu-out); padding: 22px; }
+  .neu-in { box-shadow: var(--neu-in); }
+
+  .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+  /* swatches */
+  .swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px,1fr)); gap: 10px; }
+  .sw { border-radius: var(--radius-md); height: 78px; padding: 10px; display: flex; flex-direction: column; justify-content: flex-end; font-size: 11px; font-family: var(--font-mono); border: 1px solid var(--border); }
+  .sw b { font-size: 12px; font-family: var(--font-sans); }
+
+  /* buttons */
+  .btn { border: 0; cursor: pointer; font: 600 14px var(--font-sans); padding: 12px 20px; border-radius: 999px; transition: transform .15s, box-shadow .15s; }
+  .btn:active { transform: translateY(1px) scale(.99); }
+  .btn-primary { background: var(--primary); color: var(--primary-fg); box-shadow: 0 10px 24px -10px var(--primary), inset 0 1px 0 rgba(255,255,255,.18); }
+  .btn-accent { background: var(--accent); color: #fff; box-shadow: 0 10px 24px -10px var(--accent); }
+  .btn-neu { background: var(--bg); color: var(--fg); box-shadow: var(--neu-out); }
+  .btn-neu:active { box-shadow: var(--neu-in); }
+  .btn-glass { background: var(--glass-bg-strong); color: var(--fg); border: 1px solid var(--glass-border); backdrop-filter: blur(12px); }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+
+  /* chips / status */
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .chip i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .chip-flat { background: var(--secondary); color: var(--secondary-fg); }
+  .c-ok { background: color-mix(in oklab, var(--status-success) 18%, transparent); color: var(--status-success); }
+  .c-warn { background: color-mix(in oklab, var(--status-warning) 18%, transparent); color: var(--status-warning); }
+  .c-err { background: color-mix(in oklab, var(--status-danger) 16%, transparent); color: var(--status-danger); }
+  .c-info { background: color-mix(in oklab, var(--status-info) 16%, transparent); color: var(--status-info); }
+
+  /* chat sample */
+  .chat { display: flex; flex-direction: column; gap: 14px; }
+  .msg { display: flex; gap: 10px; align-items: flex-end; max-width: 78%; }
+  .msg.me { align-self: flex-end; flex-direction: row-reverse; }
+  .avatar { width: 34px; height: 34px; border-radius: 12px; background: linear-gradient(135deg, var(--mist-400), var(--ox-500)); box-shadow: var(--neu-out); flex: none; }
+  .bubble { padding: 12px 16px; border-radius: 18px; line-height: 1.55; font-size: 14.5px; }
+  .msg.ai .bubble { background: var(--glass-bg-strong); border: 1px solid var(--glass-border); backdrop-filter: blur(14px); border-bottom-left-radius: 6px; }
+  .msg.me .bubble { background: var(--primary); color: var(--primary-fg); border-bottom-right-radius: 6px; box-shadow: 0 12px 24px -12px var(--primary); }
+  .meta { font-size: 11px; color: var(--fg-subtle); margin: 4px 6px 0; }
+  .composer { margin-top: 16px; display: flex; gap: 10px; align-items: center; padding: 8px 8px 8px 18px; border-radius: 999px; background: var(--bg); box-shadow: var(--neu-in); }
+  .composer input { flex: 1; border: 0; background: transparent; font: 15px var(--font-sans); color: var(--fg); outline: none; }
+  .send { width: 42px; height: 42px; border-radius: 50%; background: var(--accent); color: #fff; border: 0; font-weight: 700; box-shadow: 0 10px 20px -8px var(--accent); }
+
+  /* flat "poster" card */
+  .poster { border-radius: var(--radius-lg); overflow: hidden; background: var(--primary); color: var(--primary-fg); padding: 22px; position: relative; min-height: 170px; }
+  .poster::after { content: ""; position: absolute; right: -40px; bottom: -60px; width: 200px; height: 200px; border-radius: 50%; background: var(--accent); opacity: .85; }
+  .poster::before { content: ""; position: absolute; right: 60px; top: -50px; width: 120px; height: 120px; border-radius: 50%; background: var(--secondary); opacity: .9; }
+  .poster h3 { font-family: var(--font-display); font-size: 26px; margin: 0 0 6px; position: relative; z-index: 1; }
+  .poster p { margin: 0; opacity: .85; position: relative; z-index: 1; font-size: 13px; }
+
+  .toggle { position: fixed; top: 16px; right: 16px; }
+  code { font-family: var(--font-mono); font-size: 12px; background: var(--glass-bg); padding: 2px 6px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<button class="btn btn-glass toggle" onclick="var r=document.documentElement; r.dataset.theme = r.dataset.theme==='dark'?'light':'dark'">☀︎ / ☾ 切换明暗</button>
+<div class="wrap">
+  <h1>CharaVerse · Warm Glass</h1>
+  <p class="sub">液态玻璃 × 新拟物 × 平面海报感 — 基于 #33251b / #adbcc3 / #41140e / #f2dece 推导的 token 预览</p>
+
+  <h2>Palette</h2>
+  <div class="swatches">
+    <div class="sw" style="background:#f2dece;color:#33251b"><b>cream</b>#f2dece · bg</div>
+    <div class="sw" style="background:#fbf6f1;color:#33251b"><b>cream-50</b>#fbf6f1 · elevated</div>
+    <div class="sw" style="background:#adbcc3;color:#33251b"><b>mist</b>#adbcc3 · secondary</div>
+    <div class="sw" style="background:#41140e;color:#f2dece"><b>oxblood</b>#41140e · primary</div>
+    <div class="sw" style="background:#33251b;color:#f2dece"><b>ink</b>#33251b · text / dark bg</div>
+    <div class="sw" style="background:#c9643b;color:#fff"><b>sienna</b>#c9643b · accent</div>
+    <div class="sw" style="background:#d99a2b;color:#fff"><b>amber</b>#d99a2b · accent 2</div>
+    <div class="sw" style="background:#6f8f7a;color:#fff"><b>sage</b>#6f8f7a · accent 3</div>
+    <div class="sw" style="background:#4f8a6a;color:#fff"><b>success</b>#4f8a6a</div>
+    <div class="sw" style="background:#d08a1f;color:#fff"><b>warning</b>#d08a1f</div>
+    <div class="sw" style="background:#b8322d;color:#fff"><b>danger</b>#b8322d</div>
+    <div class="sw" style="background:#4f7fa3;color:#fff"><b>info</b>#4f7fa3</div>
+  </div>
+
+  <h2>Surfaces</h2>
+  <div class="grid">
+    <div class="glass">
+      <b>Glass panel</b>
+      <p style="color:var(--fg-muted);font-size:13px;margin:6px 0 0">backdrop-filter blur 18px + saturate 160%，1px 高光描边，用于浮层 / 侧栏 / AI 气泡。</p>
+    </div>
+    <div class="neu">
+      <b>Neumorphic surface</b>
+      <p style="color:var(--fg-muted);font-size:13px;margin:6px 0 0">双光源柔和投影，用于输入框、卡片、设置面板。按下切换为 inset。</p>
+    </div>
+    <div class="poster">
+      <h3>Flat poster</h3>
+      <p>纯色几何块 + 衬线展示字，用于角色卡封面、空状态、onboarding。</p>
+    </div>
+  </div>
+
+  <h2>Controls</h2>
+  <div class="glass">
+    <div class="row">
+      <button class="btn btn-primary">开始聊天</button>
+      <button class="btn btn-accent">发布角色</button>
+      <button class="btn btn-neu">设置</button>
+      <button class="btn btn-glass">取消</button>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <span class="chip chip-flat">#治愈</span>
+      <span class="chip chip-flat">#多角色</span>
+      <span class="chip c-ok"><i style="background:var(--status-success)"></i>API 正常</span>
+      <span class="chip c-warn"><i style="background:var(--status-warning)"></i>上下文 82%</span>
+      <span class="chip c-err"><i style="background:var(--status-danger)"></i>请求失败</span>
+      <span class="chip c-info"><i style="background:var(--status-info)"></i>记忆已更新</span>
+    </div>
+  </div>
+
+  <h2>Chat sample</h2>
+  <div class="neu">
+    <div class="chat">
+      <div class="msg ai"><div class="avatar"></div><div><div class="bubble">雨还没停。你要是不急着走，我这儿还有半壶热茶——虽然不太会泡。</div><div class="meta">冉澄 · 02:45</div></div></div>
+      <div class="msg me"><div class="avatar" style="background:linear-gradient(135deg,var(--accent),var(--ox-600))"></div><div><div class="bubble">不急。茶就茶吧，反正也睡不着。</div><div class="meta" style="text-align:right">你 · 02:46</div></div></div>
+      <div class="msg ai"><div class="avatar"></div><div><div class="bubble">……那你坐近点。火快灭了。</div><div class="meta">冉澄 · 02:47</div></div></div>
+    </div>
+    <div class="composer"><input placeholder="说点什么…"><button class="send">↑</button></div>
+  </div>
+
+  <p style="color:var(--fg-subtle);font-size:12px;margin-top:28px">所有颜色都通过 <code>--cv-*</code> 语义 token 暴露；用户导入的主题只需覆盖 token，作者的角色卡 CSS 作用在 <code>#cv-chat-root</code> 作用域内。</p>
+</div>
+</body>
+</html>

@@ -20,7 +20,10 @@ import {
   MapPin,
   MessageCircle,
   ArrowLeft,
-  Loader2
+  Loader2,
+  Palette,
+  Code,
+  Copy
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -95,6 +98,7 @@ export default function EditCharacterPage() {
   const [activeTab, setActiveTab] = useState('basic')
   const [avatarTimestamp, setAvatarTimestamp] = useState(Date.now())
   const [isCreatingMultiSession, setIsCreatingMultiSession] = useState(false)
+  const [customCss, setCustomCss] = useState<string>('')
 
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -156,6 +160,9 @@ export default function EditCharacterPage() {
             gender: basicInfoData.gender || '',
             keywords: basicInfoData.keywords || []
           })
+
+          // 加载自定义美化 CSS
+          setCustomCss(promptTemplate.custom_css || '')
 
           // 设置模块数据，如果没有模块则使用默认的用户角色设定
           if (modulesData.length > 0) {
@@ -338,7 +345,8 @@ export default function EditCharacterPage() {
       // 构建完整的 prompt template
       const promptTemplate = {
         basic_info: basicInfo,
-        modules: processedModules
+        modules: processedModules,
+        custom_css: customCss || ''
       }
 
       const { error } = await supabase
@@ -526,9 +534,13 @@ export default function EditCharacterPage() {
         
         <motion.div variants={itemVariants}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="basic">基本信息</TabsTrigger>
               <TabsTrigger value="settings">其他设定</TabsTrigger>
+              <TabsTrigger value="appearance">
+                <Palette className="w-4 h-4 mr-1.5" />
+                外观美化
+              </TabsTrigger>
             </TabsList>
 
             {/* Basic Information Tab */}
@@ -852,6 +864,89 @@ export default function EditCharacterPage() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {/* 外观美化 Tab */}
+            <TabsContent value="appearance" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Palette className="w-5 h-5 mr-2" />
+                    自定义聊天界面
+                  </CardTitle>
+                  <CardDescription>
+                    通过编写 CSS 代码，为你的角色卡定制独特的聊天界面视觉风格。
+                    支持直接粘贴 <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded">&lt;style&gt;...&lt;/style&gt;</code> 代码块。
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="custom_css" className="flex items-center">
+                      <Code className="w-4 h-4 mr-1.5" />
+                      自定义 CSS 代码
+                    </Label>
+                    <Textarea
+                      id="custom_css"
+                      placeholder={`示例：\n#cv_chat_root {\n  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n}\n\n.cv_ai_message_bubble {\n  background: rgba(255,255,255,0.9) !important;\n  border-radius: 20px !important;\n  box-shadow: 0 4px 20px rgba(0,0,0,0.1);\n}`}
+                      value={customCss}
+                      onChange={(e) => setCustomCss(e.target.value)}
+                      className="min-h-[280px] font-mono text-xs resize-y"
+                      style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
+                    />
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      出于安全考虑，<code className="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded">@import</code>、
+                      <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded">expression()</code>、
+                      <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded">javascript:</code> 等内容会被自动过滤。
+                    </p>
+                  </div>
+
+                  {/* 选择器参考表 */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-semibold">可用选择器速查表</Label>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">点击即可复制</span>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                      <SelectorTable />
+                    </div>
+                  </div>
+
+                  {/* 示例模板 */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold">快速应用模板</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <TemplatePreset
+                        name="紫色梦幻"
+                        onApply={() => setCustomCss(PRESET_PURPLE_DREAM)}
+                      />
+                      <TemplatePreset
+                        name="极简黑白"
+                        onApply={() => setCustomCss(PRESET_MINIMAL)}
+                      />
+                      <TemplatePreset
+                        name="暖阳橙调"
+                        onApply={() => setCustomCss(PRESET_WARM_ORANGE)}
+                      />
+                    </div>
+                  </div>
+
+                  {customCss && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        if (window.confirm('确定要清空自定义 CSS 吗？')) {
+                          setCustomCss('')
+                        }
+                      }}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <X className="w-4 h-4 mr-1.5" />
+                      清空样式
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
         </motion.div>
 
@@ -914,4 +1009,227 @@ export default function EditCharacterPage() {
       </form>
     </motion.div>
   )
-} 
+}
+
+// ============= 外观美化相关常量与子组件 =============
+
+const SELECTOR_GROUPS: { label: string; items: { selector: string; desc: string }[] }[] = [
+  {
+    label: '整体布局',
+    items: [
+      { selector: '#cv_chat_root', desc: '整个聊天页面根容器' },
+      { selector: '#cv_background_image', desc: '聊天背景图层' },
+      { selector: '#cv_background_overlay', desc: '背景遮罩层' },
+      { selector: '#cv_chat_header', desc: '顶部栏容器' },
+      { selector: '#cv_chat_body', desc: '消息主体区域' },
+      { selector: '#cv_messages_container', desc: '消息列表滚动容器' },
+    ]
+  },
+  {
+    label: '顶部栏',
+    items: [
+      { selector: '#cv_back_button', desc: '返回按钮' },
+    ]
+  },
+  {
+    label: '消息气泡',
+    items: [
+      { selector: '.cv_message_bubble', desc: '所有消息气泡' },
+      { selector: '.cv_ai_message_bubble', desc: 'AI 消息气泡' },
+      { selector: '.cv_user_message_bubble', desc: '用户消息气泡' },
+      { selector: '.cv_message_avatar', desc: '消息头像' },
+      { selector: '.cv_ai_avatar', desc: 'AI 头像' },
+      { selector: '.cv_user_avatar', desc: '用户头像' },
+      { selector: '.cv_message_selected', desc: '被选中的消息气泡' },
+      { selector: '.cv_message_row', desc: '消息行容器' },
+    ]
+  },
+  {
+    label: '输入框',
+    items: [
+      { selector: '#cv_chat_input_container', desc: '输入框外层容器' },
+      { selector: '#cv_chat_input_box', desc: '输入框框体' },
+      { selector: '#cv_chat_input_textarea', desc: '输入框文本域' },
+      { selector: '#cv_send_button', desc: '发送按钮' },
+    ]
+  },
+  {
+    label: '消息操作',
+    items: [
+      { selector: '#cv_message_actions_box', desc: '消息操作按钮组容器' },
+    ]
+  },
+]
+
+function SelectorTable() {
+  const [copiedSelector, setCopiedSelector] = useState<string | null>(null)
+
+  const handleCopy = async (selector: string) => {
+    try {
+      await navigator.clipboard.writeText(selector)
+      setCopiedSelector(selector)
+      setTimeout(() => setCopiedSelector(null), 1500)
+    } catch (err) {
+      console.error('复制失败:', err)
+    }
+  }
+
+  return (
+    <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-200 dark:divide-slate-700">
+      {SELECTOR_GROUPS.map((group) => (
+        <div key={group.label}>
+          <div className="bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 sticky top-0">
+            {group.label}
+          </div>
+          {group.items.map((item) => (
+            <button
+              key={item.selector}
+              type="button"
+              onClick={() => handleCopy(item.selector)}
+              className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left"
+            >
+              <div className="flex items-center space-x-3 min-w-0 flex-1">
+                <code className="text-xs bg-slate-100 dark:bg-slate-900 px-1.5 py-0.5 rounded text-purple-600 dark:text-purple-400 font-mono flex-shrink-0">
+                  {item.selector}
+                </code>
+                <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{item.desc}</span>
+              </div>
+              <div className="flex-shrink-0 ml-2">
+                {copiedSelector === item.selector ? (
+                  <span className="text-xs text-green-600">已复制</span>
+                ) : (
+                  <Copy className="w-3.5 h-3.5 text-slate-400" />
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function TemplatePreset({ name, onApply }: { name: string; onApply: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onApply}
+      className="p-3 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all text-sm font-medium"
+    >
+      {name}
+    </button>
+  )
+}
+
+// 预设美化模板
+const PRESET_PURPLE_DREAM = `/* 紫色梦幻主题 */
+#cv_chat_root {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%) !important;
+}
+
+#cv_background_overlay {
+  background: linear-gradient(180deg, rgba(118, 75, 162, 0.1), rgba(102, 126, 234, 0.15));
+}
+
+#cv_chat_header {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5) !important;
+}
+
+.cv_ai_message_bubble {
+  background: linear-gradient(135deg, #ffffff 0%, #faf5ff 100%) !important;
+  border: 1px solid rgba(168, 85, 247, 0.2) !important;
+  box-shadow: 0 4px 20px rgba(168, 85, 247, 0.1);
+  border-radius: 20px !important;
+}
+
+.cv_user_message_bubble {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+#cv_chat_input_container {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(20px);
+}
+
+#cv_send_button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+`
+
+const PRESET_MINIMAL = `/* 极简黑白主题 */
+#cv_chat_root {
+  background: #fafafa !important;
+}
+
+#cv_chat_header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e5e5e5 !important;
+  box-shadow: none !important;
+}
+
+.cv_ai_message_bubble {
+  background: #ffffff !important;
+  border: 1px solid #e5e5e5 !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
+.cv_user_message_bubble {
+  background: #000000 !important;
+  color: #ffffff !important;
+  border-radius: 6px !important;
+}
+
+#cv_chat_input_container {
+  background: #ffffff !important;
+  border-top: 1px solid #e5e5e5 !important;
+}
+
+#cv_chat_input_box {
+  background: #f5f5f5 !important;
+  border: 1px solid #e5e5e5 !important;
+  border-radius: 8px !important;
+}
+
+#cv_send_button {
+  background: #000000 !important;
+}
+`
+
+const PRESET_WARM_ORANGE = `/* 暖阳橙调主题 */
+#cv_chat_root {
+  background: linear-gradient(180deg, #fff4e6 0%, #ffe0b3 100%) !important;
+}
+
+#cv_chat_header {
+  background: rgba(255, 244, 230, 0.85) !important;
+  backdrop-filter: blur(15px);
+  border-bottom: 1px solid rgba(255, 153, 51, 0.2) !important;
+}
+
+.cv_ai_message_bubble {
+  background: #ffffff !important;
+  border: 1px solid rgba(255, 153, 51, 0.25) !important;
+  border-radius: 18px 18px 18px 4px !important;
+  box-shadow: 0 3px 15px rgba(255, 153, 51, 0.1);
+}
+
+.cv_user_message_bubble {
+  background: linear-gradient(135deg, #ff9a44 0%, #fc6076 100%) !important;
+  border-radius: 18px 18px 4px 18px !important;
+  box-shadow: 0 3px 12px rgba(252, 96, 118, 0.3);
+}
+
+#cv_chat_input_container {
+  background: rgba(255, 244, 230, 0.9) !important;
+  backdrop-filter: blur(15px);
+}
+
+#cv_send_button {
+  background: linear-gradient(135deg, #ff9a44 0%, #fc6076 100%) !important;
+}
+`

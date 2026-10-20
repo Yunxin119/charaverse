@@ -21,7 +21,8 @@ import {
   BookOpen,
   Trash2,
   Lightbulb,
-  Brain
+  Brain,
+  GitBranch
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -45,7 +46,8 @@ import {
   setSelectedModel,
   setSessionTitle,
   setMessages,
-  clearError
+  clearError,
+  branchChatSession
 } from '../../store/chatSlice'
 import { supabase, type ChatSession, type Character, type ScriptCharacter, type ScriptCharacterContext } from '../../lib/supabase'
 import { sendMessageWithContext, getContextConfigSuggestions, regenerateMessageWithContext } from '../../lib/enhancedChatSlice'
@@ -55,6 +57,7 @@ import { ApiManagerModal } from '../../../components/ApiManagerModal'
 import { MultiCharacterManager } from '../../lib/multiCharacterManager'
 import { ChatCharacterSelector } from '../../components/ChatCharacterSelector'
 import { MultiCharacterMessage } from '../../components/MultiCharacterMessage'
+import { CharacterStyleInjector } from '../../components/CharacterStyleInjector'
 
 // 保留命名中转配置接口以兼容现有功能
 interface NamedRelayConfig {
@@ -1312,6 +1315,27 @@ export default function ChatSessionPage() {
 
 
 
+  // 创建分支会话
+  const handleBranchSession = async (messageId: number) => {
+    if (!currentSession) return
+    
+    if (!window.confirm('确定要从此消息创建新的分支吗？这将创建一个新的会话。')) {
+      return
+    }
+
+    try {
+      const newSessionId = await dispatch(branchChatSession({
+        sessionId: currentSession.id,
+        messageId
+      })).unwrap()
+      
+      router.push(`/chat/${newSessionId}`)
+    } catch (error) {
+      console.error('创建分支失败:', error)
+      alert(`创建分支失败: ${formatErrorMessage(error)}`)
+    }
+  }
+
   const handleSwitchSpeaker = async (scriptCharacterId: string) => {
     if (!multiCharacterManager || !currentSession) return
 
@@ -1525,22 +1549,43 @@ export default function ChatSessionPage() {
 
   return (
     <div 
-      className="h-screen bg-slate-50 dark:bg-slate-900 flex flex-col transition-all duration-300"
+      id="cv_chat_root"
+      className="cv_chat_root h-screen bg-slate-50 dark:bg-slate-900 flex flex-col transition-all duration-300 relative"
       style={{
-        backgroundImage: chatBackground ? `url(${chatBackground})` : 'none',
+        backgroundImage: chatBackground ? `url(${chatBackground})` : undefined,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}
     >
+      {/* 背景图层占位（方便作者单独美化，默认透明） */}
+      <div
+        id="cv_background_image"
+        className="cv_background_image absolute inset-0 pointer-events-none"
+        aria-hidden="true"
+      />
+      {/* 背景遮罩层（默认透明，可由作者美化） */}
+      <div
+        id="cv_background_overlay"
+        className="cv_background_overlay absolute inset-0 pointer-events-none"
+        aria-hidden="true"
+      />
+
+      {/* 注入角色自定义 CSS */}
+      <CharacterStyleInjector customCss={currentCharacter?.prompt_template?.custom_css} />
+
       {/* 固定头部 */}
-      <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex-shrink-0">
+      <div
+        id="cv_chat_header"
+        className="cv_chat_header relative z-10 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex-shrink-0"
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Button
+              id="cv_back_button"
               variant="ghost"
               size="sm"
               onClick={() => router.push('/chat')}
-              className="p-2 h-8 w-8"
+              className="cv_back_button p-2 h-8 w-8"
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
@@ -1650,7 +1695,7 @@ export default function ChatSessionPage() {
 
 
       {/* 消息区域 - 占据剩余空间 */}
-      <div className="flex-1 overflow-hidden">
+      <div id="cv_chat_body" className="cv_chat_body flex-1 overflow-hidden relative z-10">
         {!hasStarted ? (
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
             <Avatar className="w-20 h-20 mb-4">
@@ -1681,8 +1726,9 @@ export default function ChatSessionPage() {
         ) : (
           // 消息列表区域
           <div 
+            id="cv_messages_container"
             ref={messagesContainerRef}
-            className="h-full overflow-y-auto px-4 py-4 space-y-4"
+            className="cv_messages_container h-full overflow-y-auto px-4 py-4 space-y-4"
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 setSelectedMessageId(null)
@@ -1793,7 +1839,9 @@ export default function ChatSessionPage() {
                   key={message.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`flex items-start space-x-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  data-message-id={message.id}
+                  data-message-role={message.role}
+                  className={`cv_message_row ${message.role === 'user' ? 'cv_message_row_user' : 'cv_message_row_ai'} flex items-start space-x-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   {/* 批量删除模式下的选择框 */}
                   {isBatchDeleteMode && (
@@ -1818,7 +1866,7 @@ export default function ChatSessionPage() {
                   <div className={`flex max-w-[85%] sm:max-w-[80%] space-x-2 sm:space-x-3 ${
                     message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''
                   }`}>
-                    <Avatar className="w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0 mt-1">
+                    <Avatar className={`cv_message_avatar ${message.role === 'user' ? 'cv_user_avatar' : 'cv_ai_avatar'} w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0 mt-1`}>
                       {message.role === 'user' ? (
                         <AvatarFallback className="bg-slate-900 text-white">
                           <User className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -1835,12 +1883,12 @@ export default function ChatSessionPage() {
                     
                     <div className="space-y-1 min-w-0 flex-1">
                       <div 
-                        className={`p-3 sm:p-4 rounded-2xl break-words transition-all duration-200 ${
+                        className={`${message.role === 'user' ? 'cv_user_message_bubble' : 'cv_ai_message_bubble'} cv_message_bubble p-3 sm:p-4 rounded-2xl break-words transition-all duration-200 ${
                           message.role === 'user' 
                             ? 'bg-sky-500 dark:bg-sky-800 text-white rounded-br-md' 
                             : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-md hover:bg-slate-50 dark:hover:bg-slate-700'
                         } ${
-                          !isBatchDeleteMode && selectedMessageId === message.id ? 'ring-2 ring-blue-500' : ''
+                          !isBatchDeleteMode && selectedMessageId === message.id ? 'ring-2 ring-blue-500 cv_message_selected' : ''
                         } ${
                           isBatchDeleteMode ? 'cursor-default' : 'cursor-pointer'
                         }`}
@@ -1927,7 +1975,7 @@ export default function ChatSessionPage() {
 
                       {/* 消息操作按钮 - 移动端优化 */}
                       {!isBatchDeleteMode && selectedMessageId === message.id && (
-                        <div className="flex flex-wrap justify-center gap-1 mt-2">
+                        <div id="cv_message_actions_box" className="cv_message_actions_box flex flex-wrap justify-center gap-1 mt-2">
                           {(() => {
                             const isLastMessage = index === messages.length - 1
                             
@@ -1986,6 +2034,16 @@ export default function ChatSessionPage() {
                                   <Button
                                     size="sm"
                                     variant="ghost"
+                                    onClick={() => handleBranchSession(message.id)}
+                                    className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600 hover:bg-purple-50 dark:hover:bg-purple-900/30 hover:border-purple-200 dark:hover:border-purple-800 hover:text-purple-600 dark:hover:text-purple-400"
+                                    title="从此消息创建新分支"
+                                  >
+                                    <GitBranch className="w-3 h-3 mr-1" />
+                                    分支
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
                                     onClick={() => handleDeleteMessage(message.id)}
                                     className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-200 dark:hover:border-red-800 hover:text-red-600 dark:hover:text-red-400"
                                   >
@@ -2020,6 +2078,16 @@ export default function ChatSessionPage() {
                                   >
                                     <Edit2 className="w-3 h-3 mr-1" />
                                     编辑
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleBranchSession(message.id)}
+                                    className="h-7 px-2 text-xs bg-white dark:bg-slate-700 dark:text-white border border-slate-200 dark:border-slate-600 hover:bg-purple-50 dark:hover:bg-purple-900/30 hover:border-purple-200 dark:hover:border-purple-800 hover:text-purple-600 dark:hover:text-purple-400"
+                                    title="从此消息创建新分支"
+                                  >
+                                    <GitBranch className="w-3 h-3 mr-1" />
+                                    分支
                                   </Button>
                                   <Button
                                     size="sm"
@@ -2086,10 +2154,17 @@ export default function ChatSessionPage() {
 
       {/* 固定底部输入框 */}
       {hasStarted && !isBatchDeleteMode && (
-        <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 p-4 flex-shrink-0 shadow-lg">
-          <div className="flex items-end space-x-3 bg-slate-50/80 dark:bg-slate-700/80 rounded-2xl p-2 shadow-inner border border-slate-200/50 dark:border-slate-600/50">
+        <div
+          id="cv_chat_input_container"
+          className="cv_chat_input_container relative z-10 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 p-4 flex-shrink-0 shadow-lg"
+        >
+          <div
+            id="cv_chat_input_box"
+            className="cv_chat_input_box flex items-end space-x-3 bg-slate-50/80 dark:bg-slate-700/80 rounded-2xl p-2 shadow-inner border border-slate-200/50 dark:border-slate-600/50"
+          >
             <Textarea
               ref={inputRef}
+              id="cv_chat_input_textarea"
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               placeholder={
@@ -2097,7 +2172,7 @@ export default function ChatSessionPage() {
                   ? "正在为你生成灵感..." 
                   : "输入消息..."
               }
-              className="flex-1 resize-none text-base bg-transparent border-none focus:ring-0 focus:outline-none min-h-[40px] max-h-[120px] px-3 py-2 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+              className="cv_chat_input_textarea flex-1 resize-none text-base bg-transparent border-none focus:ring-0 focus:outline-none min-h-[40px] max-h-[120px] px-3 py-2 placeholder:text-slate-400 dark:placeholder:text-slate-500"
               rows={1}
               style={{
                 fontSize: '16px',
@@ -2137,9 +2212,10 @@ export default function ChatSessionPage() {
                 </div>
               )}
               <Button
+                id="cv_send_button"
                 onClick={handleSendMessage}
                 disabled={!userInput.trim() || isGenerating || isGettingInspiration}
-                className="rounded-full w-10 h-10 p-0 flex-shrink-0 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="cv_send_button rounded-full w-10 h-10 p-0 flex-shrink-0 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="w-4 h-4" />
               </Button>

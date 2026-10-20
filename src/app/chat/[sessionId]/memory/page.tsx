@@ -121,11 +121,11 @@ interface ItemMemory extends BaseMemoryEntry {
 interface CharacterMemory extends BaseMemoryEntry {
   type: 'character'
   metadata: {
-  name: string
-  relationship: string
+    name: string
+    relationship: string
     appearance?: string
-  personality: string
-  status: string
+    personality: string
+    status: string
     nickname?: string       // 昵称/称呼
     age?: string           // 年龄
     occupation?: string    // 职业
@@ -139,11 +139,11 @@ interface CharacterMemory extends BaseMemoryEntry {
 interface EventMemory extends BaseMemoryEntry {
   type: 'event'
   metadata: {
-  time: string
+    time: string
     location?: string
-  participants: string[]
-  emotion_intensity: number
-  impact: string
+    participants: string[]
+    emotion_intensity: number
+    impact: string
     event_type?: 'conversation' | 'action' | 'decision' | 'conflict' | 'celebration'
     consequences?: string   // 后果
     is_enabled?: boolean    // 是否启用
@@ -154,10 +154,10 @@ interface EventMemory extends BaseMemoryEntry {
 interface SettingMemory extends BaseMemoryEntry {
   type: 'setting'
   metadata: {
-  location: string
+    location: string
     items?: string[]
     rules?: string[]
-  description: string
+    description: string
     atmosphere?: string
     significance?: string   // 重要性说明
     is_enabled?: boolean    // 是否启用
@@ -168,10 +168,10 @@ interface SettingMemory extends BaseMemoryEntry {
 interface EmotionMemory extends BaseMemoryEntry {
   type: 'emotion'
   metadata: {
-  emotion_type: string
-  intensity: number
-  cause: string
-  duration: string
+    emotion_type: string
+    intensity: number
+    cause: string
+    duration: string
     target?: string        // 情感对象
     trigger?: string       // 触发因素
     is_enabled?: boolean    // 是否启用
@@ -179,8 +179,8 @@ interface EmotionMemory extends BaseMemoryEntry {
 }
 
 // 统一的记忆条目类型
-type MemoryEntry = SpacetimeMemory | RelationshipMemory | TaskMemory | ItemMemory | 
-                  CharacterMemory | EventMemory | SettingMemory | EmotionMemory
+type MemoryEntry = SpacetimeMemory | RelationshipMemory | TaskMemory | ItemMemory |
+  CharacterMemory | EventMemory | SettingMemory | EmotionMemory
 
 // 摘要数据接口
 interface ChatSummary {
@@ -226,15 +226,15 @@ export default function MemoryManagePage() {
   const [messageCount, setMessageCount] = useState(0)
   const [summaryThreshold, setSummaryThreshold] = useState(50)
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
-  const [summaryRanges, setSummaryRanges] = useState<{start: number, end: number, count: number}[]>([])
+  const [summaryRanges, setSummaryRanges] = useState<{ start: number, end: number, count: number }[]>([])
   const [useMemoryTableFormat, setUseMemoryTableFormat] = useState(true)
   const [autoSummaryEnabled, setAutoSummaryEnabled] = useState(false)
 
   // 手动范围选择相关状态
-  const [allMessages, setAllMessages] = useState<{id: number, index: number}[]>([])
+  const [allMessages, setAllMessages] = useState<{ id: number, index: number }[]>([])
   const [manualStartRange, setManualStartRange] = useState('')
   const [manualEndRange, setManualEndRange] = useState('')
-  const [rangeValidation, setRangeValidation] = useState<{valid: boolean, message: string}>({valid: true, message: ''})
+  const [rangeValidation, setRangeValidation] = useState<{ valid: boolean, message: string }>({ valid: true, message: '' })
   const [showManualRange, setShowManualRange] = useState(false)
 
   // 记忆表格筛选状态
@@ -247,7 +247,7 @@ export default function MemoryManagePage() {
     totalMessages: number
     coveredMessages: number
     uncoveredMessages: number
-    coverageRanges: {start: number, end: number}[]
+    coverageRanges: { start: number, end: number }[]
   } | null>(null)
 
   // 加载摘要和记忆数据
@@ -423,11 +423,11 @@ export default function MemoryManagePage() {
 
       // 构建请求头，包含中转API配置
       const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'x-api-key': modelConfig.apiKey,
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'x-api-key': modelConfig.apiKey,
         'x-model': currentModel,
-          'x-regenerate': 'true' // 标记为重新生成
+        'x-regenerate': 'true' // 标记为重新生成
       }
 
       // 如果是中转API，添加额外的headers
@@ -476,11 +476,11 @@ export default function MemoryManagePage() {
         setSummaries(prev => prev.map(s =>
           s.id === summaryId
             ? {
-                ...s,
-                content: result.summary.content,
-                memory_table: result.summary.memory_table,
-                updated_at: new Date().toISOString()
-              }
+              ...s,
+              content: result.summary.content,
+              memory_table: result.summary.memory_table,
+              updated_at: new Date().toISOString()
+            }
             : s
         ))
       }
@@ -746,14 +746,14 @@ export default function MemoryManagePage() {
     .filter(memory => {
       // 类型筛选
       if (!selectedMemoryTypes.includes(memory.type)) return false
-      
+
       // 搜索筛选
       if (memorySearchTerm) {
         const searchLower = memorySearchTerm.toLowerCase()
         return memory.title.toLowerCase().includes(searchLower) ||
-               memory.content.toLowerCase().includes(searchLower)
+          memory.content.toLowerCase().includes(searchLower)
       }
-      
+
       return true
     })
     .sort((a, b) => {
@@ -785,7 +785,7 @@ export default function MemoryManagePage() {
       stats[memory.type] = (stats[memory.type] || 0) + 1
       return stats
     }, {} as Record<string, number>),
-    averageImportance: memories.length > 0 
+    averageImportance: memories.length > 0
       ? Math.round(memories.reduce((sum, m) => sum + m.importance, 0) / memories.length * 10) / 10
       : 0
   }
@@ -917,7 +917,7 @@ export default function MemoryManagePage() {
       }
 
       // 合并重叠或连续的范围
-      const ranges: {start: number, end: number}[] = []
+      const ranges: { start: number, end: number }[] = []
       for (const summary of summaries) {
         const newRange = { start: summary.start_message_id, end: summary.end_message_id }
 
@@ -1013,7 +1013,7 @@ export default function MemoryManagePage() {
       }
 
       // 获取已有摘要覆盖的消息范围
-      const summarizedRanges: {start: number, end: number}[] = []
+      const summarizedRanges: { start: number, end: number }[] = []
       summaries.forEach(summary => {
         if (summary.start_message_id && summary.end_message_id) {
           summarizedRanges.push({
@@ -1024,7 +1024,7 @@ export default function MemoryManagePage() {
       })
 
       // 找出未被摘要的消息段
-      const unsummarizedRanges: {start: number, end: number, count: number}[] = []
+      const unsummarizedRanges: { start: number, end: number, count: number }[] = []
       let currentStart: number | null = allMessages[0].id
 
       for (let i = 0; i < allMessages.length; i++) {
@@ -1112,8 +1112,8 @@ export default function MemoryManagePage() {
 
         // 检查是否有重叠
         if ((startNum >= summaryStartIndex && startNum <= summaryEndIndex) ||
-            (endNum >= summaryStartIndex && endNum <= summaryEndIndex) ||
-            (startNum <= summaryStartIndex && endNum >= summaryEndIndex)) {
+          (endNum >= summaryStartIndex && endNum <= summaryEndIndex) ||
+          (startNum <= summaryStartIndex && endNum >= summaryEndIndex)) {
           return {
             valid: false,
             message: `与现有摘要范围重叠 (第 ${summaryStartIndex}-${summaryEndIndex} 条消息)`
@@ -1229,9 +1229,9 @@ export default function MemoryManagePage() {
 
       // 构建请求头，包含中转API配置
       const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'x-api-key': modelConfig.apiKey,
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'x-api-key': modelConfig.apiKey,
         'x-model': currentModel,
       }
 
@@ -1459,466 +1459,463 @@ export default function MemoryManagePage() {
       <div className="flex-1 overflow-hidden">
         <div className="h-full overflow-y-auto">
           <div className="container mx-auto px-4 py-6 max-w-6xl">
-        <Tabs defaultValue="summaries" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
-            <TabsTrigger value="summaries" className="flex items-center space-x-2">
-              <FileText className="w-4 h-4" />
-              <span>对话摘要</span>
-            </TabsTrigger>
-            <TabsTrigger value="memories" className="flex items-center space-x-2">
-              <Table className="w-4 h-4" />
-              <span>记忆表格</span>
-            </TabsTrigger>
-            <TabsTrigger value="control" className="flex items-center space-x-2">
-              <Sparkles className="w-4 h-4" />
-              <span>摘要控制</span>
-            </TabsTrigger>
-          </TabsList>
+            <Tabs defaultValue="summaries" className="w-full">
+              <TabsList className="grid w-full grid-cols-3 mb-6">
+                <TabsTrigger value="summaries" className="flex items-center space-x-2">
+                  <FileText className="w-4 h-4" />
+                  <span>对话摘要</span>
+                </TabsTrigger>
+                <TabsTrigger value="memories" className="flex items-center space-x-2">
+                  <Table className="w-4 h-4" />
+                  <span>记忆表格</span>
+                </TabsTrigger>
+                <TabsTrigger value="control" className="flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4" />
+                  <span>摘要控制</span>
+                </TabsTrigger>
+              </TabsList>
 
-          {/* 摘要管理标签页 */}
-          <TabsContent value="summaries">
-            <div className="space-y-4">
-              {summaries.length === 0 ? (
-                <Card>
-                  <CardContent className="pt-6 text-center">
-                    <FileText className="w-12 h-12 mx-auto text-slate-400 mb-4" />
-                    <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
-                      还没有对话摘要
-                    </h3>
-                    <p className="text-slate-600 dark:text-slate-400">
-                      当对话达到一定长度时，系统会自动生成摘要
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                summaries.map((summary, index) => (
-                  <Card key={summary.id} className="relative">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3 flex-wrap">
-                          <Badge variant="outline" className="text-xs">
-                            摘要 #{index + 1}
-                          </Badge>
-                          {summary.start_message_id && summary.end_message_id ? (
-                            <Badge variant="secondary" className="text-xs">
-                              第 {getMessageIndexById(summary.start_message_id)} - {getMessageIndexById(summary.end_message_id)} 条消息
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">
-                              范围未知
-                            </Badge>
-                          )}
-                          <Badge variant={summary.summary_level === 1 ? "default" : "secondary"}>
-                            {summary.summary_level === 1 ? '普通摘要' : '压缩摘要'}
-                          </Badge>
-                          {summary.is_active ? (
-                            <Badge className="bg-green-100 text-green-800">活跃</Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-gray-100 text-gray-600">已归档</Badge>
-                          )}
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditSummary(summary.id, summary.content)}
-                            className="text-blue-600 hover:text-blue-700"
-                            title="编辑摘要"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRegenerateSummary(summary.id)}
-                            disabled={isRegenerating === summary.id}
-                            className="text-green-600 hover:text-green-700"
-                            title="重新生成摘要"
-                          >
-                            <RefreshCw className={`w-4 h-4 ${isRegenerating === summary.id ? 'animate-spin' : ''}`} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteSummary(summary.id)}
-                            className="text-red-600 hover:text-red-700"
-                            title="删除摘要"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-
-                    <CardContent>
-                      {editingSummary === summary.id ? (
-                        <div className="space-y-4">
-                          <Textarea
-                            value={editingContent}
-                            onChange={(e) => setEditingContent(e.target.value)}
-                            className="min-h-[120px]"
-                            placeholder="编辑摘要内容..."
-                          />
-                          <div className="flex justify-end space-x-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setEditingSummary(null)
-                                setEditingContent('')
-                              }}
-                            >
-                              <X className="w-4 h-4 mr-1" />
-                              取消
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={handleSaveSummary}
-                            >
-                              <Save className="w-4 h-4 mr-1" />
-                              保存
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-                            {summary.content}
-                          </p>
-                          <div className="text-xs text-slate-500 border-t pt-2">
-                            创建时间: {new Date(summary.created_at).toLocaleString()}
-                            {summary.updated_at !== summary.created_at && (
-                              <span className="ml-4">
-                                更新时间: {new Date(summary.updated_at).toLocaleString()}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
-          </TabsContent>
-
-          {/* 记忆表格标签页 */}
-          <TabsContent value="memories">
-            <div className="space-y-6">
-              {memories.length === 0 ? (
-                <Card>
-                  <CardContent className="pt-6 text-center">
-                    <Table className="w-12 h-12 mx-auto text-slate-400 mb-4" />
-                    <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
-                      记忆表格为空
-                    </h3>
-                    <p className="text-slate-600 dark:text-slate-400 mb-4">
-                      记忆表格会自动从对话中提取，或者您可以手动添加重要记忆
-                    </p>
-                    <Button
-                      onClick={() => setShowAddMemoryDialog(true)}
-                      className="bg-purple-600 hover:bg-purple-700 text-white"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      添加第一个记忆
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : (
-                <>
-                  {/* 简化的记忆概览 */}
-                  <Card className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-purple-200">
-                    <CardContent className="pt-4">
-                        <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 bg-purple-100 dark:bg-purple-800 rounded-lg">
-                            <BarChart3 className="w-5 h-5 text-purple-600" />
-                            </div>
-                            <div>
-                            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">记忆概览</div>
-                            <div className="text-xs text-slate-500">
-                              共 {memoryStats.total} 条记忆，显示 {filteredAndSortedMemories.length} 条
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* 类型快速筛选 */}
-                        <div className="flex flex-wrap gap-1">
-                          {Object.entries(memoryStats.byType).slice(0, 4).map(([type, count]) => (
-                            <Button
-                              key={type}
-                              variant={selectedMemoryTypes.includes(type) ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => {
-                                if (selectedMemoryTypes.includes(type)) {
-                                  setSelectedMemoryTypes(prev => prev.filter(t => t !== type))
-                                } else {
-                                  setSelectedMemoryTypes([type])
-                                }
-                              }}
-                              className="h-7 px-2 text-xs"
-                            >
-                              {getMemoryIcon(type)}
-                              <span className="ml-1">{count}</span>
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* 简化的搜索和筛选 */}
-                  <Card>
-                    <CardContent className="pt-4">
-                      <div className="flex flex-col md:flex-row gap-4">
-                        {/* 搜索框 */}
-                        <div className="flex-1 relative">
-                          <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                          <Input
-                            placeholder="搜索记忆内容..."
-                            value={memorySearchTerm}
-                            onChange={(e) => setMemorySearchTerm(e.target.value)}
-                            className="pl-10"
-                          />
-                        </div>
-
-                        {/* 排序选择 */}
-                        <div className="flex items-center space-x-2">
-                          <SortDesc className="w-4 h-4 text-slate-500" />
-                          <select
-                            value={memorySortBy}
-                            onChange={(e) => setMemorySortBy(e.target.value as any)}
-                            className="text-sm border border-slate-300 rounded px-3 py-2 bg-white"
-                          >
-                            <option value="importance">按重要度</option>
-                            <option value="created_at">按时间</option>
-                            <option value="type">按类型</option>
-                          </select>
-                        </div>
-
-                        {/* 快速操作 */}
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedMemoryTypes(['character', 'event', 'setting', 'emotion', 'spacetime', 'relationship', 'task', 'item'])}
-                            className="text-xs"
-                          >
-                            全部
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedMemoryTypes([])}
-                            className="text-xs"
-                          >
-                            清空
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* 记忆展示区域 */}
-                  {filteredAndSortedMemories.length === 0 ? (
+              {/* 摘要管理标签页 */}
+              <TabsContent value="summaries">
+                <div className="space-y-4">
+                  {summaries.length === 0 ? (
                     <Card>
                       <CardContent className="pt-6 text-center">
-                        <Search className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                        <FileText className="w-12 h-12 mx-auto text-slate-400 mb-4" />
                         <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
-                          没有找到匹配的记忆
+                          还没有对话摘要
                         </h3>
                         <p className="text-slate-600 dark:text-slate-400">
-                          尝试调整搜索条件或筛选设置
+                          当对话达到一定长度时，系统会自动生成摘要
                         </p>
                       </CardContent>
                     </Card>
                   ) : (
-                    <div className="space-y-6">
-                      {Object.entries(memoriesByType).map(([type, typeMemories]) => (
-                        <div key={type}>
-                          <div className="flex items-center space-x-3 mb-4">
-                            <div className={`p-2 rounded-lg ${getMemoryColor(type)}`}>
-                              {getMemoryIcon(type)}
+                    summaries.map((summary, index) => (
+                      <Card key={summary.id} className="relative">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3 flex-wrap">
+                              <Badge variant="outline" className="text-xs">
+                                摘要 #{index + 1}
+                              </Badge>
+                              {summary.start_message_id && summary.end_message_id ? (
+                                <Badge variant="secondary" className="text-xs">
+                                  第 {getMessageIndexById(summary.start_message_id)} - {getMessageIndexById(summary.end_message_id)} 条消息
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs">
+                                  范围未知
+                                </Badge>
+                              )}
+                              <Badge variant={summary.summary_level === 1 ? "default" : "secondary"}>
+                                {summary.summary_level === 1 ? '普通摘要' : '压缩摘要'}
+                              </Badge>
+                              {summary.is_active ? (
+                                <Badge className="bg-green-100 text-green-800">活跃</Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-gray-100 text-gray-600">已归档</Badge>
+                              )}
                             </div>
-                            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-                              {getMemoryTypeName(type)}
-                            </h3>
-                            <Badge variant="secondary">{typeMemories.length}</Badge>
-                          </div>
-                          
-                          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                            {typeMemories.map((memory) => (
-                              <Card key={memory.id} className="relative group hover:shadow-md transition-shadow">
-                                <CardContent className="p-4">
-                                  <div className="flex items-start justify-between mb-2">
-                                    <div className="flex-1 min-w-0">
-                                      <h4 className="font-medium text-sm text-slate-800 dark:text-slate-200 mb-1 truncate">
-                                        {memory.title}
-                                      </h4>
-                                      <div className="flex items-center space-x-2 mb-2">
-                                        <span className="text-xs text-slate-500">重要度 {memory.importance}</span>
-                                        <div className="flex">
-                                          {Array.from({length: Math.min(memory.importance, 5)}).map((_, i) => (
-                                            <div key={i} className="w-1 h-1 bg-yellow-400 rounded-full mr-0.5" />
-                                          ))}
-                                        </div>
-                            </div>
-                          </div>
 
-                                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleEditMemory(memory)}
-                                        className="text-blue-600 hover:text-blue-700 h-6 w-6 p-0"
-                                        title="编辑记忆"
-                                      >
-                                        <Edit3 className="w-3 h-3" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleToggleMemoryEnabled(memory)}
-                                        className={`h-6 w-6 p-0 ${(memory.metadata?.is_enabled ?? true) ? 'text-green-600 hover:text-green-700' : 'text-gray-400 hover:text-gray-500'}`}
-                                        title={(memory.metadata?.is_enabled ?? true) ? '点击禁用' : '点击启用'}
-                                      >
-                                        {(memory.metadata?.is_enabled ?? true) ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleDeleteMemory(memory.id)}
-                                        className="text-red-600 hover:text-red-700 h-6 w-6 p-0"
-                                        title="删除记忆"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </Button>
-                                    </div>
-                        </div>
-                                  <p className="text-sm text-slate-700 dark:text-slate-300 mb-2 line-clamp-2">
-                          {memory.content}
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditSummary(summary.id, summary.content)}
+                                className="text-blue-600 hover:text-blue-700"
+                                title="编辑摘要"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRegenerateSummary(summary.id)}
+                                disabled={isRegenerating === summary.id}
+                                className="text-green-600 hover:text-green-700"
+                                title="重新生成摘要"
+                              >
+                                <RefreshCw className={`w-4 h-4 ${isRegenerating === summary.id ? 'animate-spin' : ''}`} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteSummary(summary.id)}
+                                className="text-red-600 hover:text-red-700"
+                                title="删除摘要"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardHeader>
+
+                        <CardContent>
+                          {editingSummary === summary.id ? (
+                            <div className="space-y-4">
+                              <Textarea
+                                value={editingContent}
+                                onChange={(e) => setEditingContent(e.target.value)}
+                                className="min-h-[120px]"
+                                placeholder="编辑摘要内容..."
+                              />
+                              <div className="flex justify-end space-x-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingSummary(null)
+                                    setEditingContent('')
+                                  }}
+                                >
+                                  <X className="w-4 h-4 mr-1" />
+                                  取消
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={handleSaveSummary}
+                                >
+                                  <Save className="w-4 h-4 mr-1" />
+                                  保存
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                                {summary.content}
+                              </p>
+                              <div className="text-xs text-slate-500 border-t pt-2">
+                                创建时间: {new Date(summary.created_at).toLocaleString()}
+                                {summary.updated_at !== summary.created_at && (
+                                  <span className="ml-4">
+                                    更新时间: {new Date(summary.updated_at).toLocaleString()}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* 记忆表格标签页 */}
+              <TabsContent value="memories">
+                <div className="space-y-6">
+                  {memories.length === 0 ? (
+                    <Card>
+                      <CardContent className="pt-6 text-center">
+                        <Table className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                        <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+                          记忆表格为空
+                        </h3>
+                        <p className="text-slate-600 dark:text-slate-400 mb-4">
+                          记忆表格会自动从对话中提取，或者您可以手动添加重要记忆
                         </p>
-                                  
-                                  {/* 显示metadata信息 - 只显示有内容的字段 */}
-                                  {memory.metadata && Object.keys(memory.metadata).length > 0 && (
-                                    <div className="space-y-1 text-xs text-slate-500">
-                                      {/* 人物记忆 */}
-                                      {memory.type === 'character' && (
-                                        <div className="flex flex-wrap gap-2">
-                                          {memory.metadata.name && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-                                              👤 {memory.metadata.name}
-                                            </span>
-                                          )}
-                                          {memory.metadata.relationship && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-700 rounded text-xs">
-                                              🤝 {memory.metadata.relationship}
-                                            </span>
-                                          )}
-                                          {memory.metadata.age && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">
-                                              🎂 {memory.metadata.age}
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
-                                      
-                                      {/* 时空记忆 */}
-                                      {memory.type === 'spacetime' && (
-                                        <div className="flex flex-wrap gap-2">
-                                          {memory.metadata.date && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs">
-                                              📅 {memory.metadata.date}
-                                            </span>
-                                          )}
-                                          {memory.metadata.location && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs">
-                                              📍 {memory.metadata.location}
-                                            </span>
-                                          )}
-                                          {memory.metadata.weather && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-sky-100 text-sky-700 rounded text-xs">
-                                              🌤️ {memory.metadata.weather}
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
-                                      
-                                      {/* 关系记忆 */}
-                                      {memory.type === 'relationship' && (
-                                        <div className="flex flex-wrap gap-2">
-                                          {memory.metadata.character_name && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs">
-                                              👤 {memory.metadata.character_name}
-                                            </span>
-                                          )}
-                                          {memory.metadata.affection && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-pink-100 text-pink-700 rounded text-xs">
-                                              💖 {memory.metadata.affection}/10
-                                            </span>
-                                          )}
-                                          {memory.metadata.trust && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-cyan-100 text-cyan-700 rounded text-xs">
-                                              🤝 信任 {memory.metadata.trust}/10
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
-                                      
-                                      {/* 任务记忆 - 带状态切换 */}
-                                      {memory.type === 'task' && (
-                                        <div className="space-y-2">
-                                          <div className="flex flex-wrap gap-2">
-                                            {'scheduled_time' in memory.metadata && memory.metadata.scheduled_time && (
-                                              <span className="inline-flex items-center px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">
-                                                ⏰ {memory.metadata.scheduled_time}
-                                              </span>
-                                            )}
-                                            {'priority' in memory.metadata && memory.metadata.priority && (
-                                              <span className="inline-flex items-center px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs">
-                                                🔥 {memory.metadata.priority}
-                                              </span>
-                                            )}
-                                          </div>
-                                          <div className="flex items-center gap-1">
-                                            <span className="text-xs text-slate-500 mr-2">状态:</span>
-                                            <button
-                                              onClick={() => handleUpdateTaskStatus(memory as TaskMemory, 'pending')}
-                                              className={`px-2 py-1 rounded text-xs transition-colors ${
-                                                memory.metadata.status === 'pending'
-                                                  ? 'bg-gray-200 text-gray-800 font-medium'
-                                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-150'
-                                              }`}
-                                            >
-                                              ⏳ 待处理
-                                            </button>
-                                            <button
-                                              onClick={() => handleUpdateTaskStatus(memory as TaskMemory, 'in_progress')}
-                                              className={`px-2 py-1 rounded text-xs transition-colors ${
-                                                memory.metadata.status === 'in_progress'
-                                                  ? 'bg-blue-200 text-blue-800 font-medium'
-                                                  : 'bg-blue-100 text-blue-600 hover:bg-blue-150'
-                                              }`}
-                                            >
-                                              🔄 进行中
-                                            </button>
-                                            <button
-                                              onClick={() => handleUpdateTaskStatus(memory as TaskMemory, 'completed')}
-                                              className={`px-2 py-1 rounded text-xs transition-colors ${
-                                                memory.metadata.status === 'completed'
-                                                  ? 'bg-green-200 text-green-800 font-medium'
-                                                  : 'bg-green-100 text-green-600 hover:bg-green-150'
-                                              }`}
-                                            >
-                                              ✅ 已完成
-                                            </button>
-                                          </div>
-                                        </div>
-                                      )}
+                        <Button
+                          onClick={() => setShowAddMemoryDialog(true)}
+                          className="bg-purple-600 hover:bg-purple-700 text-white"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          添加第一个记忆
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <>
+                      {/* 简化的记忆概览 */}
+                      <Card className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-purple-200">
+                        <CardContent className="pt-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className="p-2 bg-purple-100 dark:bg-purple-800 rounded-lg">
+                                <BarChart3 className="w-5 h-5 text-purple-600" />
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium text-slate-700 dark:text-slate-300">记忆概览</div>
+                                <div className="text-xs text-slate-500">
+                                  共 {memoryStats.total} 条记忆，显示 {filteredAndSortedMemories.length} 条
+                                </div>
+                              </div>
+                            </div>
 
-                                      {/* 旧的任务状态显示（保留作为fallback） - Disabled */}
-                                      {/* {memory.type === 'task' && false && 'status' in memory.metadata && memory.metadata.status && (
+                            {/* 类型快速筛选 */}
+                            <div className="flex flex-wrap gap-1">
+                              {Object.entries(memoryStats.byType).slice(0, 4).map(([type, count]) => (
+                                <Button
+                                  key={type}
+                                  variant={selectedMemoryTypes.includes(type) ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => {
+                                    if (selectedMemoryTypes.includes(type)) {
+                                      setSelectedMemoryTypes(prev => prev.filter(t => t !== type))
+                                    } else {
+                                      setSelectedMemoryTypes([type])
+                                    }
+                                  }}
+                                  className="h-7 px-2 text-xs"
+                                >
+                                  {getMemoryIcon(type)}
+                                  <span className="ml-1">{count}</span>
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* 简化的搜索和筛选 */}
+                      <Card>
+                        <CardContent className="pt-4">
+                          <div className="flex flex-col md:flex-row gap-4">
+                            {/* 搜索框 */}
+                            <div className="flex-1 relative">
+                              <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                              <Input
+                                placeholder="搜索记忆内容..."
+                                value={memorySearchTerm}
+                                onChange={(e) => setMemorySearchTerm(e.target.value)}
+                                className="pl-10"
+                              />
+                            </div>
+
+                            {/* 排序选择 */}
+                            <div className="flex items-center space-x-2">
+                              <SortDesc className="w-4 h-4 text-slate-500" />
+                              <select
+                                value={memorySortBy}
+                                onChange={(e) => setMemorySortBy(e.target.value as any)}
+                                className="text-sm border border-slate-300 rounded px-3 py-2 bg-white"
+                              >
+                                <option value="importance">按重要度</option>
+                                <option value="created_at">按时间</option>
+                                <option value="type">按类型</option>
+                              </select>
+                            </div>
+
+                            {/* 快速操作 */}
+                            <div className="flex space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedMemoryTypes(['character', 'event', 'setting', 'emotion', 'spacetime', 'relationship', 'task', 'item'])}
+                                className="text-xs"
+                              >
+                                全部
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedMemoryTypes([])}
+                                className="text-xs"
+                              >
+                                清空
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* 记忆展示区域 */}
+                      {filteredAndSortedMemories.length === 0 ? (
+                        <Card>
+                          <CardContent className="pt-6 text-center">
+                            <Search className="w-12 h-12 mx-auto text-slate-400 mb-4" />
+                            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+                              没有找到匹配的记忆
+                            </h3>
+                            <p className="text-slate-600 dark:text-slate-400">
+                              尝试调整搜索条件或筛选设置
+                            </p>
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        <div className="space-y-6">
+                          {Object.entries(memoriesByType).map(([type, typeMemories]) => (
+                            <div key={type}>
+                              <div className="flex items-center space-x-3 mb-4">
+                                <div className={`p-2 rounded-lg ${getMemoryColor(type)}`}>
+                                  {getMemoryIcon(type)}
+                                </div>
+                                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+                                  {getMemoryTypeName(type)}
+                                </h3>
+                                <Badge variant="secondary">{typeMemories.length}</Badge>
+                              </div>
+
+                              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                                {typeMemories.map((memory) => (
+                                  <Card key={memory.id} className="relative group hover:shadow-md transition-shadow">
+                                    <CardContent className="p-4">
+                                      <div className="flex items-start justify-between mb-2">
+                                        <div className="flex-1 min-w-0">
+                                          <h4 className="font-medium text-sm text-slate-800 dark:text-slate-200 mb-1 truncate">
+                                            {memory.title}
+                                          </h4>
+                                          <div className="flex items-center space-x-2 mb-2">
+                                            <span className="text-xs text-slate-500">重要度 {memory.importance}</span>
+                                            <div className="flex">
+                                              {Array.from({ length: Math.min(memory.importance, 5) }).map((_, i) => (
+                                                <div key={i} className="w-1 h-1 bg-yellow-400 rounded-full mr-0.5" />
+                                              ))}
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleEditMemory(memory)}
+                                            className="text-blue-600 hover:text-blue-700 h-6 w-6 p-0"
+                                            title="编辑记忆"
+                                          >
+                                            <Edit3 className="w-3 h-3" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleToggleMemoryEnabled(memory)}
+                                            className={`h-6 w-6 p-0 ${(memory.metadata?.is_enabled ?? true) ? 'text-green-600 hover:text-green-700' : 'text-gray-400 hover:text-gray-500'}`}
+                                            title={(memory.metadata?.is_enabled ?? true) ? '点击禁用' : '点击启用'}
+                                          >
+                                            {(memory.metadata?.is_enabled ?? true) ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleDeleteMemory(memory.id)}
+                                            className="text-red-600 hover:text-red-700 h-6 w-6 p-0"
+                                            title="删除记忆"
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                      <p className="text-sm text-slate-700 dark:text-slate-300 mb-2 line-clamp-2">
+                                        {memory.content}
+                                      </p>
+
+                                      {/* 显示metadata信息 - 只显示有内容的字段 */}
+                                      {memory.metadata && Object.keys(memory.metadata).length > 0 && (
+                                        <div className="space-y-1 text-xs text-slate-500">
+                                          {/* 人物记忆 */}
+                                          {memory.type === 'character' && (
+                                            <div className="flex flex-wrap gap-2">
+                                              {memory.metadata.name && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                                                  👤 {memory.metadata.name}
+                                                </span>
+                                              )}
+                                              {memory.metadata.relationship && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-700 rounded text-xs">
+                                                  🤝 {memory.metadata.relationship}
+                                                </span>
+                                              )}
+                                              {memory.metadata.age && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">
+                                                  🎂 {memory.metadata.age}
+                                                </span>
+                                              )}
+                                            </div>
+                                          )}
+
+                                          {/* 时空记忆 */}
+                                          {memory.type === 'spacetime' && (
+                                            <div className="flex flex-wrap gap-2">
+                                              {memory.metadata.date && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs">
+                                                  📅 {memory.metadata.date}
+                                                </span>
+                                              )}
+                                              {memory.metadata.location && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs">
+                                                  📍 {memory.metadata.location}
+                                                </span>
+                                              )}
+                                              {memory.metadata.weather && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-sky-100 text-sky-700 rounded text-xs">
+                                                  🌤️ {memory.metadata.weather}
+                                                </span>
+                                              )}
+                                            </div>
+                                          )}
+
+                                          {/* 关系记忆 */}
+                                          {memory.type === 'relationship' && (
+                                            <div className="flex flex-wrap gap-2">
+                                              {memory.metadata.character_name && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs">
+                                                  👤 {memory.metadata.character_name}
+                                                </span>
+                                              )}
+                                              {memory.metadata.affection && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-pink-100 text-pink-700 rounded text-xs">
+                                                  💖 {memory.metadata.affection}/10
+                                                </span>
+                                              )}
+                                              {memory.metadata.trust && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-cyan-100 text-cyan-700 rounded text-xs">
+                                                  🤝 信任 {memory.metadata.trust}/10
+                                                </span>
+                                              )}
+                                            </div>
+                                          )}
+
+                                          {/* 任务记忆 - 带状态切换 */}
+                                          {memory.type === 'task' && (
+                                            <div className="space-y-2">
+                                              <div className="flex flex-wrap gap-2">
+                                                {'scheduled_time' in memory.metadata && memory.metadata.scheduled_time && (
+                                                  <span className="inline-flex items-center px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">
+                                                    ⏰ {memory.metadata.scheduled_time}
+                                                  </span>
+                                                )}
+                                                {'priority' in memory.metadata && memory.metadata.priority && (
+                                                  <span className="inline-flex items-center px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs">
+                                                    🔥 {memory.metadata.priority}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="flex items-center gap-1">
+                                                <span className="text-xs text-slate-500 mr-2">状态:</span>
+                                                <button
+                                                  onClick={() => handleUpdateTaskStatus(memory as TaskMemory, 'pending')}
+                                                  className={`px-2 py-1 rounded text-xs transition-colors ${memory.metadata.status === 'pending'
+                                                      ? 'bg-gray-200 text-gray-800 font-medium'
+                                                      : 'bg-gray-100 text-gray-600 hover:bg-gray-150'
+                                                    }`}
+                                                >
+                                                  ⏳ 待处理
+                                                </button>
+                                                <button
+                                                  onClick={() => handleUpdateTaskStatus(memory as TaskMemory, 'in_progress')}
+                                                  className={`px-2 py-1 rounded text-xs transition-colors ${memory.metadata.status === 'in_progress'
+                                                      ? 'bg-blue-200 text-blue-800 font-medium'
+                                                      : 'bg-blue-100 text-blue-600 hover:bg-blue-150'
+                                                    }`}
+                                                >
+                                                  🔄 进行中
+                                                </button>
+                                                <button
+                                                  onClick={() => handleUpdateTaskStatus(memory as TaskMemory, 'completed')}
+                                                  className={`px-2 py-1 rounded text-xs transition-colors ${memory.metadata.status === 'completed'
+                                                      ? 'bg-green-200 text-green-800 font-medium'
+                                                      : 'bg-green-100 text-green-600 hover:bg-green-150'
+                                                    }`}
+                                                >
+                                                  ✅ 已完成
+                                                </button>
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* 旧的任务状态显示（保留作为fallback） - Disabled */}
+                                          {/* {memory.type === 'task' && false && 'status' in memory.metadata && memory.metadata.status && (
                                         <div className="flex flex-wrap gap-2">
                                           {'status' in memory.metadata && memory.metadata.status && (
                                             <span className={`inline-flex items-center px-2 py-1 rounded text-xs ${
@@ -1946,499 +1943,497 @@ export default function MemoryManagePage() {
                                           )}
                                         </div>
                                       )} */}
-                                      
-                                      {/* 物品记忆 */}
-                                      {memory.type === 'item' && (
-                                        <div className="flex flex-wrap gap-2">
-                                          {memory.metadata.owner && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-teal-100 text-teal-700 rounded text-xs">
-                                              👑 {memory.metadata.owner}
-                                            </span>
+
+                                          {/* 物品记忆 */}
+                                          {memory.type === 'item' && (
+                                            <div className="flex flex-wrap gap-2">
+                                              {memory.metadata.owner && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-teal-100 text-teal-700 rounded text-xs">
+                                                  👑 {memory.metadata.owner}
+                                                </span>
+                                              )}
+                                              {memory.metadata.emotional_value && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-rose-100 text-rose-700 rounded text-xs">
+                                                  💝 情感价值 {memory.metadata.emotional_value}/10
+                                                </span>
+                                              )}
+                                              {memory.metadata.location && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-violet-100 text-violet-700 rounded text-xs">
+                                                  📍 {memory.metadata.location}
+                                                </span>
+                                              )}
+                                            </div>
                                           )}
-                                          {memory.metadata.emotional_value && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-rose-100 text-rose-700 rounded text-xs">
-                                              💝 情感价值 {memory.metadata.emotional_value}/10
-                                            </span>
+
+                                          {/* 事件记忆 */}
+                                          {memory.type === 'event' && (
+                                            <div className="flex flex-wrap gap-2">
+                                              {memory.metadata.time && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-700 rounded text-xs">
+                                                  ⏰ {memory.metadata.time}
+                                                </span>
+                                              )}
+                                              {memory.metadata.location && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                                                  📍 {memory.metadata.location}
+                                                </span>
+                                              )}
+                                              {memory.metadata.emotion_intensity && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-red-100 text-red-700 rounded text-xs">
+                                                  💥 强度 {memory.metadata.emotion_intensity}/10
+                                                </span>
+                                              )}
+                                            </div>
                                           )}
-                                          {memory.metadata.location && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-violet-100 text-violet-700 rounded text-xs">
-                                              📍 {memory.metadata.location}
-                                            </span>
+
+                                          {/* 情感记忆 */}
+                                          {memory.type === 'emotion' && (
+                                            <div className="flex flex-wrap gap-2">
+                                              {memory.metadata.emotion_type && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-pink-100 text-pink-700 rounded text-xs">
+                                                  💭 {memory.metadata.emotion_type}
+                                                </span>
+                                              )}
+                                              {memory.metadata.intensity && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-red-100 text-red-700 rounded text-xs">
+                                                  🔥 强度 {memory.metadata.intensity}/10
+                                                </span>
+                                              )}
+                                              {memory.metadata.target && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">
+                                                  🎯 {memory.metadata.target}
+                                                </span>
+                                              )}
+                                            </div>
+                                          )}
+
+                                          {/* 设定记忆 */}
+                                          {memory.type === 'setting' && (
+                                            <div className="flex flex-wrap gap-2">
+                                              {memory.metadata.location && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">
+                                                  🏛️ {memory.metadata.location}
+                                                </span>
+                                              )}
+                                              {memory.metadata.atmosphere && (
+                                                <span className="inline-flex items-center px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs">
+                                                  🌟 {memory.metadata.atmosphere}
+                                                </span>
+                                              )}
+                                            </div>
                                           )}
                                         </div>
                                       )}
 
-                                      {/* 事件记忆 */}
-                                      {memory.type === 'event' && (
-                                        <div className="flex flex-wrap gap-2">
-                                          {memory.metadata.time && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-700 rounded text-xs">
-                                              ⏰ {memory.metadata.time}
-                                            </span>
-                                          )}
-                                          {memory.metadata.location && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-                                              📍 {memory.metadata.location}
-                                            </span>
-                                          )}
-                                          {memory.metadata.emotion_intensity && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-red-100 text-red-700 rounded text-xs">
-                                              💥 强度 {memory.metadata.emotion_intensity}/10
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
+                                      <div className="text-xs text-slate-400 mt-2 pt-2 border-t border-slate-100">
+                                        {new Date(memory.created_at).toLocaleDateString()}
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </TabsContent>
 
-                                      {/* 情感记忆 */}
-                                      {memory.type === 'emotion' && (
-                                        <div className="flex flex-wrap gap-2">
-                                          {memory.metadata.emotion_type && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-pink-100 text-pink-700 rounded text-xs">
-                                              💭 {memory.metadata.emotion_type}
-                                            </span>
-                                          )}
-                                          {memory.metadata.intensity && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-red-100 text-red-700 rounded text-xs">
-                                              🔥 强度 {memory.metadata.intensity}/10
-                                            </span>
-                                          )}
-                                          {memory.metadata.target && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">
-                                              🎯 {memory.metadata.target}
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
+              {/* 摘要控制标签页 */}
+              <TabsContent value="control">
+                <div className="space-y-6">
+                  {/* 系统说明卡片 */}
+                  <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20">
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2 text-blue-700">
+                        <Brain className="w-5 h-5" />
+                        <span>智能摘要系统</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3 text-sm text-blue-700 dark:text-blue-300">
+                        <p className="font-medium">这是什么？</p>
+                        <ul className="space-y-2 ml-4">
+                          <li>• <strong>对话摘要</strong>：将长对话压缩为关键信息，节省AI记忆</li>
+                          <li>• <strong>记忆表格</strong>：自动提取人物、事件、设定、情感等结构化信息</li>
+                          <li>• <strong>智能连续</strong>：新摘要会参考之前的内容，保持记忆连贯性</li>
+                        </ul>
+                        <p className="font-medium mt-4">为什么使用？</p>
+                        <ul className="space-y-2 ml-4">
+                          <li>• 长对话时AI不会忘记早期内容</li>
+                          <li>• 节省API调用成本和时间</li>
+                          <li>• 更好的角色扮演连续性</li>
+                        </ul>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                                      {/* 设定记忆 */}
-                                      {memory.type === 'setting' && (
-                                        <div className="flex flex-wrap gap-2">
-                                          {memory.metadata.location && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">
-                                              🏛️ {memory.metadata.location}
-                                            </span>
-                                          )}
-                                          {memory.metadata.atmosphere && (
-                                            <span className="inline-flex items-center px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs">
-                                              🌟 {memory.metadata.atmosphere}
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
+                  {/* 摘要状态卡片 */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <MessageSquare className="w-5 h-5 text-blue-600" />
+                        <span>对话统计</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                          <div className="text-2xl font-bold text-blue-600">{messageCount}</div>
+                          <div className="text-sm text-slate-600 dark:text-slate-400">总消息数</div>
+                        </div>
+                        <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                          <div className="text-2xl font-bold text-green-600">{summaries.length}</div>
+                          <div className="text-sm text-slate-600 dark:text-slate-400">已有摘要</div>
+                        </div>
+                        <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                          <div className="text-2xl font-bold text-purple-600">{memories.length}</div>
+                          <div className="text-sm text-slate-600 dark:text-slate-400">记忆条目</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* 智能上下文状态 */}
+                  {contextStatus && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <Brain className="w-5 h-5 text-indigo-600" />
+                          <span>智能上下文状态</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          {/* 覆盖统计 */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="text-center p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                              <div className="text-2xl font-bold text-indigo-600">{contextStatus.coveredMessages}</div>
+                              <div className="text-sm text-slate-600 dark:text-slate-400">已摘要消息</div>
+                            </div>
+                            <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                              <div className="text-2xl font-bold text-orange-600">{contextStatus.uncoveredMessages}</div>
+                              <div className="text-sm text-slate-600 dark:text-slate-400">未摘要消息</div>
+                            </div>
+                            <div className="text-center p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
+                              <div className="text-2xl font-bold text-teal-600">
+                                {contextStatus.totalMessages > 0 ? Math.round((contextStatus.coveredMessages / contextStatus.totalMessages) * 100) : 0}%
+                              </div>
+                              <div className="text-sm text-slate-600 dark:text-slate-400">摘要覆盖率</div>
+                            </div>
+                          </div>
+
+                          {/* 覆盖范围可视化 */}
+                          {contextStatus.coverageRanges.length > 0 && (
+                            <div className="border-t pt-4">
+                              <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">📊 摘要覆盖范围</h4>
+                              <div className="space-y-2">
+                                {contextStatus.coverageRanges.map((range, index) => (
+                                  <div key={index} className="flex items-center space-x-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                                    <div className="w-4 h-4 bg-indigo-500 rounded-full flex-shrink-0"></div>
+                                    <div className="flex-1">
+                                      <div className="text-sm font-medium">第 {getMessageIndexById(range.start)} - {getMessageIndexById(range.end)} 条消息</div>
+                                      <div className="text-xs text-slate-600 dark:text-slate-400">
+                                        包含 {getMessageIndexById(range.end) - getMessageIndexById(range.start) + 1} 条消息
+                                      </div>
                                     </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 智能提示 */}
+                          <div className="border-t pt-4">
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                              <div className="flex items-start space-x-2">
+                                <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                                <div className="text-sm text-blue-800 dark:text-blue-200">
+                                  <p className="font-medium mb-1">智能上下文工作原理</p>
+                                  <p>
+                                    聊天时，AI只会接收到<strong>未被摘要覆盖的消息</strong>和<strong>摘要内容</strong>，
+                                    这样既节省了tokens成本，又保持了完整的记忆。
+                                  </p>
+                                  {contextStatus.uncoveredMessages > 50 && (
+                                    <p className="mt-2 text-amber-700 dark:text-amber-300">
+                                      💡 建议：当前有 {contextStatus.uncoveredMessages} 条未摘要消息，可以考虑生成新摘要来优化性能。
+                                    </p>
                                   )}
-                                  
-                                  <div className="text-xs text-slate-400 mt-2 pt-2 border-t border-slate-100">
-                          {new Date(memory.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
-                            ))}
-                          </div>
-                        </div>
-                  ))}
-                </div>
                   )}
-                </>
-              )}
-            </div>
-          </TabsContent>
 
-          {/* 摘要控制标签页 */}
-          <TabsContent value="control">
-            <div className="space-y-6">
-              {/* 系统说明卡片 */}
-              <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2 text-blue-700">
-                    <Brain className="w-5 h-5" />
-                    <span>智能摘要系统</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 text-sm text-blue-700 dark:text-blue-300">
-                    <p className="font-medium">这是什么？</p>
-                    <ul className="space-y-2 ml-4">
-                      <li>• <strong>对话摘要</strong>：将长对话压缩为关键信息，节省AI记忆</li>
-                      <li>• <strong>记忆表格</strong>：自动提取人物、事件、设定、情感等结构化信息</li>
-                      <li>• <strong>智能连续</strong>：新摘要会参考之前的内容，保持记忆连贯性</li>
-                    </ul>
-                    <p className="font-medium mt-4">为什么使用？</p>
-                    <ul className="space-y-2 ml-4">
-                      <li>• 长对话时AI不会忘记早期内容</li>
-                      <li>• 节省API调用成本和时间</li>
-                      <li>• 更好的角色扮演连续性</li>
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* 摘要状态卡片 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <MessageSquare className="w-5 h-5 text-blue-600" />
-                    <span>对话统计</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">{messageCount}</div>
-                      <div className="text-sm text-slate-600 dark:text-slate-400">总消息数</div>
-                    </div>
-                    <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <div className="text-2xl font-bold text-green-600">{summaries.length}</div>
-                      <div className="text-sm text-slate-600 dark:text-slate-400">已有摘要</div>
-                    </div>
-                    <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                      <div className="text-2xl font-bold text-purple-600">{memories.length}</div>
-                      <div className="text-sm text-slate-600 dark:text-slate-400">记忆条目</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* 智能上下文状态 */}
-              {contextStatus && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <Brain className="w-5 h-5 text-indigo-600" />
-                      <span>智能上下文状态</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {/* 覆盖统计 */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="text-center p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
-                          <div className="text-2xl font-bold text-indigo-600">{contextStatus.coveredMessages}</div>
-                          <div className="text-sm text-slate-600 dark:text-slate-400">已摘要消息</div>
+                  {/* 摘要设置卡片 */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <Settings className="w-5 h-5 text-purple-600" />
+                        <span>摘要设置</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-4">
+                        <div className="flex items-center space-x-3">
+                          <input
+                            type="checkbox"
+                            id="autoSummary"
+                            checked={autoSummaryEnabled}
+                            onChange={(e) => setAutoSummaryEnabled(e.target.checked)}
+                            className="rounded"
+                          />
+                          <label htmlFor="autoSummary" className="text-sm font-medium">
+                            启用自动摘要 (聊天时自动生成摘要)
+                          </label>
                         </div>
-                        <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                          <div className="text-2xl font-bold text-orange-600">{contextStatus.uncoveredMessages}</div>
-                          <div className="text-sm text-slate-600 dark:text-slate-400">未摘要消息</div>
-                        </div>
-                        <div className="text-center p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
-                          <div className="text-2xl font-bold text-teal-600">
-                            {contextStatus.totalMessages > 0 ? Math.round((contextStatus.coveredMessages / contextStatus.totalMessages) * 100) : 0}%
+
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            摘要阈值 (每 {summaryThreshold} 条消息生成一个摘要)
+                          </label>
+                          <input
+                            type="range"
+                            min="20"
+                            max="100"
+                            step="5"
+                            value={summaryThreshold}
+                            onChange={(e) => setSummaryThreshold(parseInt(e.target.value))}
+                            className="w-full"
+                          />
+                          <div className="flex justify-between text-xs text-slate-500 mt-1">
+                            <span>20</span>
+                            <span>{summaryThreshold}条</span>
+                            <span>100</span>
                           </div>
-                          <div className="text-sm text-slate-600 dark:text-slate-400">摘要覆盖率</div>
                         </div>
                       </div>
 
-                      {/* 覆盖范围可视化 */}
-                      {contextStatus.coverageRanges.length > 0 && (
-                        <div className="border-t pt-4">
-                          <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">📊 摘要覆盖范围</h4>
-                          <div className="space-y-2">
-                            {contextStatus.coverageRanges.map((range, index) => (
-                              <div key={index} className="flex items-center space-x-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                                <div className="w-4 h-4 bg-indigo-500 rounded-full flex-shrink-0"></div>
-                                <div className="flex-1">
-                                  <div className="text-sm font-medium">第 {getMessageIndexById(range.start)} - {getMessageIndexById(range.end)} 条消息</div>
-                                  <div className="text-xs text-slate-600 dark:text-slate-400">
-                                    包含 {getMessageIndexById(range.end) - getMessageIndexById(range.start) + 1} 条消息
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="useMemoryTable"
+                          checked={useMemoryTableFormat}
+                          onChange={(e) => setUseMemoryTableFormat(e.target.checked)}
+                          className="rounded"
+                        />
+                        <label htmlFor="useMemoryTable" className="text-sm">
+                          使用记忆表格格式（推荐）
+                        </label>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* 手动生成摘要卡片 */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <Sparkles className="w-5 h-5 text-yellow-600" />
+                        <span>手动生成摘要</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          选择消息范围来生成摘要。系统会自动建议合适的摘要范围。
+                        </p>
+
+                        {/* 建议的摘要范围 */}
+                        {summaryRanges.length > 0 ? (
+                          <div className="space-y-3">
+                            <h4 className="font-medium text-sm text-green-700">💡 发现可摘要的对话段落：</h4>
+                            {summaryRanges.map((range, index) => (
+                              <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-lg border border-green-200">
+                                <div className="flex items-center space-x-3">
+                                  <Clock className="w-4 h-4 text-green-600" />
+                                  <div>
+                                    <div className="text-sm font-medium">
+                                      第 {getMessageIndexById(range.start)} - {getMessageIndexById(range.end)} 条消息
+                                    </div>
+                                    <div className="text-xs text-slate-600">
+                                      包含 {range.count} 条对话 • 建议生成摘要
+                                    </div>
                                   </div>
                                 </div>
+                                {(() => {
+                                  const validation = validateSummarySequence(range.start, range.end)
+                                  return (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleGenerateSummary(range.start, range.end)}
+                                      disabled={isGeneratingSummary || !validation.valid}
+                                      className={`${validation.valid
+                                          ? "bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
+                                          : "bg-gray-400 cursor-not-allowed"
+                                        } text-white border-0`}
+                                      title={!validation.valid ? validation.message : "生成摘要"}
+                                    >
+                                      {isGeneratingSummary ? (
+                                        <RefreshCw className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <>
+                                          <Sparkles className="w-4 h-4 mr-1" />
+                                          生成摘要
+                                        </>
+                                      )}
+                                    </Button>
+                                  )
+                                })()}
                               </div>
                             ))}
                           </div>
-                        </div>
-                      )}
-
-                      {/* 智能提示 */}
-                      <div className="border-t pt-4">
-                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                          <div className="flex items-start space-x-2">
-                            <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                            <div className="text-sm text-blue-800 dark:text-blue-200">
-                              <p className="font-medium mb-1">智能上下文工作原理</p>
-                              <p>
-                                聊天时，AI只会接收到<strong>未被摘要覆盖的消息</strong>和<strong>摘要内容</strong>，
-                                这样既节省了tokens成本，又保持了完整的记忆。
-                              </p>
-                              {contextStatus.uncoveredMessages > 50 && (
-                                <p className="mt-2 text-amber-700 dark:text-amber-300">
-                                  💡 建议：当前有 {contextStatus.uncoveredMessages} 条未摘要消息，可以考虑生成新摘要来优化性能。
-                                </p>
-                              )}
-                            </div>
+                        ) : (
+                          <div className="text-center py-8 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                            <MessageSquare className="w-12 h-12 mx-auto text-slate-400 mb-3" />
+                            <p className="text-slate-600 dark:text-slate-400 mb-2">暂无需要摘要的对话</p>
+                            <p className="text-xs text-slate-500">
+                              当对话超过 {summaryThreshold} 条消息时，会出现摘要建议
+                            </p>
                           </div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                        )}
 
-              {/* 摘要设置卡片 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Settings className="w-5 h-5 text-purple-600" />
-                    <span>摘要设置</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="checkbox"
-                        id="autoSummary"
-                        checked={autoSummaryEnabled}
-                        onChange={(e) => setAutoSummaryEnabled(e.target.checked)}
-                        className="rounded"
-                      />
-                      <label htmlFor="autoSummary" className="text-sm font-medium">
-                        启用自动摘要 (聊天时自动生成摘要)
-                      </label>
-                    </div>
+                        {/* 手动选择范围 */}
+                        <div className="border-t pt-4 mt-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-medium text-sm text-blue-700">✍️ 手动选择摘要范围</h4>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowManualRange(!showManualRange)}
+                              className="text-blue-600 hover:text-blue-700"
+                            >
+                              <ChevronRight className={`w-4 h-4 transition-transform ${showManualRange ? 'rotate-90' : ''}`} />
+                              {showManualRange ? '收起' : '展开'}
+                            </Button>
+                          </div>
 
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        摘要阈值 (每 {summaryThreshold} 条消息生成一个摘要)
-                      </label>
-                      <input
-                        type="range"
-                        min="20"
-                        max="100"
-                        step="5"
-                        value={summaryThreshold}
-                        onChange={(e) => setSummaryThreshold(parseInt(e.target.value))}
-                        className="w-full"
-                      />
-                      <div className="flex justify-between text-xs text-slate-500 mt-1">
-                        <span>20</span>
-                        <span>{summaryThreshold}条</span>
-                        <span>100</span>
-                      </div>
-                    </div>
-                  </div>
+                          <AnimatePresence>
+                            {showManualRange && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="space-y-4"
+                              >
+                                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200">
+                                  <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                                    💡 手动输入消息序号范围，例如：1-100，101-200。已摘要的范围无法重复选择。
+                                  </p>
 
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="useMemoryTable"
-                      checked={useMemoryTableFormat}
-                      onChange={(e) => setUseMemoryTableFormat(e.target.checked)}
-                      className="rounded"
-                    />
-                    <label htmlFor="useMemoryTable" className="text-sm">
-                      使用记忆表格格式（推荐）
-                    </label>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* 手动生成摘要卡片 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Sparkles className="w-5 h-5 text-yellow-600" />
-                    <span>手动生成摘要</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
-                      选择消息范围来生成摘要。系统会自动建议合适的摘要范围。
-                    </p>
-
-                    {/* 建议的摘要范围 */}
-                    {summaryRanges.length > 0 ? (
-                      <div className="space-y-3">
-                        <h4 className="font-medium text-sm text-green-700">💡 发现可摘要的对话段落：</h4>
-                        {summaryRanges.map((range, index) => (
-                          <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-lg border border-green-200">
-                            <div className="flex items-center space-x-3">
-                              <Clock className="w-4 h-4 text-green-600" />
-                              <div>
-                                <div className="text-sm font-medium">
-                                  第 {getMessageIndexById(range.start)} - {getMessageIndexById(range.end)} 条消息
-                                </div>
-                                <div className="text-xs text-slate-600">
-                                  包含 {range.count} 条对话 • 建议生成摘要
-                                </div>
-                              </div>
-                            </div>
-                            {(() => {
-                              const validation = validateSummarySequence(range.start, range.end)
-                              return (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleGenerateSummary(range.start, range.end)}
-                                  disabled={isGeneratingSummary || !validation.valid}
-                                  className={`${
-                                    validation.valid
-                                      ? "bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
-                                      : "bg-gray-400 cursor-not-allowed"
-                                  } text-white border-0`}
-                                  title={!validation.valid ? validation.message : "生成摘要"}
-                                >
-                                  {isGeneratingSummary ? (
-                                    <RefreshCw className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <>
-                                      <Sparkles className="w-4 h-4 mr-1" />
-                                      生成摘要
-                                    </>
+                                  {/* 显示已摘要的范围 */}
+                                  {summaries.length > 0 && (
+                                    <div className="mb-3">
+                                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">已摘要范围：</p>
+                                      <div className="flex flex-wrap gap-2">
+                                        {summaries
+                                          .filter(s => s.start_message_id && s.end_message_id)
+                                          .map((s, idx) => (
+                                            <Badge key={idx} variant="outline" className="text-xs">
+                                              {getMessageIndexById(s.start_message_id!)}-{getMessageIndexById(s.end_message_id!)}条
+                                            </Badge>
+                                          ))
+                                        }
+                                      </div>
+                                    </div>
                                   )}
-                                </Button>
-                              )
-                            })()}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                        <MessageSquare className="w-12 h-12 mx-auto text-slate-400 mb-3" />
-                        <p className="text-slate-600 dark:text-slate-400 mb-2">暂无需要摘要的对话</p>
-                        <p className="text-xs text-slate-500">
-                          当对话超过 {summaryThreshold} 条消息时，会出现摘要建议
-                        </p>
-                      </div>
-                    )}
 
-                    {/* 手动选择范围 */}
-                    <div className="border-t pt-4 mt-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-medium text-sm text-blue-700">✍️ 手动选择摘要范围</h4>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowManualRange(!showManualRange)}
-                          className="text-blue-600 hover:text-blue-700"
-                        >
-                          <ChevronRight className={`w-4 h-4 transition-transform ${showManualRange ? 'rotate-90' : ''}`} />
-                          {showManualRange ? '收起' : '展开'}
-                        </Button>
-                      </div>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        起始消息序号 (1-{messageCount})
+                                      </label>
+                                      <Input
+                                        type="number"
+                                        min="1"
+                                        max={messageCount}
+                                        value={manualStartRange}
+                                        onChange={(e) => handleManualRangeChange(e.target.value, manualEndRange)}
+                                        placeholder="例如：1"
+                                        className={`text-sm ${!rangeValidation.valid ? 'border-red-300 focus:border-red-500' : ''}`}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        结束消息序号 (1-{messageCount})
+                                      </label>
+                                      <Input
+                                        type="number"
+                                        min="1"
+                                        max={messageCount}
+                                        value={manualEndRange}
+                                        onChange={(e) => handleManualRangeChange(manualStartRange, e.target.value)}
+                                        placeholder="例如：100"
+                                        className={`text-sm ${!rangeValidation.valid ? 'border-red-300 focus:border-red-500' : ''}`}
+                                      />
+                                    </div>
+                                  </div>
 
-                      <AnimatePresence>
-                        {showManualRange && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="space-y-4"
-                          >
-                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200">
-                              <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
-                                💡 手动输入消息序号范围，例如：1-100，101-200。已摘要的范围无法重复选择。
-                              </p>
+                                  {/* 验证信息 */}
+                                  {manualStartRange && manualEndRange && (
+                                    <div className={`mt-3 p-2 rounded text-xs ${rangeValidation.valid
+                                        ? 'bg-green-100 text-green-700 border border-green-200'
+                                        : 'bg-red-100 text-red-700 border border-red-200'
+                                      }`}>
+                                      {rangeValidation.valid ? (
+                                        <span>✅ {rangeValidation.message} - 将生成 {parseInt(manualEndRange) - parseInt(manualStartRange) + 1} 条消息的摘要</span>
+                                      ) : (
+                                        <span>❌ {rangeValidation.message}</span>
+                                      )}
+                                    </div>
+                                  )}
 
-                              {/* 显示已摘要的范围 */}
-                              {summaries.length > 0 && (
-                                <div className="mb-3">
-                                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">已摘要范围：</p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {summaries
-                                      .filter(s => s.start_message_id && s.end_message_id)
-                                      .map((s, idx) => (
-                                        <Badge key={idx} variant="outline" className="text-xs">
-                                          {getMessageIndexById(s.start_message_id!)}-{getMessageIndexById(s.end_message_id!)}条
-                                        </Badge>
-                                      ))
-                                    }
+                                  <div className="mt-4 flex justify-end">
+                                    <Button
+                                      size="sm"
+                                      onClick={handleGenerateManualSummary}
+                                      disabled={!rangeValidation.valid || !manualStartRange || !manualEndRange || isGeneratingSummary}
+                                      className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white"
+                                    >
+                                      {isGeneratingSummary ? (
+                                        <RefreshCw className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <>
+                                          <Sparkles className="w-4 h-4 mr-1" />
+                                          生成手动摘要
+                                        </>
+                                      )}
+                                    </Button>
                                   </div>
                                 </div>
-                              )}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
 
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                    起始消息序号 (1-{messageCount})
-                                  </label>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    max={messageCount}
-                                    value={manualStartRange}
-                                    onChange={(e) => handleManualRangeChange(e.target.value, manualEndRange)}
-                                    placeholder="例如：1"
-                                    className={`text-sm ${!rangeValidation.valid ? 'border-red-300 focus:border-red-500' : ''}`}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                    结束消息序号 (1-{messageCount})
-                                  </label>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    max={messageCount}
-                                    value={manualEndRange}
-                                    onChange={(e) => handleManualRangeChange(manualStartRange, e.target.value)}
-                                    placeholder="例如：100"
-                                    className={`text-sm ${!rangeValidation.valid ? 'border-red-300 focus:border-red-500' : ''}`}
-                                  />
-                                </div>
-                              </div>
-
-                              {/* 验证信息 */}
-                              {manualStartRange && manualEndRange && (
-                                <div className={`mt-3 p-2 rounded text-xs ${
-                                  rangeValidation.valid
-                                    ? 'bg-green-100 text-green-700 border border-green-200'
-                                    : 'bg-red-100 text-red-700 border border-red-200'
-                                }`}>
-                                  {rangeValidation.valid ? (
-                                    <span>✅ {rangeValidation.message} - 将生成 {parseInt(manualEndRange) - parseInt(manualStartRange) + 1} 条消息的摘要</span>
-                                  ) : (
-                                    <span>❌ {rangeValidation.message}</span>
-                                  )}
-                                </div>
-                              )}
-
-                              <div className="mt-4 flex justify-end">
-                                <Button
-                                  size="sm"
-                                  onClick={handleGenerateManualSummary}
-                                  disabled={!rangeValidation.valid || !manualStartRange || !manualEndRange || isGeneratingSummary}
-                                  className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white"
-                                >
-                                  {isGeneratingSummary ? (
-                                    <RefreshCw className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <>
-                                      <Sparkles className="w-4 h-4 mr-1" />
-                                      生成手动摘要
-                                    </>
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-
-                    {/* 刷新建议按钮 */}
-                    <div className="flex justify-center">
-                      <Button
-                        variant="outline"
-                        onClick={calculateSummaryRanges}
-                        className="flex items-center space-x-2"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                        <span>重新扫描对话</span>
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
+                        {/* 刷新建议按钮 */}
+                        <div className="flex justify-center">
+                          <Button
+                            variant="outline"
+                            onClick={calculateSummaryRanges}
+                            className="flex items-center space-x-2"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                            <span>重新扫描对话</span>
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>
 
       {/* 添加记忆对话框 */}
       <Dialog open={showAddMemoryDialog} onOpenChange={setShowAddMemoryDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <Plus className="w-5 h-5" />
@@ -2446,101 +2441,31 @@ export default function MemoryManagePage() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">记忆类型</label>
-              <select
-                value={newMemory.type}
-                onChange={(e) => setNewMemory(prev => ({ ...prev, type: e.target.value as any }))}
-                className="w-full p-2 border border-slate-300 rounded-md"
-              >
-                <option value="character">👤 人物记忆</option>
-                <option value="event">📅 事件记忆</option>
-                <option value="setting">🏛️ 设定记忆</option>
-                <option value="emotion">💭 情感记忆</option>
-                <option value="spacetime">⏰ 时空记忆</option>
-                <option value="relationship">🤝 关系记忆</option>
-                <option value="task">📋 任务约定</option>
-                <option value="item">📦 重要物品</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">标题</label>
-              <Input
-                value={newMemory.title || ''}
-                onChange={(e) => setNewMemory(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="为这个记忆起个标题..."
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">内容</label>
-              <Textarea
-                value={newMemory.content || ''}
-                onChange={(e) => setNewMemory(prev => ({ ...prev, content: e.target.value }))}
-                placeholder="记录详细内容..."
-                rows={3}
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                重要度 ({newMemory.importance}/10)
-              </label>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={newMemory.importance || 5}
-                onChange={(e) => setNewMemory(prev => ({ ...prev, importance: parseInt(e.target.value) }))}
-                className="w-full"
-              />
-            </div>
-
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button
-                variant="ghost"
-                onClick={() => setShowAddMemoryDialog(false)}
-              >
-                取消
-              </Button>
-              <Button
-                onClick={handleAddMemory}
-                className="bg-purple-600 hover:bg-purple-700 text-white"
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                添加
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* 编辑记忆对话框 */}
-      <Dialog open={showEditMemoryDialog} onOpenChange={setShowEditMemoryDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <Edit3 className="w-5 h-5" />
-              <span>编辑记忆</span>
-            </DialogTitle>
-          </DialogHeader>
-
-          {editingMemory && (
+          <div className="flex-1 overflow-y-auto min-h-0 py-2 pr-2">
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">记忆类型</label>
-                <div className="p-2 bg-slate-100 rounded-md text-sm">
-                  {getMemoryTypeName(editingMemory.type)}
-                </div>
+                <select
+                  value={newMemory.type}
+                  onChange={(e) => setNewMemory(prev => ({ ...prev, type: e.target.value as any }))}
+                  className="w-full p-2 border border-slate-300 rounded-md"
+                >
+                  <option value="character">👤 人物记忆</option>
+                  <option value="event">📅 事件记忆</option>
+                  <option value="setting">🏛️ 设定记忆</option>
+                  <option value="emotion">💭 情感记忆</option>
+                  <option value="spacetime">⏰ 时空记忆</option>
+                  <option value="relationship">🤝 关系记忆</option>
+                  <option value="task">📋 任务约定</option>
+                  <option value="item">📦 重要物品</option>
+                </select>
               </div>
 
               <div>
                 <label className="text-sm font-medium mb-2 block">标题</label>
                 <Input
-                  value={editingMemory.title || ''}
-                  onChange={(e) => setEditingMemory(prev => prev ? { ...prev, title: e.target.value } : null)}
+                  value={newMemory.title || ''}
+                  onChange={(e) => setNewMemory(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="为这个记忆起个标题..."
                 />
               </div>
@@ -2548,42 +2473,43 @@ export default function MemoryManagePage() {
               <div>
                 <label className="text-sm font-medium mb-2 block">内容</label>
                 <Textarea
-                  value={editingMemory.content || ''}
-                  onChange={(e) => setEditingMemory(prev => prev ? { ...prev, content: e.target.value } : null)}
+                  value={newMemory.content || ''}
+                  onChange={(e) => setNewMemory(prev => ({ ...prev, content: e.target.value }))}
                   placeholder="记录详细内容..."
-                  rows={3}
+                  rows={5}
+                  className="max-h-[240px] resize-none"
                 />
               </div>
 
               <div>
                 <label className="text-sm font-medium mb-2 block">
-                  重要度 ({editingMemory.importance}/10)
+                  重要度 ({newMemory.importance}/10)
                 </label>
                 <input
                   type="range"
                   min="1"
                   max="10"
-                  value={editingMemory.importance || 5}
-                  onChange={(e) => setEditingMemory(prev => prev ? { ...prev, importance: parseInt(e.target.value) } : null)}
+                  value={newMemory.importance || 5}
+                  onChange={(e) => setNewMemory(prev => ({ ...prev, importance: parseInt(e.target.value) }))}
                   className="w-full"
                 />
               </div>
 
-              {/* 时空记忆的时间地点编辑 */}
-              {(editingMemory.type === 'spacetime' || editingMemory.type === 'event' || editingMemory.type === 'task') && (
+              {/* 时空记忆的特殊字段 */}
+              {newMemory.type === 'spacetime' && (
                 <div className="space-y-3 border-t pt-3">
-                  <div className="text-sm font-medium text-slate-600">时间与地点</div>
+                  <div className="text-sm font-medium text-slate-600">时空详情</div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-slate-500 mb-1 block">日期</label>
                       <Input
                         type="text"
-                        value={(editingMemory.metadata as any)?.date || ''}
-                        onChange={(e) => setEditingMemory(prev => prev ? {
+                        value={(newMemory.metadata as any)?.date || ''}
+                        onChange={(e) => setNewMemory(prev => ({
                           ...prev,
                           metadata: { ...prev.metadata, date: e.target.value } as any
-                        } : null)}
+                        }))}
                         placeholder="如: 2024年3月15日"
                         className="text-sm"
                       />
@@ -2593,15 +2519,11 @@ export default function MemoryManagePage() {
                       <label className="text-xs text-slate-500 mb-1 block">时间</label>
                       <Input
                         type="text"
-                        value={(editingMemory.metadata as any)?.time || (editingMemory.metadata as any)?.scheduled_time || ''}
-                        onChange={(e) => setEditingMemory(prev => prev ? {
+                        value={(newMemory.metadata as any)?.time || ''}
+                        onChange={(e) => setNewMemory(prev => ({
                           ...prev,
-                          metadata: {
-                            ...prev.metadata,
-                            time: e.target.value,
-                            ...(prev.type === 'task' && { scheduled_time: e.target.value })
-                          } as any
-                        } : null)}
+                          metadata: { ...prev.metadata, time: e.target.value } as any
+                        }))}
                         placeholder="如: 下午3点"
                         className="text-sm"
                       />
@@ -2612,36 +2534,298 @@ export default function MemoryManagePage() {
                     <label className="text-xs text-slate-500 mb-1 block">地点</label>
                     <Input
                       type="text"
-                      value={(editingMemory.metadata as any)?.location || ''}
-                      onChange={(e) => setEditingMemory(prev => prev ? {
+                      value={(newMemory.metadata as any)?.location || ''}
+                      onChange={(e) => setNewMemory(prev => ({
                         ...prev,
                         metadata: { ...prev.metadata, location: e.target.value } as any
-                      } : null)}
+                      }))}
                       placeholder="如: 市中心咖啡厅"
                       className="text-sm"
                     />
                   </div>
 
-                  {editingMemory.type === 'spacetime' && (
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-slate-500 mb-1 block">氛围</label>
                       <Input
                         type="text"
-                        value={(editingMemory.metadata as any)?.atmosphere || ''}
-                        onChange={(e) => setEditingMemory(prev => prev ? {
+                        value={(newMemory.metadata as any)?.atmosphere || ''}
+                        onChange={(e) => setNewMemory(prev => ({
                           ...prev,
                           metadata: { ...prev.metadata, atmosphere: e.target.value } as any
-                        } : null)}
+                        }))}
                         placeholder="如: 温馨浪漫"
                         className="text-sm"
                       />
                     </div>
-                  )}
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">天气</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.weather || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, weather: e.target.value } as any
+                        }))}
+                        placeholder="如: 晴朗"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 事件记忆的特殊字段 */}
+              {newMemory.type === 'event' && (
+                <div className="space-y-3 border-t pt-3">
+                  <div className="text-sm font-medium text-slate-600">事件详情</div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">时间</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.time || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, time: e.target.value } as any
+                        }))}
+                        placeholder="如: 2024年3月15日"
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">地点</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.location || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, location: e.target.value } as any
+                        }))}
+                        placeholder="如: 公司会议室"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">事件类型</label>
+                    <select
+                      value={(newMemory.metadata as any)?.event_type || 'conversation'}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, event_type: e.target.value } as any
+                      }))}
+                      className="w-full p-2 border border-slate-300 rounded-md text-sm"
+                    >
+                      <option value="conversation">💬 对话</option>
+                      <option value="action">🎯 行动</option>
+                      <option value="decision">🤔 决定</option>
+                      <option value="conflict">⚔️ 冲突</option>
+                      <option value="celebration">🎉 庆祝</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">参与者 (用逗号分隔)</label>
+                    <Input
+                      type="text"
+                      value={((newMemory.metadata as any)?.participants || []).join(', ')}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, participants: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) } as any
+                      }))}
+                      placeholder="如: 张三, 李四, 王五"
+                      className="text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">情感强度 ({(newMemory.metadata as any)?.emotion_intensity || 5}/10)</label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={(newMemory.metadata as any)?.emotion_intensity || 5}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, emotion_intensity: parseInt(e.target.value) } as any
+                      }))}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">影响</label>
+                    <Textarea
+                      value={(newMemory.metadata as any)?.impact || ''}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, impact: e.target.value } as any
+                      }))}
+                      placeholder="事件产生的影响..."
+                      rows={2}
+                      className="text-sm resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">后果</label>
+                    <Textarea
+                      value={(newMemory.metadata as any)?.consequences || ''}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, consequences: e.target.value } as any
+                      }))}
+                      placeholder="事件的后续结果..."
+                      rows={2}
+                      className="text-sm resize-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 任务记忆的特殊字段 */}
+              {newMemory.type === 'task' && (
+                <div className="space-y-3 border-t pt-3">
+                  <div className="text-sm font-medium text-slate-600">任务详情</div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">分配者</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.assigned_by || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, assigned_by: e.target.value } as any
+                        }))}
+                        placeholder="谁分配的"
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">执行者</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.assigned_to || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, assigned_to: e.target.value } as any
+                        }))}
+                        placeholder="谁执行"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">任务类型</label>
+                      <select
+                        value={(newMemory.metadata as any)?.task_type || 'command'}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, task_type: e.target.value } as any
+                        }))}
+                        className="w-full p-2 border border-slate-300 rounded-md text-sm"
+                      >
+                        <option value="command">📢 指令</option>
+                        <option value="agreement">🤝 协议</option>
+                        <option value="promise">💍 承诺</option>
+                        <option value="appointment">📅 约定</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">优先级</label>
+                      <select
+                        value={(newMemory.metadata as any)?.priority || 'medium'}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, priority: e.target.value } as any
+                        }))}
+                        className="w-full p-2 border border-slate-300 rounded-md text-sm"
+                      >
+                        <option value="low">🟢 低</option>
+                        <option value="medium">🟡 中</option>
+                        <option value="high">🟠 高</option>
+                        <option value="urgent">🔴 紧急</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">约定时间</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.scheduled_time || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, scheduled_time: e.target.value } as any
+                        }))}
+                        placeholder="如: 明天下午2点"
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">地点</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.location || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, location: e.target.value } as any
+                        }))}
+                        placeholder="如: 办公室"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">持续时间</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.duration || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, duration: e.target.value } as any
+                        }))}
+                        placeholder="如: 2小时"
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">任务状态</label>
+                      <select
+                        value={(newMemory.metadata as any)?.status || 'pending'}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, status: e.target.value } as any
+                        }))}
+                        className="w-full p-2 border border-slate-300 rounded-md text-sm"
+                      >
+                        <option value="pending">⏳ 待处理</option>
+                        <option value="in_progress">🔄 进行中</option>
+                        <option value="completed">✅ 已完成</option>
+                        <option value="cancelled">❌ 已取消</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
               )}
 
               {/* 角色记忆的特殊字段 */}
-              {editingMemory.type === 'character' && (
+              {newMemory.type === 'character' && (
                 <div className="space-y-3 border-t pt-3">
                   <div className="text-sm font-medium text-slate-600">角色信息</div>
 
@@ -2650,11 +2834,11 @@ export default function MemoryManagePage() {
                       <label className="text-xs text-slate-500 mb-1 block">角色名</label>
                       <Input
                         type="text"
-                        value={(editingMemory.metadata as any)?.name || ''}
-                        onChange={(e) => setEditingMemory(prev => prev ? {
+                        value={(newMemory.metadata as any)?.name || ''}
+                        onChange={(e) => setNewMemory(prev => ({
                           ...prev,
                           metadata: { ...prev.metadata, name: e.target.value } as any
-                        } : null)}
+                        }))}
                         placeholder="角色名字"
                         className="text-sm"
                       />
@@ -2664,12 +2848,164 @@ export default function MemoryManagePage() {
                       <label className="text-xs text-slate-500 mb-1 block">关系</label>
                       <Input
                         type="text"
-                        value={(editingMemory.metadata as any)?.relationship || ''}
-                        onChange={(e) => setEditingMemory(prev => prev ? {
+                        value={(newMemory.metadata as any)?.relationship || ''}
+                        onChange={(e) => setNewMemory(prev => ({
                           ...prev,
                           metadata: { ...prev.metadata, relationship: e.target.value } as any
-                        } : null)}
+                        }))}
                         placeholder="如: 朋友"
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">昵称/称呼</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.nickname || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, nickname: e.target.value } as any
+                        }))}
+                        placeholder="如: 小明"
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">职业</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.occupation || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, occupation: e.target.value } as any
+                        }))}
+                        placeholder="如: 教师"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">外观</label>
+                    <Textarea
+                      value={(newMemory.metadata as any)?.appearance || ''}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, appearance: e.target.value } as any
+                      }))}
+                      placeholder="外貌特征..."
+                      rows={2}
+                      className="text-sm resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">性格</label>
+                    <Textarea
+                      value={(newMemory.metadata as any)?.personality || ''}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, personality: e.target.value } as any
+                      }))}
+                      placeholder="性格特点..."
+                      rows={2}
+                      className="text-sm resize-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 情感记忆的特殊字段 */}
+              {newMemory.type === 'emotion' && (
+                <div className="space-y-3 border-t pt-3">
+                  <div className="text-sm font-medium text-slate-600">情感详情</div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">情感类型</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.emotion_type || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, emotion_type: e.target.value } as any
+                        }))}
+                        placeholder="如: 喜悦、悲伤、愤怒"
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">持续时间</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.duration || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, duration: e.target.value } as any
+                        }))}
+                        placeholder="如: 短暂、持续"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">强度 ({(newMemory.metadata as any)?.intensity || 5}/10)</label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={(newMemory.metadata as any)?.intensity || 5}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, intensity: parseInt(e.target.value) } as any
+                      }))}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">原因</label>
+                    <Textarea
+                      value={(newMemory.metadata as any)?.cause || ''}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, cause: e.target.value } as any
+                      }))}
+                      placeholder="情感产生的原因..."
+                      rows={2}
+                      className="text-sm resize-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">情感对象</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.target || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, target: e.target.value } as any
+                        }))}
+                        placeholder="针对的人或事"
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">触发因素</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.trigger || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, trigger: e.target.value } as any
+                        }))}
+                        placeholder="触发条件"
                         className="text-sm"
                       />
                     </div>
@@ -2677,7 +3013,1198 @@ export default function MemoryManagePage() {
                 </div>
               )}
 
-              <div className="flex justify-end space-x-2 pt-4">
+              {/* 关系记忆的特殊字段 */}
+              {newMemory.type === 'relationship' && (
+                <div className="space-y-3 border-t pt-3">
+                  <div className="text-sm font-medium text-slate-600">关系详情</div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">角色名</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.character_name || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, character_name: e.target.value } as any
+                        }))}
+                        placeholder="角色名字"
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">关系类型</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.relationship || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, relationship: e.target.value } as any
+                        }))}
+                        placeholder="如: 朋友、同事"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">态度</label>
+                    <Input
+                      type="text"
+                      value={(newMemory.metadata as any)?.attitude || ''}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, attitude: e.target.value } as any
+                      }))}
+                      placeholder="如: 友好、中立、敌对"
+                      className="text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">好感度 ({(newMemory.metadata as any)?.affection || 5}/10)</label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={(newMemory.metadata as any)?.affection || 5}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, affection: parseInt(e.target.value) } as any
+                      }))}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">信任度 ({(newMemory.metadata as any)?.trust || 5}/10)</label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={(newMemory.metadata as any)?.trust || 5}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, trust: parseInt(e.target.value) } as any
+                      }))}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">最后互动</label>
+                    <Input
+                      type="text"
+                      value={(newMemory.metadata as any)?.last_interaction || ''}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, last_interaction: e.target.value } as any
+                      }))}
+                      placeholder="如: 昨天下午一起喝咖啡"
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 设定记忆的特殊字段 */}
+              {newMemory.type === 'setting' && (
+                <div className="space-y-3 border-t pt-3">
+                  <div className="text-sm font-medium text-slate-600">设定详情</div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">地点</label>
+                    <Input
+                      type="text"
+                      value={(newMemory.metadata as any)?.location || ''}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, location: e.target.value } as any
+                      }))}
+                      placeholder="如: 图书馆、咖啡厅"
+                      className="text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">描述</label>
+                    <Textarea
+                      value={(newMemory.metadata as any)?.description || ''}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, description: e.target.value } as any
+                      }))}
+                      placeholder="场景描述..."
+                      rows={3}
+                      className="text-sm resize-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">氛围</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.atmosphere || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, atmosphere: e.target.value } as any
+                        }))}
+                        placeholder="如: 安静、热闹"
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">重要性说明</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.significance || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, significance: e.target.value } as any
+                        }))}
+                        placeholder="为何重要"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">物品 (用逗号分隔)</label>
+                    <Input
+                      type="text"
+                      value={((newMemory.metadata as any)?.items || []).join(', ')}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, items: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) } as any
+                      }))}
+                      placeholder="如: 书籍, 电脑, 咖啡杯"
+                      className="text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">规则 (用逗号分隔)</label>
+                    <Input
+                      type="text"
+                      value={((newMemory.metadata as any)?.rules || []).join(', ')}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, rules: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) } as any
+                      }))}
+                      placeholder="如: 保持安静, 禁止吸烟"
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 物品记忆的特殊字段 */}
+              {newMemory.type === 'item' && (
+                <div className="space-y-3 border-t pt-3">
+                  <div className="text-sm font-medium text-slate-600">物品详情</div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">物品名</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.item_name || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, item_name: e.target.value } as any
+                        }))}
+                        placeholder="物品名称"
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">拥有者</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.owner || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, owner: e.target.value } as any
+                        }))}
+                        placeholder="谁拥有"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">物品描述</label>
+                    <Textarea
+                      value={(newMemory.metadata as any)?.description || ''}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, description: e.target.value } as any
+                      }))}
+                      placeholder="详细描述物品..."
+                      rows={2}
+                      className="text-sm resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">重要原因</label>
+                    <Textarea
+                      value={(newMemory.metadata as any)?.importance_reason || ''}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, importance_reason: e.target.value } as any
+                      }))}
+                      placeholder="为什么重要..."
+                      rows={2}
+                      className="text-sm resize-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">存放地点</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.location || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, location: e.target.value } as any
+                        }))}
+                        placeholder="如: 书桌抽屉"
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">获得方式</label>
+                      <Input
+                        type="text"
+                        value={(newMemory.metadata as any)?.acquisition_method || ''}
+                        onChange={(e) => setNewMemory(prev => ({
+                          ...prev,
+                          metadata: { ...prev.metadata, acquisition_method: e.target.value } as any
+                        }))}
+                        placeholder="如: 礼物、购买"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">情感价值 ({(newMemory.metadata as any)?.emotional_value || 5}/10)</label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={(newMemory.metadata as any)?.emotional_value || 5}
+                      onChange={(e) => setNewMemory(prev => ({
+                        ...prev,
+                        metadata: { ...prev.metadata, emotional_value: parseInt(e.target.value) } as any
+                      }))}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </div>
+          <div className="flex justify-end space-x-2 pt-2 flex-shrink-0">
+            <Button
+              variant="ghost"
+              onClick={() => setShowAddMemoryDialog(false)}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleAddMemory}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              添加
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 编辑记忆对话框 */}
+      <Dialog open={showEditMemoryDialog} onOpenChange={setShowEditMemoryDialog}>
+        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Edit3 className="w-5 h-5" />
+              <span>编辑记忆</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          {editingMemory && (
+            <>
+              <div className="flex-1 overflow-y-auto min-h-0 py-2 pr-2">
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">记忆类型</label>
+                    <div className="p-2 bg-slate-100 rounded-md text-sm">
+                      {getMemoryTypeName(editingMemory.type)}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">标题</label>
+                    <Input
+                      value={editingMemory.title || ''}
+                      onChange={(e) => setEditingMemory(prev => prev ? { ...prev, title: e.target.value } : null)}
+                      placeholder="为这个记忆起个标题..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">内容</label>
+                    <Textarea
+                      value={editingMemory.content || ''}
+                      onChange={(e) => setEditingMemory(prev => prev ? { ...prev, content: e.target.value } : null)}
+                      placeholder="记录详细内容..."
+                      rows={5}
+                      className="max-h-[240px] resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      重要度 ({editingMemory.importance}/10)
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={editingMemory.importance || 5}
+                      onChange={(e) => setEditingMemory(prev => prev ? { ...prev, importance: parseInt(e.target.value) } : null)}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* 时空记忆的时间地点编辑 */}
+                  {editingMemory.type === 'spacetime' && (
+                    <div className="space-y-3 border-t pt-3">
+                      <div className="text-sm font-medium text-slate-600">时空详情</div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">日期</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.date || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, date: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 2024年3月15日"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">时间</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.time || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, time: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 下午3点"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">地点</label>
+                        <Input
+                          type="text"
+                          value={(editingMemory.metadata as any)?.location || ''}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, location: e.target.value } as any
+                          } : null)}
+                          placeholder="如: 市中心咖啡厅"
+                          className="text-sm"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">氛围</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.atmosphere || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, atmosphere: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 温馨浪漫"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">天气</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.weather || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, weather: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 晴朗"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 事件记忆的特殊字段 */}
+                  {editingMemory.type === 'event' && (
+                    <div className="space-y-3 border-t pt-3">
+                      <div className="text-sm font-medium text-slate-600">事件详情</div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">时间</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.time || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, time: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 2024年3月15日"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">地点</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.location || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, location: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 公司会议室"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">事件类型</label>
+                        <select
+                          value={(editingMemory.metadata as any)?.event_type || 'conversation'}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, event_type: e.target.value } as any
+                          } : null)}
+                          className="w-full p-2 border border-slate-300 rounded-md text-sm"
+                        >
+                          <option value="conversation">💬 对话</option>
+                          <option value="action">🎯 行动</option>
+                          <option value="decision">🤔 决定</option>
+                          <option value="conflict">⚔️ 冲突</option>
+                          <option value="celebration">🎉 庆祝</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">参与者 (用逗号分隔)</label>
+                        <Input
+                          type="text"
+                          value={((editingMemory.metadata as any)?.participants || []).join(', ')}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, participants: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) } as any
+                          } : null)}
+                          placeholder="如: 张三, 李四, 王五"
+                          className="text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">情感强度 ({(editingMemory.metadata as any)?.emotion_intensity || 5}/10)</label>
+                        <input
+                          type="range"
+                          min="1"
+                          max="10"
+                          value={(editingMemory.metadata as any)?.emotion_intensity || 5}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, emotion_intensity: parseInt(e.target.value) } as any
+                          } : null)}
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">影响</label>
+                        <Textarea
+                          value={(editingMemory.metadata as any)?.impact || ''}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, impact: e.target.value } as any
+                          } : null)}
+                          placeholder="事件产生的影响..."
+                          rows={2}
+                          className="text-sm resize-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">后果</label>
+                        <Textarea
+                          value={(editingMemory.metadata as any)?.consequences || ''}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, consequences: e.target.value } as any
+                          } : null)}
+                          placeholder="事件的后续结果..."
+                          rows={2}
+                          className="text-sm resize-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 任务记忆的特殊字段 */}
+                  {editingMemory.type === 'task' && (
+                    <div className="space-y-3 border-t pt-3">
+                      <div className="text-sm font-medium text-slate-600">任务详情</div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">分配者</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.assigned_by || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, assigned_by: e.target.value } as any
+                            } : null)}
+                            placeholder="谁分配的"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">执行者</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.assigned_to || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, assigned_to: e.target.value } as any
+                            } : null)}
+                            placeholder="谁执行"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">任务类型</label>
+                          <select
+                            value={(editingMemory.metadata as any)?.task_type || 'command'}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, task_type: e.target.value } as any
+                            } : null)}
+                            className="w-full p-2 border border-slate-300 rounded-md text-sm"
+                          >
+                            <option value="command">📢 指令</option>
+                            <option value="agreement">🤝 协议</option>
+                            <option value="promise">💍 承诺</option>
+                            <option value="appointment">📅 约定</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">优先级</label>
+                          <select
+                            value={(editingMemory.metadata as any)?.priority || 'medium'}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, priority: e.target.value } as any
+                            } : null)}
+                            className="w-full p-2 border border-slate-300 rounded-md text-sm"
+                          >
+                            <option value="low">🟢 低</option>
+                            <option value="medium">🟡 中</option>
+                            <option value="high">🟠 高</option>
+                            <option value="urgent">🔴 紧急</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">约定时间</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.scheduled_time || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, scheduled_time: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 明天下午2点"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">地点</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.location || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, location: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 办公室"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">持续时间</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.duration || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, duration: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 2小时"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">任务状态</label>
+                          <select
+                            value={(editingMemory.metadata as any)?.status || 'pending'}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, status: e.target.value } as any
+                            } : null)}
+                            className="w-full p-2 border border-slate-300 rounded-md text-sm"
+                          >
+                            <option value="pending">⏳ 待处理</option>
+                            <option value="in_progress">🔄 进行中</option>
+                            <option value="completed">✅ 已完成</option>
+                            <option value="cancelled">❌ 已取消</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 角色记忆的特殊字段 */}
+                  {editingMemory.type === 'character' && (
+                    <div className="space-y-3 border-t pt-3">
+                      <div className="text-sm font-medium text-slate-600">角色信息</div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">角色名</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.name || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, name: e.target.value } as any
+                            } : null)}
+                            placeholder="角色名字"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">关系</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.relationship || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, relationship: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 朋友"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">昵称/称呼</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.nickname || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, nickname: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 小明"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">职业</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.occupation || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, occupation: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 教师"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">外观</label>
+                        <Textarea
+                          value={(editingMemory.metadata as any)?.appearance || ''}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, appearance: e.target.value } as any
+                          } : null)}
+                          placeholder="外貌特征..."
+                          rows={2}
+                          className="text-sm resize-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">性格</label>
+                        <Textarea
+                          value={(editingMemory.metadata as any)?.personality || ''}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, personality: e.target.value } as any
+                          } : null)}
+                          placeholder="性格特点..."
+                          rows={2}
+                          className="text-sm resize-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 情感记忆的特殊字段 */}
+                  {editingMemory.type === 'emotion' && (
+                    <div className="space-y-3 border-t pt-3">
+                      <div className="text-sm font-medium text-slate-600">情感详情</div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">情感类型</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.emotion_type || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, emotion_type: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 喜悦、悲伤、愤怒"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">持续时间</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.duration || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, duration: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 短暂、持续"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">强度 ({(editingMemory.metadata as any)?.intensity || 5}/10)</label>
+                        <input
+                          type="range"
+                          min="1"
+                          max="10"
+                          value={(editingMemory.metadata as any)?.intensity || 5}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, intensity: parseInt(e.target.value) } as any
+                          } : null)}
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">原因</label>
+                        <Textarea
+                          value={(editingMemory.metadata as any)?.cause || ''}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, cause: e.target.value } as any
+                          } : null)}
+                          placeholder="情感产生的原因..."
+                          rows={2}
+                          className="text-sm resize-none"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">情感对象</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.target || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, target: e.target.value } as any
+                            } : null)}
+                            placeholder="针对的人或事"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">触发因素</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.trigger || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, trigger: e.target.value } as any
+                            } : null)}
+                            placeholder="触发条件"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 关系记忆的特殊字段 */}
+                  {editingMemory.type === 'relationship' && (
+                    <div className="space-y-3 border-t pt-3">
+                      <div className="text-sm font-medium text-slate-600">关系详情</div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">角色名</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.character_name || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, character_name: e.target.value } as any
+                            } : null)}
+                            placeholder="角色名字"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">关系类型</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.relationship || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, relationship: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 朋友、同事"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">态度</label>
+                        <Input
+                          type="text"
+                          value={(editingMemory.metadata as any)?.attitude || ''}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, attitude: e.target.value } as any
+                          } : null)}
+                          placeholder="如: 友好、中立、敌对"
+                          className="text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">好感度 ({(editingMemory.metadata as any)?.affection || 5}/10)</label>
+                        <input
+                          type="range"
+                          min="1"
+                          max="10"
+                          value={(editingMemory.metadata as any)?.affection || 5}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, affection: parseInt(e.target.value) } as any
+                          } : null)}
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">信任度 ({(editingMemory.metadata as any)?.trust || 5}/10)</label>
+                        <input
+                          type="range"
+                          min="1"
+                          max="10"
+                          value={(editingMemory.metadata as any)?.trust || 5}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, trust: parseInt(e.target.value) } as any
+                          } : null)}
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">最后互动</label>
+                        <Input
+                          type="text"
+                          value={(editingMemory.metadata as any)?.last_interaction || ''}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, last_interaction: e.target.value } as any
+                          } : null)}
+                          placeholder="如: 昨天下午一起喝咖啡"
+                          className="text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 设定记忆的特殊字段 */}
+                  {editingMemory.type === 'setting' && (
+                    <div className="space-y-3 border-t pt-3">
+                      <div className="text-sm font-medium text-slate-600">设定详情</div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">地点</label>
+                        <Input
+                          type="text"
+                          value={(editingMemory.metadata as any)?.location || ''}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, location: e.target.value } as any
+                          } : null)}
+                          placeholder="如: 图书馆、咖啡厅"
+                          className="text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">描述</label>
+                        <Textarea
+                          value={(editingMemory.metadata as any)?.description || ''}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, description: e.target.value } as any
+                          } : null)}
+                          placeholder="场景描述..."
+                          rows={3}
+                          className="text-sm resize-none"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">氛围</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.atmosphere || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, atmosphere: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 安静、热闹"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">重要性说明</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.significance || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, significance: e.target.value } as any
+                            } : null)}
+                            placeholder="为何重要"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">物品 (用逗号分隔)</label>
+                        <Input
+                          type="text"
+                          value={((editingMemory.metadata as any)?.items || []).join(', ')}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, items: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) } as any
+                          } : null)}
+                          placeholder="如: 书籍, 电脑, 咖啡杯"
+                          className="text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">规则 (用逗号分隔)</label>
+                        <Input
+                          type="text"
+                          value={((editingMemory.metadata as any)?.rules || []).join(', ')}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, rules: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) } as any
+                          } : null)}
+                          placeholder="如: 保持安静, 禁止吸烟"
+                          className="text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 物品记忆的特殊字段 */}
+                  {editingMemory.type === 'item' && (
+                    <div className="space-y-3 border-t pt-3">
+                      <div className="text-sm font-medium text-slate-600">物品详情</div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">物品名</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.item_name || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, item_name: e.target.value } as any
+                            } : null)}
+                            placeholder="物品名称"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">拥有者</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.owner || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, owner: e.target.value } as any
+                            } : null)}
+                            placeholder="谁拥有"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">物品描述</label>
+                        <Textarea
+                          value={(editingMemory.metadata as any)?.description || ''}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, description: e.target.value } as any
+                          } : null)}
+                          placeholder="详细描述物品..."
+                          rows={2}
+                          className="text-sm resize-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">重要原因</label>
+                        <Textarea
+                          value={(editingMemory.metadata as any)?.importance_reason || ''}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, importance_reason: e.target.value } as any
+                          } : null)}
+                          placeholder="为什么重要..."
+                          rows={2}
+                          className="text-sm resize-none"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">存放地点</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.location || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, location: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 书桌抽屉"
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-500 mb-1 block">获得方式</label>
+                          <Input
+                            type="text"
+                            value={(editingMemory.metadata as any)?.acquisition_method || ''}
+                            onChange={(e) => setEditingMemory(prev => prev ? {
+                              ...prev,
+                              metadata: { ...prev.metadata, acquisition_method: e.target.value } as any
+                            } : null)}
+                            placeholder="如: 礼物、购买"
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-500 mb-1 block">情感价值 ({(editingMemory.metadata as any)?.emotional_value || 5}/10)</label>
+                        <input
+                          type="range"
+                          min="1"
+                          max="10"
+                          value={(editingMemory.metadata as any)?.emotional_value || 5}
+                          onChange={(e) => setEditingMemory(prev => prev ? {
+                            ...prev,
+                            metadata: { ...prev.metadata, emotional_value: parseInt(e.target.value) } as any
+                          } : null)}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2 pt-2 flex-shrink-0">
                 <Button
                   variant="ghost"
                   onClick={() => {
@@ -2695,7 +4222,7 @@ export default function MemoryManagePage() {
                   保存
                 </Button>
               </div>
-            </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
