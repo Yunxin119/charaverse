@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '../../../lib/supabase'
 import { useAppSelector } from '../../../store/hooks'
+import { useAuth } from '@/providers/AuthProvider'
 import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 
@@ -28,7 +29,7 @@ export default function ChatHistoryPage() {
   const sessionId = params.sessionId as string
 
   const { currentCharacter } = useAppSelector((state) => state.chat)
-  const { user } = useAppSelector((state) => state.auth)
+  const { user } = useAuth()
 
   const [messages, setMessages] = useState<Message[]>([])
   const [currentPage, setCurrentPage] = useState(1)

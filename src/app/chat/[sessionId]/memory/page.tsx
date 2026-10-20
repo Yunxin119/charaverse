@@ -41,6 +41,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAppSelector } from '../../../store/hooks'
+import { useAuth } from '@/providers/AuthProvider'
 import { supabase } from '../../../lib/supabase'
 import { getSummaries } from '../../../lib/enhancedChatSlice'
 import { useApiConfig } from '../../../lib/useApiConfig'
@@ -202,7 +203,7 @@ export default function MemoryManagePage() {
   const router = useRouter()
   const sessionId = params.sessionId as string
 
-  const { user } = useAppSelector((state) => state.auth)
+  const { user } = useAuth()
   const { currentCharacter, selectedModel } = useAppSelector((state) => state.chat)
   const { getModelConfig, availableModels } = useApiConfig()
 
@@ -527,7 +528,7 @@ export default function MemoryManagePage() {
 
       const { data, error } = await supabase
         .from('chat_memories')
-        .insert(memoryToAdd)
+        .insert(memoryToAdd as unknown as Record<string, unknown>)
         .select()
         .single()
 

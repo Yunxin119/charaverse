@@ -1,0 +1,143 @@
+/* ==========================================================================
+   CharaVerse design tokens — "Warm Glass"
+   Every color / radius / shadow in the app resolves to a --cv-* token here.
+   User-imported themes override these on :root (see lib/theme/applyTheme).
+   Base palette: ink #33251b · mist #adbcc3 · oxblood #41140e · cream #f2dece
+   ========================================================================== */
+
+:root {
+  /* ---- raw ramps ---- */
+  --cv-cream-50:  #fbf6f1;
+  --cv-cream-100: #f7ebe0;
+  --cv-cream-200: #f2dece;
+  --cv-cream-300: #e6cbb6;
+  --cv-cream-400: #d6b396;
+
+  --cv-ink-900: #1c1410;
+  --cv-ink-800: #261b15;
+  --cv-ink-700: #33251b;
+  --cv-ink-600: #4a3729;
+  --cv-ink-500: #6b5342;
+  --cv-ink-400: #8f7663;
+
+  --cv-mist-200: #d7e0e4;
+  --cv-mist-300: #c3cfd5;
+  --cv-mist-400: #adbcc3;
+  --cv-mist-500: #8ea0a9;
+  --cv-mist-600: #6f838d;
+
+  --cv-ox-700: #41140e;
+  --cv-ox-600: #5a1f16;
+  --cv-ox-500: #7a2d21;
+  --cv-ox-400: #9c4233;
+
+  --cv-sienna: #c9643b;
+  --cv-amber:  #d99a2b;
+  --cv-sage:   #6f8f7a;
+
+  /* ---- semantic: light ---- */
+  --cv-bg:            var(--cv-cream-200);
+  --cv-bg-elevated:   var(--cv-cream-50);
+  --cv-bg-sunken:     var(--cv-cream-300);
+  --cv-fg:            var(--cv-ink-700);
+  --cv-fg-muted:      var(--cv-ink-500);
+  --cv-fg-subtle:     var(--cv-ink-400);
+  --cv-primary:       var(--cv-ox-700);
+  --cv-primary-hover: var(--cv-ox-600);
+  --cv-primary-fg:    var(--cv-cream-50);
+  --cv-secondary:     var(--cv-mist-400);
+  --cv-secondary-fg:  var(--cv-ink-700);
+  --cv-accent:        var(--cv-sienna);
+  --cv-accent-fg:     #ffffff;
+  --cv-accent-2:      var(--cv-amber);
+  --cv-accent-3:      var(--cv-sage);
+  --cv-border:        rgba(51, 37, 27, 0.10);
+  --cv-border-strong: rgba(51, 37, 27, 0.18);
+  --cv-ring:          rgba(201, 100, 59, 0.45);
+
+  --cv-success: #4f8a6a;
+  --cv-warning: #d08a1f;
+  --cv-danger:  #b8322d;
+  --cv-info:    #4f7fa3;
+
+  /* glass */
+  --cv-glass-bg:        rgba(251, 246, 241, 0.55);
+  --cv-glass-bg-strong: rgba(251, 246, 241, 0.80);
+  --cv-glass-border:    rgba(255, 255, 255, 0.55);
+  --cv-glass-blur:      18px;
+  --cv-glass-saturate:  160%;
+  --cv-glass-shadow:    0 1px 0 rgba(255, 255, 255, 0.40) inset, 0 20px 50px -20px rgba(51, 37, 27, 0.35);
+
+  /* neumorphic dual light */
+  --cv-neu-light: rgba(255, 255, 255, 0.70);
+  --cv-neu-dark:  rgba(51, 37, 27, 0.16);
+  --cv-neu-out:   -6px -6px 14px var(--cv-neu-light), 6px 6px 14px var(--cv-neu-dark);
+  --cv-neu-out-sm: -3px -3px 8px var(--cv-neu-light), 3px 3px 8px var(--cv-neu-dark);
+  --cv-neu-in:    inset -4px -4px 10px var(--cv-neu-light), inset 4px 4px 10px var(--cv-neu-dark);
+  --cv-neu-in-sm: inset -2px -2px 5px var(--cv-neu-light), inset 2px 2px 5px var(--cv-neu-dark);
+
+  /* ambient background blobs */
+  --cv-ambient-1: color-mix(in oklab, var(--cv-secondary) 45%, transparent);
+  --cv-ambient-2: color-mix(in oklab, var(--cv-accent) 22%, transparent);
+
+  /* shape */
+  --cv-radius-sm: 10px;
+  --cv-radius-md: 16px;
+  --cv-radius-lg: 24px;
+  --cv-radius-xl: 32px;
+
+  /* motion */
+  --cv-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --cv-dur-fast: 150ms;
+  --cv-dur: 240ms;
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"],
+.dark {
+  --cv-bg:            var(--cv-ink-900);
+  --cv-bg-elevated:   var(--cv-ink-800);
+  --cv-bg-sunken:     #140e0b;
+  --cv-fg:            var(--cv-cream-200);
+  --cv-fg-muted:      var(--cv-cream-300);
+  --cv-fg-subtle:     var(--cv-mist-500);
+  --cv-primary:       var(--cv-ox-400);
+  --cv-primary-hover: var(--cv-ox-500);
+  --cv-primary-fg:    var(--cv-cream-50);
+  --cv-secondary:     var(--cv-mist-500);
+  --cv-secondary-fg:  var(--cv-ink-900);
+  --cv-accent:        #e07a4c;
+  --cv-border:        rgba(242, 222, 206, 0.10);
+  --cv-border-strong: rgba(242, 222, 206, 0.20);
+  --cv-ring:          rgba(224, 122, 76, 0.50);
+
+  --cv-glass-bg:        rgba(38, 27, 21, 0.50);
+  --cv-glass-bg-strong: rgba(38, 27, 21, 0.80);
+  --cv-glass-border:    rgba(242, 222, 206, 0.14);
+  --cv-glass-shadow:    0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 20px 50px -20px rgba(0, 0, 0, 0.6);
+
+  --cv-neu-light: rgba(255, 255, 255, 0.05);
+  --cv-neu-dark:  rgba(0, 0, 0, 0.55);
+
+  --cv-ambient-1: color-mix(in oklab, var(--cv-mist-600) 30%, transparent);
+  --cv-ambient-2: color-mix(in oklab, var(--cv-accent) 18%, transparent);
+
+  color-scheme: dark;
+}
+
+/* Font tokens live on body: next/font sets --font-* variables on <body>, so they
+   are only resolvable from body downwards (declaring them on :root would be invalid). */
+body {
+  --cv-font-sans: var(--font-geist-sans, -apple-system), -apple-system, "SF Pro", "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif;
+  --cv-font-display: var(--font-display, "Fraunces"), "Fraunces", "Playfair Display", "Songti SC", Georgia, serif;
+  --cv-font-mono: var(--font-geist-mono, Menlo), "SF Mono", Menlo, monospace;
+}
+
+/* Low-end devices / user preference: drop the blur, keep the look readable */
+@media (prefers-reduced-transparency: reduce) {
+  :root { --cv-glass-blur: 0px; --cv-glass-bg: var(--cv-bg-elevated); --cv-glass-bg-strong: var(--cv-bg-elevated); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --cv-dur: 0ms; --cv-dur-fast: 0ms; }
+}

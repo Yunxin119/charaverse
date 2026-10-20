@@ -31,6 +31,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAppSelector, useAppDispatch } from '../../store/hooks'
+import { useAuth } from '@/providers/AuthProvider'
 import {
   fetchCharacter,
   fetchChatSession,
@@ -116,7 +117,7 @@ export default function ChatSessionPage() {
   const router = useRouter()
   const dispatch = useAppDispatch()
   
-  const { user } = useAppSelector((state) => state.auth)
+  const { user } = useAuth()
   const { 
     currentSession, 
     currentCharacter, 
@@ -490,10 +491,7 @@ export default function ChatSessionPage() {
 
   // 初始化页面数据
   useEffect(() => {
-    if (!user) {
-      router.push('/login')
-      return
-    }
+    if (!user) return
 
     const initializeChat = async () => {
       if (sessionId === 'new') {

@@ -7,8 +7,8 @@
 | Phase | 内容 | 预计 | 状态 |
 |---|---|---|---|
 | P0 | 止血：删死代码、堵安全洞、升级依赖 | 0.5 天 | ✅ 2026-10-20（hotfix SQL 待在 dashboard 执行） |
-| P1 | 地基：设计 token、App 壳、鉴权中间件、数据层 | 1 天 | ⬜ 下一步 |
-| P2 | 聊天核心重写：流式、预设驱动的 prompt 组装、消息组件 | 1.5 天 | ⬜ |
+| P1 | 地基：设计 token、App 壳、鉴权中间件、数据层 | 1 天 | 🟡 2026-10-20 基本完成（baseline 迁移 + gen types 待你跑 CLI） |
+| P2 | 聊天核心重写：流式、预设驱动的 prompt 组装、消息组件 | 1.5 天 | ⬜ 下一步 |
 | P3 | 可定制化：预设导入/管理、主题导入、作者皮肤、HTML 块沙箱 | 1.5 天 | ⬜ |
 | P4 | 其余页面换皮 + API 连接管理合并 | 1 天 | ⬜ |
 | P5 | 记忆 / 摘要 / 日记：schema 驱动重建 | 1 天 | ⬜ |
@@ -235,16 +235,22 @@ docs/                       # 本文件 + design/
 
 ### P1 · 地基（1 天）
 目标：新壳立起来，后续页面能往里搬。
-- [ ] `styles/tokens.css`（§5.1 全套 `--cv-*` + dark）、`globals.css` 用 `@theme` 映射；删掉 `.line-clamp-*` 等手写工具类
-- [ ] `components/glass/*`：GlassPanel、NeuSurface、PosterCard、Chip、StatusDot、IconButton、GlassSheet（移动端底部抽屉）
-- [ ] 重做 `components/ui/*` 样式（button/input/dialog/tabs/switch/select）走 token，保持 API 不变
-- [ ] App 壳：`(app)/layout.tsx` = 桌面左侧玻璃 rail + 移动端底部 tab；去掉 `AppWrapper` 的路径判断逻辑
-- [ ] `ThemeProvider` 重写：支持 light/dark/system + 自定义主题 JSON；inline script 防闪烁
-- [ ] `lib/supabase/{client,server,middleware}` + `middleware.ts` 路由守卫；登录页换皮
-- [ ] `supabase/migrations/0001_baseline.sql`（从 dashboard `pg_dump --schema-only` 导出整理；顺手移除 `session_characters`、`script_*`、贴纸表）+ `supabase gen types` → `types/database.ts`；删 3 份手写类型
-- [ ] TanStack Query Provider + 第一批 hooks：`useCharacter`、`useSessions`、`useMessages`
-- [ ] 删 Redux：`authSlice` → Supabase session hook；`chatSlice` 先保留给旧页面，P2 删
-- 验收：登录 / 列表页在新壳里能跑；明暗切换无闪烁；Lighthouse a11y ≥ 90
+- [x] `styles/tokens.css`（§5.1 全套 `--cv-*` + dark）、`globals.css` 用 `@theme` 映射；删掉 `.line-clamp-*` 等手写工具类
+- [x] `components/glass/*`：GlassPanel、NeuSurface、PosterCard、Chip、StatusDot、IconButton、GlassSheet（移动端底部抽屉）
+- [x] 重做 `components/ui/*` 样式（button/input/dialog/tabs/switch/select）走 token，保持 API 不变
+- [x] App 壳：`components/shell/AppShell`（根 layout 直接包）= 桌面左侧玻璃 rail + 移动端浮动玻璃 tab；沉浸式路由（聊天、公开角色页）不显示 tab；`AppWrapper`/`BottomNavbar` 已删
+- [x] `ThemeProvider` 重写：支持 light/dark/system + 自定义主题 JSON；inline script 防闪烁
+- [x] `lib/supabase/{client,server}` + `src/proxy.ts`（Next 16 的 middleware，**必须放在 src/ 下**）路由守卫；`providers/AuthProvider` + `useAuth()`；登录页换皮（海报 + 玻璃表单）
+- [ ] **需要你跑 CLI**（我没有你的 Supabase 访问权限）：
+  ```bash
+  npx supabase login && npx supabase link --project-ref <你的 project ref>
+  npx supabase db dump --schema public -f supabase/migrations/0001_baseline.sql
+  npx supabase gen types typescript --linked > src/types/database.ts
+  ```
+  跑完后我来整理 baseline（移除 `session_characters`、`script_*`、贴纸表）并把 3 份手写类型换成 `types/database.ts`
+- [x] TanStack Query Provider + 第一批 hooks：`useCharacter`、`useSessions`、`useMessages`
+- [x] 删 Redux：`authSlice` → Supabase session hook；`chatSlice` 先保留给旧页面，P2 删
+- 验收：登录页在浅色/深色/手机宽度下渲染正确 ✅；未登录访问任何页面被 proxy 重定向到 /login ✅；`tsc` / `next build` / `eslint` 全绿 ✅；旧页面在新壳里能跑（待你登录验证）；Lighthouse a11y 留到 P6
 
 ### P2 · 聊天核心（1.5 天）
 目标：一个干净的、流式的、可扩展的聊天视图。

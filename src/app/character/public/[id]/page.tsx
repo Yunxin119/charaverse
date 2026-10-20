@@ -24,7 +24,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Textarea } from '@/components/ui/textarea'
 import { supabase, type ScriptCharacter } from '../../../lib/supabase'
-import { useAppSelector } from '../../../store/hooks'
+import { useAuth } from '@/providers/AuthProvider'
 import ImageUpload from '../../../components/ImageUpload'
 import ImageViewer from '../../../components/ImageViewer'
 import { uploadCommentImages, type CompressedImage } from '../../../lib/imageUtils'
@@ -59,7 +59,7 @@ interface Comment {
 export default function PublicScriptPage() {
   const { id } = useParams()
   const router = useRouter()
-  const { user } = useAppSelector((state) => state.auth)
+  const { user } = useAuth()
 
   const [script, setScript] = useState<Script | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
@@ -76,10 +76,7 @@ export default function PublicScriptPage() {
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0)
 
   useEffect(() => {
-    if (!user) {
-      router.push('/login')
-      return
-    }
+    if (!user) return
     
     if (id) {
       fetchScriptDetails()

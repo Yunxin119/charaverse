@@ -35,11 +35,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useAppSelector, useAppDispatch } from '../store/hooks'
-import { signOut } from '../store/authSlice'
+import { useAuth } from '@/providers/AuthProvider'
 import { supabase } from '../lib/supabase'
 import UserBanner from '../components/UserBanner'
-import { BottomNavbar } from '../components/layout/BottomNavbar'
 import { AvatarUpload } from '../components/AvatarUpload'
 import { uploadUserAvatar } from '../lib/avatarUpload'
 import { useRouter } from 'next/navigation'
@@ -84,8 +82,7 @@ interface NamedRelayConfig {
 }
 
 export default function MyPage() {
-  const { user } = useAppSelector((state) => state.auth)
-  const dispatch = useAppDispatch()
+  const { user, signOut } = useAuth()
   const router = useRouter()
   const { theme, setTheme } = useTheme()
   
@@ -498,7 +495,7 @@ export default function MyPage() {
   const handleSignOut = async () => {
     if (confirm('确定要退出登录吗？')) {
       try {
-        await dispatch(signOut()).unwrap()
+        await signOut()
         router.push('/login')
       } catch (error) {
         console.error('退出登录失败:', error)
@@ -559,7 +556,6 @@ export default function MyPage() {
             <p className="text-slate-600 dark:text-slate-300">加载中...</p>
           </div>
         </div>
-        <BottomNavbar />
       </div>
     )
   }
@@ -1449,7 +1445,6 @@ export default function MyPage() {
         </div>
       </main>
 
-      <BottomNavbar />
     </div>
   )
 }

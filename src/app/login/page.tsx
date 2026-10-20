@@ -1,17 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { useAppDispatch, useAppSelector } from '../store/hooks'
-import { signIn, signUp, clearError } from '../store/authSlice'
-import { Loader2, Mail, Lock, User, Sparkles, Eye, EyeOff } from 'lucide-react'
+import { GlassPanel, PosterCard, PosterTitle, Chip } from '@/components/glass'
+import { ThemeToggle } from '@/components/shell'
+import { useAuth } from '@/providers/AuthProvider'
+import { Loader2, Mail, Lock, User, Sparkles, Eye, EyeOff, ArrowRight } from 'lucide-react'
 
-export default function LoginPage() {
+function LoginForm() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
@@ -19,290 +19,176 @@ export default function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  
-  const dispatch = useAppDispatch()
-  const { user, loading, error } = useAppSelector((state) => state.auth)
+
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const { user, signIn, signUp } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // Only allow same-origin relative paths as the post-login destination.
+  const rawNext = searchParams.get('next')
+  const nextPath = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/chat'
 
   useEffect(() => {
     if (user) {
-      router.push('/')
+      router.replace(nextPath)
     }
-  }, [user, router])
-
-  useEffect(() => {
-    return () => {
-      dispatch(clearError())
-    }
-  }, [dispatch])
+  }, [user, router, nextPath])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (isSignUp && password !== confirmPassword) {
-      return
-    }
+    if (isSignUp && password !== confirmPassword) return
 
+    setError(null)
+    setLoading(true)
     try {
       if (isSignUp) {
-        await dispatch(signUp({ email, password, username })).unwrap()
+        await signUp(email, password, username)
       } else {
-        await dispatch(signIn({ email, password })).unwrap()
+        await signIn(email, password)
       }
+      router.replace(nextPath)
+      router.refresh()
     } catch (err) {
-      // Error is handled in the slice
+      setError(err instanceof Error ? err.message : (isSignUp ? '注册失败' : '登录失败'))
+    } finally {
+      setLoading(false)
     }
   }
 
-  const containerVariants = {
-    hidden: { opacity: 0, y: 50 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: {
-        duration: 0.6,
-        staggerChildren: 0.1
-      }
-    }
+  const switchMode = () => {
+    setIsSignUp((v) => !v)
+    setError(null)
+    setConfirmPassword('')
+    setUsername('')
+    setShowPassword(false)
+    setShowConfirmPassword(false)
   }
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: { 
-        duration: 0.4
-      }
-    }
-  }
-
-  const logoVariants = {
-    hidden: { scale: 0.8, opacity: 0 },
-    visible: { 
-      scale: 1, 
-      opacity: 1,
-      transition: { 
-        duration: 0.8,
-        delay: 0.2
-      }
-    }
-  }
+  const mismatch = isSignUp && !!confirmPassword && password !== confirmPassword
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center p-4">
+    <div className="relative min-h-dvh px-4 py-6 sm:px-6 md:grid md:place-items-center">
+      <ThemeToggle className="absolute right-4 top-4 z-10" />
+
       <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="w-full max-w-md"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.2, 0.8, 0.2, 1] }}
+        className="mx-auto grid w-full max-w-5xl gap-4 md:grid-cols-[1.1fr_1fr] md:gap-6"
       >
-        {/* Logo and Title */}
-        <motion.div 
-          variants={logoVariants}
-          className="text-center mb-8"
-        >
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 dark:from-slate-100 dark:to-slate-300 mb-4 shadow-lg">
-            <Sparkles className="w-8 h-8 text-white dark:text-slate-900" />
+        {/* Poster side */}
+        <PosterCard tone="ink" className="flex min-h-[200px] flex-col justify-between p-6 sm:p-8 md:min-h-[560px]">
+          <div className="flex items-center gap-2">
+            <span className="flex size-9 items-center justify-center rounded-cv-sm bg-cv-accent text-white shadow-[0_10px_24px_-10px_var(--cv-accent)]">
+              <Sparkles className="size-4" />
+            </span>
+            <span className="font-mono text-[11px] uppercase tracking-[0.2em] opacity-70">CharaVerse</span>
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">CharaVerse</h1>
-          <p className="text-slate-600 dark:text-slate-400">进入你的 AI 角色扮演宇宙</p>
-        </motion.div>
+          <div className="mt-8 md:mt-0">
+            <PosterTitle className="text-3xl sm:text-4xl md:text-5xl md:leading-[1.05]">
+              你的角色，<br />
+              <em className="font-medium italic opacity-90">有自己的宇宙。</em>
+            </PosterTitle>
+            <p className="mt-4 max-w-sm text-sm opacity-80 sm:text-base">
+              创建人设、导入预设与皮肤，用你自己的模型和 API Key 开始一段不会被遗忘的对话。
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Chip tone="glass" className="text-cv-cream-200/90 border-white/15">BYOK · 密钥只在你的浏览器</Chip>
+              <Chip tone="glass" className="text-cv-cream-200/90 border-white/15">长期记忆</Chip>
+              <Chip tone="glass" className="text-cv-cream-200/90 border-white/15">可导入主题 / 预设</Chip>
+            </div>
+          </div>
+        </PosterCard>
 
-        <motion.div variants={itemVariants}>
-          <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
-            <CardHeader className="space-y-4 pb-6">
-              <div className="text-center">
-                <CardTitle className="text-2xl font-semibold text-slate-900 dark:text-white">
-                  {isSignUp ? '创建账户' : '欢迎回来'}
-                </CardTitle>
-                <CardDescription className="text-slate-600 dark:text-slate-400 mt-2">
-                  {isSignUp 
-                    ? '开始你在 AI 宇宙中的旅程' 
-                    : '登录以继续你的冒险'
-                  }
-                </CardDescription>
+        {/* Form side */}
+        <GlassPanel strength="strong" padding="none" className="p-6 sm:p-8">
+          <div className="mb-6">
+            <h1 className="font-display text-2xl font-semibold">{isSignUp ? '创建账户' : '欢迎回来'}</h1>
+            <p className="mt-1 text-sm text-cv-fg-muted">{isSignUp ? '几秒钟就好，然后开始你的第一段对话。' : '登录以继续你的冒险。'}</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="email">邮箱</Label>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-cv-fg-subtle" />
+                <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-11" placeholder="you@example.com" required />
               </div>
-            </CardHeader>
-            
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <motion.div variants={itemVariants} className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    邮箱地址
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
-                    <Input
-                      id="email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10 h-12 border-slate-200 dark:border-slate-600 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-slate-400 dark:focus:ring-slate-500 bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                      placeholder="your@email.com"
-                      required
-                    />
-                  </div>
-                </motion.div>
+            </div>
 
-                {isSignUp && (
-                  <motion.div 
-                    variants={itemVariants}
-                    initial="hidden"
-                    animate="visible"
-                    className="space-y-2"
-                  >
-                    <Label htmlFor="username" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      用户名
-                    </Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
-                      <Input
-                        id="username"
-                        type="text"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        className="pl-10 h-12 border-slate-200 dark:border-slate-600 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-slate-400 dark:focus:ring-slate-500 bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                        placeholder="设置你的用户名"
-                        required={isSignUp}
-                      />
-                    </div>
-                  </motion.div>
-                )}
+            {isSignUp && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-1.5">
+                <Label htmlFor="username">用户名</Label>
+                <div className="relative">
+                  <User className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-cv-fg-subtle" />
+                  <Input id="username" type="text" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} className="pl-11" placeholder="别人会看到的名字" required={isSignUp} />
+                </div>
+              </motion.div>
+            )}
 
-                <motion.div variants={itemVariants} className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    密码
-                  </Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 pr-10 h-12 border-slate-200 dark:border-slate-600 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-slate-400 dark:focus:ring-slate-500 bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                      placeholder="输入您的密码"
-                      required
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-1 top-1/2 transform -translate-y-1/2 h-10 w-10 p-0 hover:bg-slate-100 dark:hover:bg-slate-600"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                      ) : (
-                        <Eye className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                      )}
-                    </Button>
-                  </div>
-                </motion.div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password">密码</Label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-cv-fg-subtle" />
+                <Input id="password" type={showPassword ? 'text' : 'password'} autoComplete={isSignUp ? 'new-password' : 'current-password'} value={password} onChange={(e) => setPassword(e.target.value)} className="pl-11 pr-11" placeholder="••••••••" required />
+                <button type="button" aria-label={showPassword ? '隐藏密码' : '显示密码'} onClick={() => setShowPassword((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-cv-fg-subtle hover:text-cv-fg">
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+            </div>
 
-                {isSignUp && (
-                  <motion.div 
-                    variants={itemVariants}
-                    initial="hidden"
-                    animate="visible"
-                    className="space-y-2"
-                  >
-                    <Label htmlFor="confirmPassword" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      确认密码
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
-                      <Input
-                        id="confirmPassword"
-                        type={showConfirmPassword ? "text" : "password"}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="pl-10 pr-10 h-12 border-slate-200 dark:border-slate-600 focus:border-slate-400 dark:focus:border-slate-500 focus:ring-slate-400 dark:focus:ring-slate-500 bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                        placeholder="确认您的密码"
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-10 w-10 p-0 hover:bg-slate-100 dark:hover:bg-slate-600"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                        ) : (
-                          <Eye className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                        )}
-                      </Button>
-                    </div>
-                    {isSignUp && password !== confirmPassword && confirmPassword && (
-                      <p className="text-sm text-red-500 dark:text-red-400">密码不匹配</p>
-                    )}
-                  </motion.div>
-                )}
+            {isSignUp && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-1.5">
+                <Label htmlFor="confirmPassword">确认密码</Label>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-cv-fg-subtle" />
+                  <Input id="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="pl-11 pr-11" placeholder="再输一次" required aria-invalid={mismatch || undefined} />
+                  <button type="button" aria-label={showConfirmPassword ? '隐藏密码' : '显示密码'} onClick={() => setShowConfirmPassword((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-cv-fg-subtle hover:text-cv-fg">
+                    {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+                {mismatch && <p className="text-xs text-cv-danger">两次输入的密码不一致</p>}
+              </motion.div>
+            )}
 
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3"
-                  >
-                    <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-                  </motion.div>
-                )}
+            {error && (
+              <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} role="alert" className="rounded-cv-md border border-cv-danger/30 bg-[color-mix(in_oklab,var(--cv-danger)_10%,transparent)] px-4 py-3 text-sm text-cv-danger">
+                {error}
+              </motion.div>
+            )}
 
-                <motion.div variants={itemVariants} className="space-y-4">
-                  <Button
-                    type="submit"
-                    disabled={loading || (isSignUp && password !== confirmPassword)}
-                    className="w-full h-12 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-medium rounded-lg transition-all duration-200 disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {isSignUp ? '创建账户中...' : '登录中...'}
-                      </>
-                    ) : (
-                      <>
-                        <User className="mr-2 h-4 w-4" />
-                        {isSignUp ? '创建账户' : '登录'}
-                      </>
-                    )}
-                  </Button>
+            <Button type="submit" size="lg" disabled={loading || mismatch} className="w-full">
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  {isSignUp ? '创建中…' : '登录中…'}
+                </>
+              ) : (
+                <>
+                  {isSignUp ? '创建账户' : '登录'}
+                  <ArrowRight />
+                </>
+              )}
+            </Button>
 
-                  <div className="text-center">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsSignUp(!isSignUp)
-                        dispatch(clearError())
-                        setConfirmPassword('')
-                        setUsername('')
-                        setShowPassword(false)
-                        setShowConfirmPassword(false)
-                      }}
-                      className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors duration-200"
-                    >
-                      {isSignUp 
-                        ? '已有账户？立即登录' 
-                        : '还没有账户？立即注册'
-                      }
-                    </button>
-                  </div>
-                </motion.div>
-              </form>
-            </CardContent>
-          </Card>
-        </motion.div>
+            <button type="button" onClick={switchMode} className="block w-full text-center text-sm text-cv-fg-muted transition-colors hover:text-cv-fg">
+              {isSignUp ? '已有账户？立即登录' : '还没有账户？立即注册'}
+            </button>
+          </form>
 
-        <motion.div 
-          variants={itemVariants}
-          className="mt-8 text-center text-sm text-slate-500 dark:text-slate-400"
-        >
-          <p>继续使用即表示您同意我们的服务条款</p>
-        </motion.div>
+          <p className="mt-6 text-center text-xs text-cv-fg-subtle">继续使用即表示你同意我们的服务条款</p>
+        </GlassPanel>
       </motion.div>
     </div>
   )
-} 
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  )
+}

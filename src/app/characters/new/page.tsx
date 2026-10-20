@@ -28,7 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { supabase } from '../../lib/supabase'
-import { useAppSelector } from '../../store/hooks'
+import { useAuth } from '@/providers/AuthProvider'
 import { TemplateManager } from '../../components/TemplateManager'
 import { SimpleAvatarUpload } from '../../components/AvatarUpload'
 import { uploadCharacterAvatar } from '../../lib/avatarUpload'
@@ -61,7 +61,7 @@ interface PromptModule {
 
 export default function NewCharacterPage() {
   const router = useRouter()
-  const { user } = useAppSelector((state) => state.auth)
+  const { user } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   
   const [basicInfo, setBasicInfo] = useState<BasicInfo>({

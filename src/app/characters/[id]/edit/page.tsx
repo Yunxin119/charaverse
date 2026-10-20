@@ -34,7 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { supabase } from '../../../lib/supabase'
-import { useAppSelector } from '../../../store/hooks'
+import { useAuth } from '@/providers/AuthProvider'
 import { TemplateManager } from '../../../components/TemplateManager'
 import { SimpleAvatarUpload } from '../../../components/AvatarUpload'
 import { uploadCharacterAvatar } from '../../../lib/avatarUpload'
@@ -68,7 +68,7 @@ interface PromptModule {
 export default function EditCharacterPage() {
   const router = useRouter()
   const params = useParams()
-  const { user } = useAppSelector((state) => state.auth)
+  const { user } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const characterId = params.id as string
@@ -123,10 +123,7 @@ export default function EditCharacterPage() {
 
   // 加载角色数据
   useEffect(() => {
-    if (!user) {
-      router.push('/login')
-      return
-    }
+    if (!user) return
 
     if (!characterId) return
 

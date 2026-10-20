@@ -26,8 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { supabase } from '../lib/supabase'
-import { useAppSelector } from '../store/hooks'
-import { BottomNavbar } from '../components/layout/BottomNavbar'
+import { useAuth } from '@/providers/AuthProvider'
 
 interface PublicCharacter {
   id: number
@@ -44,7 +43,7 @@ interface PublicCharacter {
 }
 
 export default function ExplorePage() {
-  const { user } = useAppSelector((state) => state.auth)
+  const { user } = useAuth()
   const router = useRouter()
   
   const [characters, setCharacters] = useState<PublicCharacter[]>([])
@@ -54,10 +53,7 @@ export default function ExplorePage() {
   const [filterType, setFilterType] = useState('all') // all, trending, recent
 
   useEffect(() => {
-    if (!user) {
-      router.push('/login')
-      return
-    }
+    if (!user) return
     
     fetchPublicCharacters()
   }, [user, router, sortBy, filterType])
@@ -461,7 +457,6 @@ export default function ExplorePage() {
       </main>
 
       {/* Bottom Navigation */}
-      <BottomNavbar />
     </div>
   )
 }

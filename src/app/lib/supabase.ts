@@ -1,20 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export { supabase } from '@/lib/supabase/client'
+export type { User } from '@supabase/supabase-js'
 
 // Types for our database
-export type User = {
-  id: string
-  email?: string
-  user_metadata?: {
-    username?: string
-    avatar_url?: string
-  }
-}
-
 export type Profile = {
   id: string
   username?: string

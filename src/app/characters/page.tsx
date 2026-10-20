@@ -25,14 +25,14 @@ import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { useAppSelector } from '../store/hooks'
+import { useAuth } from '@/providers/AuthProvider'
 import { supabase } from '../lib/supabase'
 import { Character } from '../store/chatSlice'
 import { useAppDispatch } from '../store/hooks'
 import { getExistingSession } from '../store/chatSlice'
 
 export default function CharactersPage() {
-  const { user } = useAppSelector((state) => state.auth)
+  const { user } = useAuth()
   const dispatch = useAppDispatch()
   const router = useRouter()
   
@@ -43,10 +43,7 @@ export default function CharactersPage() {
   const [sortBy, setSortBy] = useState('created_at') // created_at, name, updated_at
 
   useEffect(() => {
-    if (!user) {
-      router.push('/login')
-      return
-    }
+    if (!user) return
     
     fetchCharacters()
   }, [user, router])

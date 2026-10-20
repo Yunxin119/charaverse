@@ -8,7 +8,9 @@ SillyTavern-style AI character chat app. Next.js 16 (App Router) + Supabase (aut
 - Skin samples the theming system must be able to render: `docs/skin-samples/` (SillyTavern-style HTML/CSS cards). Legacy SQL and notes: `docs/legacy-*` (reference only).
 
 ## Conventions
-- Every `/api/*` route starts with `requireUser(request)` from `src/lib/server/auth.ts`; client calls use `authedFetch` from `src/lib/authedFetch.ts`.
+- Auth: cookie sessions via `@supabase/ssr`. Pages are guarded by `src/proxy.ts` (Next 16 proxy; it must live under `src/`). Client components read the user with `useAuth()` from `src/providers/AuthProvider.tsx`. Every `/api/*` route starts with `requireUser(request)` from `src/lib/server/auth.ts`; client calls use `authedFetch` from `src/lib/authedFetch.ts`.
+- UI: tokens in `src/styles/tokens.css`, Tailwind mapping in `src/app/globals.css` (`bg-cv-*`, `glass`, `neu`, `rounded-cv-*`, `shadow-neu`, `font-display`). Surfaces come from `src/components/glass`; shadcn atoms in `src/components/ui` are already restyled onto the tokens. The frame is `src/components/shell/AppShell`.
+- Data: server state through TanStack Query hooks in `src/queries/`; UI state in Zustand stores (`src/stores/`, from P2). The remaining Redux `chatSlice` is legacy and goes away with the chat rewrite.
 - Any user-supplied LLM `baseUrl` goes through `assertSafeBaseUrl` (`src/lib/server/llmGuards.ts`). Upstream error bodies are summarized, never echoed.
 - Never log API keys, auth headers, prompts, or message content, on the server or in the browser.
 - Author-supplied CSS is sanitized with a real parser and scoped to `#cv-chat-root`; author HTML/JS only ever renders inside a sandboxed iframe.

@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { useAppSelector } from '../store/hooks'
+import { useAuth } from '@/providers/AuthProvider'
 import { supabase } from '../lib/supabase'
 import { useAppDispatch } from '../store/hooks'
 import { getExistingSession } from '../store/chatSlice'
@@ -39,7 +39,7 @@ interface ChatSessionWithCharacter {
 }
 
 export default function ChatPage() {
-  const { user } = useAppSelector((state) => state.auth)
+  const { user } = useAuth()
   const dispatch = useAppDispatch()
   const router = useRouter()
   
@@ -49,10 +49,7 @@ export default function ChatPage() {
   const [isSearchVisible, setIsSearchVisible] = useState(false)
 
   useEffect(() => {
-    if (!user) {
-      router.push('/login')
-      return
-    }
+    if (!user) return
     
     fetchChatSessions()
   }, [user, router])

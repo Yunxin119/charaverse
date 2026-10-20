@@ -28,7 +28,7 @@ import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { supabase, type Diary, type ChatSession, type Character } from '@/app/lib/supabase'
-import { useAppSelector } from '@/app/store/hooks'
+import { useAuth } from '@/providers/AuthProvider'
 
 interface NamedRelayConfig {
   id: string
@@ -56,7 +56,7 @@ export default function DiaryPage() {
   const router = useRouter()
   const sessionId = params.sessionId as string
   
-  const { user } = useAppSelector((state) => state.auth)
+  const { user } = useAuth()
   
   const [data, setData] = useState<DiaryPageData>({
     session: null,
