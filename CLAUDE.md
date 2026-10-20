@@ -13,7 +13,7 @@ SillyTavern-style AI character chat app. Next.js 16 (App Router) + Supabase (aut
 - Data: server state through TanStack Query hooks in `src/queries/`; UI state in Zustand stores (`src/stores/`, from P2). The remaining Redux `chatSlice` is legacy and goes away with the chat rewrite.
 - Any user-supplied LLM `baseUrl` goes through `assertSafeBaseUrl` (`src/lib/server/llmGuards.ts`). Upstream error bodies are summarized, never echoed.
 - Never log API keys, auth headers, prompts, or message content, on the server or in the browser.
-- Author-supplied CSS is sanitized with a real parser and scoped to `#cv-chat-root`; author HTML/JS only ever renders inside a sandboxed iframe.
+- Author-supplied CSS is sanitized with a real parser and scoped to `#cv_chat_root`; author HTML/JS only ever renders inside a sandboxed iframe.
 - Schema changes go in `supabase/migrations/` (P1+). One-off fixes for the live DB live in `supabase/hotfix/` and are applied by hand in the Supabase SQL editor.
 - Decisions already made (do not re-open): no mobile app / PWA / IM-style phone chat, no multi-character "script" mode, no sticker system, Redux is being removed in favor of Zustand + TanStack Query, LLM calls move to the Vercel AI SDK with streaming.
 

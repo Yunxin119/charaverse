@@ -4,12 +4,14 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import type { ChatMessage } from '@/app/lib/supabase'
 import { MessageBubble, StreamingBubble, type Speaker } from './MessageBubble'
+import type { RenderSkin } from './MessageContent'
 import type { MessageActionHandlers } from './MessageActions'
 
 interface Props {
   messages: ChatMessage[] // oldest first
   character: Speaker
   user: Speaker
+  skin?: RenderSkin | null
   streamingText: string | null // null = not streaming a visible bubble
   busy: boolean
   selectedId: number | null
@@ -28,7 +30,7 @@ interface Props {
 const NEAR_BOTTOM = 160
 
 export function MessageList({
-  messages, character, user, streamingText, busy, selectedId, editingId, onSelect, handlersFor,
+  messages, character, user, skin, streamingText, busy, selectedId, editingId, onSelect, handlersFor,
   onEditSave, onEditCancel, onSwipe, hasOlder, loadingOlder, onLoadOlder, emptyState,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null)
@@ -107,6 +109,7 @@ export function MessageList({
               key={m.id}
               message={m}
               speaker={m.role === 'user' ? user : character}
+              skin={skin}
               isLast={isLast}
               selected={selectedId === m.id}
               onSelect={() => onSelect(selectedId === m.id ? null : m.id)}
@@ -119,7 +122,7 @@ export function MessageList({
             />
           )
         })}
-        {streamingText !== null && <StreamingBubble text={streamingText} speaker={character} />}
+        {streamingText !== null && <StreamingBubble text={streamingText} speaker={character} skin={skin} />}
       </div>
     </div>
   )

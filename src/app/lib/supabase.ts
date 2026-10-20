@@ -15,6 +15,8 @@ export type Character = {
   name: string // 剧本名称
   avatar_url?: string // 剧本封面
   prompt_template: any
+  /** author skin: css / regexScripts / renderHtml (lib/skins/schema.ts) */
+  skin?: Record<string, unknown>
   is_public: boolean
   created_at: string
 }

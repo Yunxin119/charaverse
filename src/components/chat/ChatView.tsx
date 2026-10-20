@@ -15,7 +15,8 @@ import { useConnection } from '@/lib/llm/useConnection'
 import { parseSessionSettings, type SessionSettings } from '@/lib/chat/settings'
 import { parseCharacterCard } from '@/lib/chat/characterCard'
 import { BUILTIN_DEFAULT_PRESET } from '@/lib/prompt/presets'
-import { CharacterStyleInjector } from '@/app/components/CharacterStyleInjector'
+import { parseSkin } from '@/lib/skins/schema'
+import { SkinStyle } from './SkinStyle'
 import { Button } from '@/components/ui/button'
 import { PosterCard, PosterTitle } from '@/components/glass'
 import type { ChatMessage } from '@/app/lib/supabase'
@@ -41,6 +42,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
 
   const settings: SessionSettings = useMemo(() => parseSessionSettings(session?.settings), [session?.settings])
   const card = useMemo(() => (character ? parseCharacterCard(character) : null), [character])
+  const skin = useMemo(() => parseSkin((character as { skin?: unknown } | undefined)?.skin), [character])
 
   const messages: ChatMessage[] = useMemo(() => {
     const all = (messagesQ.data?.pages ?? []).flat()
@@ -172,7 +174,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
 
   return (
     <div id="cv_chat_root" className="relative flex h-dvh flex-col overflow-hidden">
-      <CharacterStyleInjector customCss={card.customCss} />
+      <SkinStyle css={skin.css || card.customCss || ''} allowedUrlHosts={skin.allowedUrlHosts} />
       {bg.url && (
         <>
           <div id="cv_background_image" aria-hidden className="pointer-events-none absolute inset-0 -z-20 bg-cover bg-center" style={{ backgroundImage: `url(${bg.url})`, opacity: bg.opacity, filter: bg.blur ? `blur(${bg.blur}px)` : undefined, transform: bg.blur ? 'scale(1.05)' : undefined }} />
@@ -194,6 +196,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         messages={messages}
         character={characterSpeaker}
         user={userSpeaker}
+        skin={{ regexScripts: skin.regexScripts, renderHtml: skin.renderHtml, char: card.name, user: userSpeaker.name }}
         streamingText={stream.isStreaming && stream.streamingAction !== 'inspire' ? stream.streamingText : null}
         busy={busy}
         selectedId={selectedId}

@@ -844,6 +844,11 @@ export default function EditCharacterPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  <div className="rounded-xl border border-amber-300/50 bg-amber-50/60 p-4 text-sm dark:bg-amber-900/20">
+                    <div className="font-semibold">新的皮肤编辑器已上线</div>
+                    <p className="mt-1 text-xs opacity-80">支持实时预览、正则脚本和沙箱 HTML 渲染。这里的旧 CSS 会在新编辑器里自动带入，保存后以新编辑器为准。</p>
+                    <Button type="button" size="sm" className="mt-3" onClick={() => router.push(`/characters/${characterId}/skin`)}>打开皮肤编辑器</Button>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="custom_css" className="flex items-center">
                       <Code className="w-4 h-4 mr-1.5" />

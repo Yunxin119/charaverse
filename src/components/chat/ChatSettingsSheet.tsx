@@ -95,7 +95,7 @@ export function ChatSettingsSheet({ open, onOpenChange, sessionId, userId, title
                 {presets.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}{p.is_default ? ' · 默认' : ''}</SelectItem>)}
               </SelectContent>
             </Select>
-            <p className="text-xs text-cv-fg-subtle">预设决定 system prompt 的组装顺序与采样参数，可在「我的 → 预设」导入酒馆预设。</p>
+            <p className="text-xs text-cv-fg-subtle">预设决定 system prompt 的组装顺序与采样参数。<a href="/settings/presets" className="text-cv-accent underline underline-offset-2">管理 / 导入预设</a></p>
           </section>
 
           <section className="space-y-3">

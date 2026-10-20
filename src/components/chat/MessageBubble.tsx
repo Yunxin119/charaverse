@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { ChatMessage } from '@/app/lib/supabase'
-import { Markdown } from './Markdown'
+import { MessageContent, type RenderSkin } from './MessageContent'
 import { MessageActions, type MessageActionHandlers } from './MessageActions'
 import { TypingIndicator } from './TypingIndicator'
 
@@ -20,6 +20,7 @@ export interface Speaker {
 interface Props extends MessageActionHandlers {
   message: ChatMessage
   speaker: Speaker
+  skin?: RenderSkin | null
   isLast: boolean
   selected: boolean
   onSelect: () => void
@@ -30,7 +31,7 @@ interface Props extends MessageActionHandlers {
   onSwipe?: (index: number) => void
 }
 
-export function MessageBubble({ message, speaker, isLast, selected, onSelect, busy, editing, onEditSave, onEditCancel, onSwipe, ...handlers }: Props) {
+export function MessageBubble({ message, speaker, skin, isLast, selected, onSelect, busy, editing, onEditSave, onEditCancel, onSwipe, ...handlers }: Props) {
   const isUser = message.role === 'user'
   const swipes = message.swipes ?? []
   const swipeIndex = message.swipe_index ?? 0
@@ -65,7 +66,7 @@ export function MessageBubble({ message, speaker, isLast, selected, onSelect, bu
           {editing ? (
             <EditBox initial={message.content} onSave={onEditSave} onCancel={onEditCancel} />
           ) : (
-            <Markdown text={message.content} className={isUser ? '[&_a]:text-cv-cream-200 [&_code]:bg-white/15' : ''} />
+            <MessageContent text={message.content} role={message.role} skin={skin} className={isUser ? '[&_a]:text-cv-cream-200 [&_code]:bg-white/15' : ''} />
           )}
         </motion.div>
 
@@ -110,7 +111,7 @@ function EditBox({ initial, onSave, onCancel }: { initial: string; onSave: (v: s
 }
 
 /** Streaming reply that is not persisted yet. */
-export function StreamingBubble({ text, speaker }: { text: string; speaker: Speaker }) {
+export function StreamingBubble({ text, speaker, skin }: { text: string; speaker: Speaker; skin?: RenderSkin | null }) {
   return (
     <div className="cv_message_row cv_message_row_ai flex w-full items-end gap-2.5">
       <Avatar className="cv_message_avatar cv_ai_avatar size-9 rounded-cv-sm shadow-neu-sm">
@@ -119,7 +120,7 @@ export function StreamingBubble({ text, speaker }: { text: string; speaker: Spea
       </Avatar>
       <div className="flex max-w-[82%] min-w-0 flex-col gap-1 sm:max-w-[72%]">
         <div className="cv_message_bubble cv_ai_message_bubble glass-strong rounded-cv-lg rounded-bl-md px-4 py-2.5 text-cv-fg">
-          {text ? <Markdown text={text} /> : <TypingIndicator />}
+          {text ? <MessageContent text={text} role="assistant" skin={skin} /> : <TypingIndicator />}
         </div>
         <div className="px-1 text-[11px] text-cv-fg-subtle">{speaker.name} · 正在输入…</div>
       </div>

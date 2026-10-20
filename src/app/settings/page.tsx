@@ -1376,6 +1376,16 @@ export default function MyPage() {
 
               {/* 外观设置Tab */}
               <TabsContent value="appearance" className="space-y-6">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button type="button" onClick={() => router.push('/settings/appearance')} className="glass rounded-cv-lg p-4 text-left transition-shadow hover:shadow-glass">
+                    <div className="font-display text-lg font-semibold">主题与外观 →</div>
+                    <p className="mt-1 text-xs text-cv-fg-muted">内置主题、导入 / 导出主题 JSON、明暗模式</p>
+                  </button>
+                  <button type="button" onClick={() => router.push('/settings/presets')} className="glass rounded-cv-lg p-4 text-left transition-shadow hover:shadow-glass">
+                    <div className="font-display text-lg font-semibold">预设 →</div>
+                    <p className="mt-1 text-xs text-cv-fg-muted">酒馆式 prompt 预设：导入、排序、开关、采样参数</p>
+                  </button>
+                </div>
                 <Card className="shadow-lg border-slate-200 dark:border-slate-700">
                   <CardHeader className="pb-4">
                     <div className="flex items-center space-x-3">

@@ -9,7 +9,7 @@
 | P0 | 止血：删死代码、堵安全洞、升级依赖 | 0.5 天 | ✅ 2026-10-20（hotfix SQL 待在 dashboard 执行） |
 | P1 | 地基：设计 token、App 壳、鉴权中间件、数据层 | 1 天 | 🟡 2026-10-20 基本完成（baseline 迁移 + gen types 待你跑 CLI） |
 | P2 | 聊天核心重写：流式、预设驱动的 prompt 组装、消息组件 | 1.5 天 | 🟡 2026-10-20 代码完成，待你跑 0002 迁移 + 登录实测 |
-| P3 | 可定制化：预设导入/管理、主题导入、作者皮肤、HTML 块沙箱 | 1.5 天 | ⬜ |
+| P3 | 可定制化：预设导入/管理、主题导入、作者皮肤、HTML 块沙箱 | 1.5 天 | 🟡 2026-10-20 代码完成，待你跑 0003 迁移 + 登录实测 |
 | P4 | 其余页面换皮 + API 连接管理合并 | 1 天 | ⬜ |
 | P5 | 记忆 / 摘要 / 日记：schema 驱动重建 | 1 天 | ⬜ |
 | P6 | 加固：限流、日志、CSP、测试、性能 | 0.5 天 | ⬜ |
@@ -96,8 +96,8 @@
 | A5 | BYOK 模型 | key 继续留在客户端（IndexedDB/localStorage，不进 DB），每次请求带 `x-cv-key` header；**服务端只做鉴权 + 校验 + 转发 + 限流**，不落盘不打日志 | 隐私承诺不变；后续可选「加密同步到 Supabase」多设备 |
 | A6 | `baseUrl` 安全 | 服务端校验：必须 https、禁止 IP 字面量/私网/localhost/云元数据、禁止 `?#`、路径固定拼接；可选 host allowlist | 堵 SSRF |
 | A7 | 数据库 | 用 Supabase CLI 建 `supabase/migrations/0001_baseline.sql`，根目录全部 SQL 归档；`supabase gen types` 生成 `types/database.ts` 作为唯一类型来源 | 结束 3 份类型 + 33 个零散 SQL |
-| A8 | 主题系统 | 三层：① **App 主题** = `--cv-*` token JSON（可导入/导出，像酒馆主题）② **聊天皮肤** = 作者的 CSS（+可选 HTML 模板）作用于 `#cv-chat-root` ③ **消息内 HTML 块** = 正则脚本 → sandboxed iframe | 见 §5 |
-| A9 | 作者 CSS 隔离 | 用 `css-tree`/`postcss` 真解析：丢弃 `@import`/`@font-face` 外链/`url()` 非 allowlist/`position:fixed` 覆盖整屏；所有选择器加 `#cv-chat-root` 前缀（或 `@scope`） | 正则清洗挡不住 CSS 打点与假 UI |
+| A8 | 主题系统 | 三层：① **App 主题** = `--cv-*` token JSON（可导入/导出，像酒馆主题）② **聊天皮肤** = 作者的 CSS（+可选 HTML 模板）作用于 `#cv_chat_root` ③ **消息内 HTML 块** = 正则脚本 → sandboxed iframe | 见 §5 |
+| A9 | 作者 CSS 隔离 | 用 `css-tree`/`postcss` 真解析：丢弃 `@import`/`@font-face` 外链/`url()` 非 allowlist/`position:fixed` 覆盖整屏；所有选择器加 `#cv_chat_root` 前缀（或 `@scope`） | 正则清洗挡不住 CSS 打点与假 UI |
 | A10 | 作者 HTML/JS | `<iframe sandbox="allow-scripts">`（**不给** `allow-same-origin`）+ `srcdoc` + CSP meta + postMessage 回传高度；不渲染任何 HTML 到主文档 | 支持酒馆式美化卡（含 `<script>`）又不碰主站 origin |
 | A11 | Markdown | react-markdown + remark-gfm，`img`/`a` 走 host allowlist（Supabase storage + 用户自定义白名单），不启用 rehype-raw | 堵 markdown 图片外泄 |
 | A12 | 公开角色 | **发布即快照**：`characters` 增加 `published_snapshot jsonb + published_at`，explore / 他人开聊只读快照；作者改稿需手动「重新发布」 | 堵「活的注入通道」+ 作者隐私（`src/migrate.md` 已提过） |
@@ -187,7 +187,7 @@ docs/                       # 本文件 + design/
 导入 = 校验 schema（zod）→ 存 `user_themes` 表 + localStorage 缓存 → `applyTheme()` 写 `:root` 变量。导出就是这个 JSON。
 
 ### 5.5 作者定制的三个层级（对标酒馆）
-1. **聊天皮肤 CSS**（角色卡 `custom_css` → 迁到 `characters.skin jsonb`）：经 A9 清洗后作用于 `#cv-chat-root`。提供选择器文档 + 3 个预设 + 实时预览编辑器。
+1. **聊天皮肤 CSS**（角色卡 `custom_css` → 迁到 `characters.skin jsonb`）：经 A9 清洗后作用于 `#cv_chat_root`。提供选择器文档 + 3 个预设 + 实时预览编辑器。
 2. **消息内 HTML 块**：正则脚本（酒馆 regex script 格式：`find / replace / flags / trimStrings`，作用于 AI 输出显示层）把 `<qsm>…</qsm>` 之类的块替换成 HTML 模板 → `HtmlBlockFrame` 用 sandboxed iframe 渲染，自动高度。`mobile.html`、`rancheng.md` 就能直接跑。
 3. **全局 UI 主题**（上面的 JSON）：换整个 app 的皮。
 
@@ -274,18 +274,19 @@ docs/                       # 本文件 + design/
 
 ### P3 · 可定制化（1.5 天）
 目标：用户能导入预设和主题，作者能做皮肤，且安全。
-- [ ] 预设管理页 `settings/presets`：列表 / 导入（粘贴 JSON 或上传文件，自动识别酒馆格式）/ 导出 / 复制 / 设为默认
-- [ ] 预设编辑器（Prompt Manager）：条目拖拽排序、开关、编辑内容与 role、marker 条目显示「将填入：角色描述」等说明、采样参数滑块、token 预估
-- [ ] 聊天 header 快速切换预设；会话级覆盖
-- [ ] `lib/theme/schema.ts`（zod）+ `ThemeImportDialog`（粘贴 JSON / 上传文件 / 导出）+ `user_themes` 表
-- [ ] 内置主题：Warm Glass Light / Dark，再出 1 个「冷调碳黑」对标你 rancheng 卡的氛围
-- [ ] `lib/theme/sanitizeCss.ts`：css-tree 解析 → 白名单属性/at-rule → `url()` 仅允许 Supabase storage + 用户白名单 → 选择器加 `#cv-chat-root` 前缀 → 序列化
-- [ ] `characters.skin jsonb`（迁移 `prompt_template.custom_css`）+ `SkinEditor`（左代码右实时预览、选择器文档、3 预设）
-- [ ] 正则脚本：`characters.skin.regexScripts[]`，格式对齐酒馆（find / replace / flags / 作用于显示层）；支持导入酒馆 regex JSON
-- [ ] `HtmlBlockFrame`：sandboxed iframe + srcdoc + CSP meta + ResizeObserver→postMessage 高度；在 markdown 渲染管线里把正则替换出的 HTML 块交给它
-- [ ] 用 `docs/skin-samples/mobile.html`（`<qsm>` 手机聊天）和 `rancheng.md` 做端到端验证
-- [ ] Markdown `img`/`a` host allowlist（A11）
-- 验收：导入主题 JSON 全站变色；作者 CSS 无法影响聊天区以外；`<script>` 在 iframe 里跑、拿不到主站 cookie/localStorage
+- [x] 预设管理页 `settings/presets`：列表 / 导入（粘贴 JSON 或上传文件，自动识别酒馆格式）/ 导出 / 复制 / 设为默认
+- [x] 预设编辑器（Prompt Manager）：条目拖拽排序、开关、编辑内容与 role、marker 条目显示「将填入：角色描述」等说明、采样参数滑块、token 预估
+- [x] 会话级预设选择（会话设置面板）；header 显示当前模型 · 预设（快速切换下拉留到 P4 连接管理合并时一起做）
+- [x] `lib/theme/schema.ts`（zod）+ `ThemeImportDialog`（粘贴 JSON / 上传文件 / 导出）+ `user_themes` 表
+- [x] 内置主题：Warm Glass Light / Dark、Carbon Neon（冷调碳黑）、Sage Paper；`settings/appearance` 页 + `ThemeSync` 登录后同步 DB 里的激活主题
+- [x] `lib/skins/sanitizeCss.ts`：css-tree 解析 → 白名单属性/at-rule → `url()` 仅允许 Supabase storage + 用户白名单 → 选择器加 `#cv_chat_root` 前缀 → 序列化
+- [x] `characters.skin jsonb`（迁移 `prompt_template.custom_css`）+ `SkinEditor`（左代码右实时预览、选择器文档、3 预设）
+- [x] 正则脚本：`characters.skin.regexScripts[]`，格式对齐酒馆（find / replace / flags / 作用于显示层）；支持导入酒馆 regex JSON
+- [x] `HtmlBlockFrame`：sandboxed iframe + srcdoc + CSP meta + ResizeObserver→postMessage 高度；在 markdown 渲染管线里把正则替换出的 HTML 块交给它
+- [x] `src/lib/skins/__tests__/samples.test.ts` 用三份真实样本做回归（CSS 清洗后保留 >50% 且全部加了作用域、HTML 块能被切出）；视觉效果待登录实测
+- [x] Markdown `img`/`a` host allowlist（A11）
+- [ ] **需要你手动执行**：Supabase SQL editor 跑 `supabase/migrations/0003_skins_themes.sql`（`characters.skin` 列并回填旧 custom_css、`user_themes` 表）
+- 验收：`tsc` / `eslint` / `next build` 全绿 ✅；91 个测试通过 ✅；导入主题 JSON 全站变色、作者 CSS 不越界、iframe 里 `<script>` 拿不到主站 cookie —— **待你登录实测**（入口：我的 → 外观 / 预设；聊天 → 更多 → 角色皮肤）
 
 ### P4 · 页面换皮 + 连接管理（1 天）
 - [ ] `lib/connections/`：统一模型 `{ id, name, kind: 'openai-compatible'|'google'|'deepseek'|'anthropic', baseUrl?, apiKey, models[], isDefault }`；一次性迁移 `api_pool_config` / `named_relay_configs` / `api_key_*`；删 `apiManager`、`apiMigration`、`useApiConfig`、`ApiPoolManager`、`RelayServiceManager`、`ApiManagerModal`
