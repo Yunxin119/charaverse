@@ -52,7 +52,6 @@ import {
 import { supabase, type ChatSession, type Character, type ScriptCharacter, type ScriptCharacterContext } from '../../lib/supabase'
 import { sendMessageWithContext, getContextConfigSuggestions, regenerateMessageWithContext } from '../../lib/enhancedChatSlice'
 import { useApiConfig } from '../../lib/useApiConfig'
-import { ApiPoolManager } from '../../components/ApiPoolManager'
 import { ApiManagerModal } from '../../../components/ApiManagerModal'
 import { MultiCharacterManager } from '../../lib/multiCharacterManager'
 import { ChatCharacterSelector } from '../../components/ChatCharacterSelector'

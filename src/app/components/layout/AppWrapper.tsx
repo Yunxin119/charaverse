@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppSelector } from '../../store/hooks'
 import { BottomNavbar } from './BottomNavbar'
-import { PWAInstallPrompt, IOSInstallPrompt } from '../pwa/PWAInstallPrompt'
 
 export function AppWrapper({ children }: { children: React.ReactNode }) {
   const { user } = useAppSelector((state) => state.auth)
@@ -51,8 +50,6 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
     return (
       <>
         {children}
-        <PWAInstallPrompt />
-        <IOSInstallPrompt />
       </>
     )
   }
@@ -62,8 +59,6 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
     return (
       <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
         {children}
-        <PWAInstallPrompt />
-        <IOSInstallPrompt />
       </div>
     )
   }
@@ -99,8 +94,6 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
       <BottomNavbar />
       
       {/* PWA安装提示 */}
-      <PWAInstallPrompt />
-      <IOSInstallPrompt />
     </div>
   )
 }

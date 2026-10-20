@@ -1,0 +1,1917 @@
+<div id="cen-profile-container"
+    style="width: 100%; max-width: 400px; margin: 0 auto; padding: 12px 14px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif; color: #f5f7fa; box-sizing: border-box; position: relative;">
+
+    <style>
+        #cen-profile-container {
+            background: transparent;
+        }
+
+        /* 角色档案板块 */
+        .cen-profile-block {
+            width: 100%;
+            margin-bottom: 0;
+        }
+
+        /* design by censy — 论坛区（独立第二板块） */
+        .cen-forum {
+            width: 100%;
+            margin: 36px 0 6px;
+            padding: 8px 2px 4px;
+            box-sizing: border-box;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            position: relative;
+        }
+
+        .cen-forum::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: 10%;
+            right: 10%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 204, 153, 0.28), transparent);
+            pointer-events: none;
+        }
+
+        .cen-forum-heading {
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 9px;
+            letter-spacing: 2px;
+            color: rgba(255, 204, 153, 0.45);
+            margin: 0 0 4px 2px;
+            text-transform: uppercase;
+        }
+
+        .cen-forum-heading strong {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            color: rgba(255, 204, 153, 0.88);
+            margin-top: 4px;
+            text-transform: none;
+        }
+
+        .cen-forum-hint {
+            font-size: 11px;
+            color: rgba(245, 247, 250, 0.32);
+            margin: 0 0 12px 2px;
+            letter-spacing: 0.3px;
+        }
+
+        .cen-forum .bf-feed {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .cen-forum details.bf-thread {
+            border-radius: 14px;
+            overflow: hidden;
+            background: rgba(12, 12, 14, 0.55);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 204, 153, 0.14);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+            transition: border-color 0.25s;
+        }
+
+        .cen-forum details.bf-thread[open] {
+            border-color: rgba(255, 204, 153, 0.28);
+            background: rgba(12, 12, 14, 0.62);
+        }
+
+        .cen-forum .bf-thread-summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 12px 14px 12px 12px;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            background: linear-gradient(90deg, rgba(255, 204, 153, 0.04), transparent);
+        }
+
+        .cen-forum .bf-thread-summary::-webkit-details-marker,
+        .cen-forum .bf-thread-summary::marker {
+            display: none;
+        }
+
+        .cen-forum .bf-thread-summary:hover {
+            background: linear-gradient(90deg, rgba(255, 204, 153, 0.08), transparent);
+        }
+
+        .cen-forum .bf-chevron {
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
+            margin-top: 2px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 204, 153, 0.2);
+            background: rgba(255, 204, 153, 0.06);
+            position: relative;
+            transition: transform 0.28s ease, background 0.2s;
+        }
+
+        .cen-forum .bf-chevron::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 46%;
+            width: 6px;
+            height: 6px;
+            border-right: 1.5px solid rgba(255, 204, 153, 0.75);
+            border-bottom: 1.5px solid rgba(255, 204, 153, 0.75);
+            transform: translate(-50%, -60%) rotate(45deg);
+        }
+
+        .cen-forum details[open] .bf-chevron {
+            transform: rotate(180deg);
+            background: rgba(255, 204, 153, 0.12);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .cen-forum .bf-chevron,
+            .cen-forum details.bf-thread {
+                transition: none;
+            }
+        }
+
+        .cen-forum .bf-summary-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .cen-forum .bf-board {
+            display: inline-block;
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 9px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-bottom: 6px;
+            background: rgba(255, 204, 153, 0.1);
+            color: rgba(255, 204, 153, 0.75);
+            border: 1px solid rgba(255, 204, 153, 0.15);
+        }
+
+        .cen-forum .bf-thread-gossip .bf-board {
+            background: rgba(255, 180, 200, 0.08);
+            color: rgba(255, 200, 210, 0.85);
+            border-color: rgba(255, 180, 200, 0.15);
+        }
+
+        .cen-forum .bf-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: rgba(245, 247, 250, 0.92);
+            line-height: 1.4;
+            margin: 0 0 6px;
+        }
+
+        .cen-forum .bf-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 10px;
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 10px;
+            color: rgba(255, 204, 153, 0.4);
+            margin-bottom: 6px;
+        }
+
+        .cen-forum .bf-meta-hot {
+            color: #ffb84d;
+        }
+
+        .cen-forum .bf-teaser {
+            font-size: 12px;
+            line-height: 1.5;
+            color: rgba(245, 247, 250, 0.45);
+            margin: 0;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .cen-forum details[open] .bf-teaser {
+            display: none;
+        }
+
+        .cen-forum .bf-reply-panel {
+            border-top: 1px solid rgba(255, 204, 153, 0.08);
+            max-height: min(36vh, 300px);
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            background: transparent;
+        }
+
+        .cen-forum .bf-reply-panel::-webkit-scrollbar {
+            width: 3px;
+        }
+
+        .cen-forum .bf-reply-panel::-webkit-scrollbar-thumb {
+            background: rgba(255, 204, 153, 0.25);
+            border-radius: 3px;
+        }
+
+        .cen-forum .bf-floor {
+            display: flex;
+            gap: 8px;
+            padding: 10px 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+            font-size: 13px;
+        }
+
+        .cen-forum .bf-floor-op {
+            background: linear-gradient(90deg, rgba(255, 204, 153, 0.07), transparent 65%);
+            border-top: none;
+        }
+
+        .cen-forum .bf-floor-side {
+            flex-shrink: 0;
+            width: 34px;
+            text-align: center;
+        }
+
+        .cen-forum .bf-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: var(--av-bg, rgba(255, 204, 153, 0.08));
+            color: var(--av-fg, rgba(255, 204, 153, 0.7));
+            font-size: 10px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 3px;
+            border: 1px solid rgba(255, 204, 153, 0.1);
+        }
+
+        .cen-forum .bf-floor-id {
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 9px;
+            font-weight: 600;
+            color: rgba(255, 204, 153, 0.35);
+        }
+
+        .cen-forum .bf-floor-op .bf-floor-id {
+            color: rgba(255, 204, 153, 0.7);
+        }
+
+        .cen-forum .bf-floor-main {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .cen-forum .bf-floor-top {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+
+        .cen-forum .bf-nick {
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255, 204, 153, 0.82);
+        }
+
+        .cen-forum .bf-time {
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 10px;
+            color: rgba(245, 247, 250, 0.28);
+            flex-shrink: 0;
+        }
+
+        .cen-forum .bf-body {
+            line-height: 1.55;
+            color: rgba(245, 247, 250, 0.78);
+            word-break: break-word;
+        }
+
+        .cen-forum .bf-body p {
+            margin: 0 0 6px;
+        }
+
+        .cen-forum .bf-body p:last-child {
+            margin-bottom: 0;
+        }
+
+        .cen-forum .bf-op-list {
+            margin: 6px 0;
+            padding-left: 1.1em;
+            color: rgba(245, 247, 250, 0.6);
+            font-size: 12px;
+        }
+
+        .cen-forum .bf-op-list li {
+            margin-bottom: 3px;
+        }
+
+        .cen-forum .bf-quote {
+            margin-top: 6px;
+            padding: 8px 10px;
+            background: rgba(255, 204, 153, 0.05);
+            border-left: 2px solid rgba(255, 204, 153, 0.35);
+            border-radius: 0 6px 6px 0;
+            font-size: 12px;
+            color: rgba(245, 247, 250, 0.5);
+            font-style: italic;
+        }
+
+        .cen-forum .bf-ref {
+            color: rgba(255, 204, 153, 0.9);
+        }
+
+        .cen-forum .bf-floor-ad .bf-nick,
+        .cen-forum .bf-floor-ad .bf-body {
+            color: rgba(245, 247, 250, 0.3);
+            font-size: 11px;
+        }
+
+        .cen-forum .bf-link-card {
+            display: block;
+            margin-top: 4px;
+            padding: 8px 10px;
+            background: rgba(255, 204, 153, 0.05);
+            border-radius: 6px;
+            color: rgba(255, 204, 153, 0.75);
+            font-size: 12px;
+            border: 1px dashed rgba(255, 204, 153, 0.18);
+        }
+
+        .cen-forum .bf-status-block {
+            margin: 0;
+            padding: 8px 10px;
+            background: rgba(255, 204, 153, 0.05);
+            border-radius: 6px;
+            font-size: 12px;
+            line-height: 1.65;
+            color: rgba(245, 247, 250, 0.65);
+            border: 1px solid rgba(255, 204, 153, 0.08);
+        }
+
+        .cen-forum .bf-status-block span {
+            display: block;
+        }
+
+        /* ============ 滚动条 ============ */
+        #cen-profile-container .cen-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        #cen-profile-container .cen-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #cen-profile-container .cen-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 204, 153, 0.25);
+            border-radius: 2px;
+        }
+
+        #cen-profile-container .cen-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 204, 153, 0.5);
+        }
+
+        /* ============ 翻转卡 ============ */
+        #cen-profile-container .cen-flip-scene {
+            perspective: 1100px;
+            width: 100%;
+            margin-bottom: 4px;
+        }
+
+        #cen-profile-container .cen-flip-card {
+            position: relative;
+            width: 100%;
+            min-height: 460px;
+            transform-style: preserve-3d;
+            transition: transform 0.65s cubic-bezier(0.4, 0.2, 0.2, 1);
+        }
+
+        #cen-profile-container .cen-flip-card.is-flipped {
+            transform: rotateY(180deg);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            #cen-profile-container .cen-flip-card {
+                transition: none;
+            }
+        }
+
+        #cen-profile-container .cen-face {
+            position: absolute;
+            inset: 0;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            border-radius: 16px;
+            overflow: hidden;
+            background: rgba(12, 12, 14, 0.92);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 204, 153, 0.15);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            box-sizing: border-box;
+        }
+
+        #cen-profile-container .cen-face-front {
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        #cen-profile-container .cen-face-back {
+            transform: rotateY(180deg);
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        #cen-profile-container .cen-card-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            background-image: url('https://s3.uuu.ovh/2026/05/19/ECROn0Dz.jpg');
+            background-size: cover;
+            background-position: center top;
+            filter: sepia(15%) contrast(1.08) brightness(0.78) saturate(0.9);
+        }
+
+        #cen-profile-container .cen-card-bg::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(12, 12, 14, 0.15) 0%, rgba(12, 12, 14, 0.55) 45%, rgba(12, 12, 14, 0.98) 100%);
+        }
+
+        #cen-profile-container .cen-face-front::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            pointer-events: none;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.04) 2px, rgba(0, 0, 0, 0.04) 3px);
+        }
+
+        #cen-profile-container .cen-card-top {
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            right: 14px;
+            z-index: 3;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 9px;
+            color: rgba(255, 204, 153, 0.75);
+            letter-spacing: 1.5px;
+        }
+
+        #cen-profile-container .cen-card-top-l {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #cen-profile-container .cen-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #6dd56d;
+            box-shadow: 0 0 8px rgba(109, 213, 109, 0.7);
+            animation: cen-pulse 1.6s ease-in-out infinite;
+        }
+
+        @keyframes cen-pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        #cen-profile-container .cen-card-body {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 3;
+            padding: 18px 18px 52px;
+        }
+
+        #cen-profile-container .cen-team {
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 9px;
+            color: rgba(255, 204, 153, 0.6);
+            letter-spacing: 2px;
+            margin-bottom: 4px;
+        }
+
+        #cen-profile-container .cen-num {
+            font-size: 72px;
+            font-weight: 800;
+            color: #ffcc99;
+            line-height: 0.85;
+            text-shadow: 0 0 20px rgba(255, 204, 153, 0.35);
+            font-family: 'SF Mono', Menlo, monospace;
+            letter-spacing: -2px;
+        }
+
+        #cen-profile-container .cen-name {
+            font-size: 14px;
+            font-weight: 300;
+            letter-spacing: 4px;
+            margin-top: 8px;
+            color: rgba(245, 247, 250, 0.9);
+        }
+
+        #cen-profile-container .cen-name-cn {
+            font-size: 12px;
+            letter-spacing: 6px;
+            color: rgba(255, 204, 153, 0.55);
+            margin-top: 4px;
+        }
+
+        #cen-profile-container .cen-card-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 12px;
+            margin-top: 16px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(255, 204, 153, 0.12);
+        }
+
+        #cen-profile-container .cen-card-stat-label {
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 8px;
+            color: rgba(255, 204, 153, 0.45);
+            letter-spacing: 1px;
+            margin-bottom: 3px;
+        }
+
+        #cen-profile-container .cen-card-stat-val {
+            font-size: 12px;
+            color: rgba(245, 247, 250, 0.88);
+            line-height: 1.35;
+        }
+
+        #cen-profile-container .cen-flip-hint {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 4;
+            padding: 12px 18px 14px;
+            text-align: center;
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 10px;
+            letter-spacing: 2px;
+            color: rgba(255, 204, 153, 0.65);
+            background: linear-gradient(0deg, rgba(12, 12, 14, 0.95) 0%, transparent 100%);
+            pointer-events: none;
+        }
+
+        #cen-profile-container .cen-flip-hint::after {
+            content: ' ›';
+            display: inline-block;
+            animation: cen-hint-nudge 1.4s ease-in-out infinite;
+        }
+
+        @keyframes cen-hint-nudge {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            50% {
+                transform: translateX(4px);
+            }
+        }
+
+        #cen-profile-container .cen-back-header {
+            flex-shrink: 0;
+            padding: 14px 16px 10px;
+            border-bottom: 1px solid rgba(255, 204, 153, 0.1);
+        }
+
+        #cen-profile-container .cen-flip-back-btn {
+            background: rgba(255, 204, 153, 0.08);
+            border: 1px solid rgba(255, 204, 153, 0.2);
+            color: rgba(255, 204, 153, 0.85);
+            font-size: 12px;
+            letter-spacing: 1px;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s, border-color 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #cen-profile-container .cen-flip-back-btn:hover,
+        #cen-profile-container .cen-flip-back-btn:active {
+            background: rgba(255, 204, 153, 0.15);
+            border-color: rgba(255, 204, 153, 0.35);
+        }
+
+        #cen-profile-container .cen-detail-body {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 14px 16px 16px;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        #cen-profile-container .cen-corner {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            z-index: 3;
+            border: 1px solid rgba(255, 204, 153, 0.4);
+        }
+
+        #cen-profile-container .cen-corner.tl {
+            top: 8px;
+            left: 8px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        #cen-profile-container .cen-corner.br {
+            bottom: 8px;
+            right: 8px;
+            border-left: none;
+            border-top: none;
+        }
+
+        /* ============ 导航 ============ */
+        #cen-profile-container .cen-nav {
+            display: flex;
+            width: 100%;
+            gap: 0;
+            border-bottom: 1px solid rgba(255, 204, 153, 0.12);
+            padding-bottom: 12px;
+            margin-bottom: 14px;
+            flex-shrink: 0;
+        }
+
+        #cen-profile-container .cen-nav-btn {
+            flex: 1;
+            min-width: 0;
+            color: rgba(245, 247, 250, 0.4);
+            font-size: 12px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.25s ease;
+            letter-spacing: 1px;
+            user-select: none;
+            text-align: center;
+            padding: 2px 4px 0;
+            box-sizing: border-box;
+        }
+
+        #cen-profile-container .cen-nav-btn:not(:last-child) {
+            border-right: 1px solid rgba(255, 204, 153, 0.08);
+        }
+
+        #cen-profile-container .cen-nav-btn::before {
+            content: attr(data-en);
+            display: block;
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 7px;
+            letter-spacing: 0.5px;
+            opacity: 0.5;
+            margin-bottom: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #cen-profile-container .cen-nav-btn:hover {
+            color: rgba(255, 204, 153, 0.7);
+        }
+
+        #cen-profile-container .cen-nav-btn.active {
+            color: #ffcc99;
+            text-shadow: 0 0 10px rgba(255, 204, 153, 0.35);
+        }
+
+        #cen-profile-container .cen-nav-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: #ffcc99;
+            box-shadow: 0 0 10px rgba(255, 204, 153, 0.6);
+        }
+
+        /* ============ 面板 ============ */
+        #cen-profile-container .cen-panel {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 12px;
+        }
+
+        #cen-profile-container .cen-panel.active {
+            display: block;
+            flex: 1;
+            min-height: 0;
+            animation: cen-fade 0.4s ease;
+        }
+
+        #cen-profile-container #cen-tab-3.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        @keyframes cen-fade {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ============ 通用排版 ============ */
+        #cen-profile-container .cen-section-title {
+            font-size: 10px;
+            color: #ffcc99;
+            letter-spacing: 2.5px;
+            font-family: 'SF Mono', Menlo, monospace;
+            opacity: 0.85;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #cen-profile-container .cen-section-title::before {
+            content: '';
+            width: 3px;
+            height: 10px;
+            background: #ffcc99;
+            box-shadow: 0 0 6px rgba(255, 204, 153, 0.5);
+        }
+
+        #cen-profile-container .cen-section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, rgba(255, 204, 153, 0.2), transparent);
+        }
+
+        /* 引言 */
+        #cen-profile-container .cen-quote {
+            position: relative;
+            padding: 14px 16px 14px 32px;
+            margin-bottom: 22px;
+            font-size: 13.5px;
+            font-weight: 300;
+            line-height: 1.6;
+            color: rgba(245, 247, 250, 0.92);
+            font-style: italic;
+            background: linear-gradient(90deg, rgba(255, 204, 153, 0.05), rgba(255, 204, 153, 0.01));
+            border-left: 2px solid #ffcc99;
+            border-radius: 0 6px 6px 0;
+        }
+
+        #cen-profile-container .cen-quote::before {
+            content: '"';
+            position: absolute;
+            left: 10px;
+            top: 4px;
+            font-size: 32px;
+            color: #ffcc99;
+            opacity: 0.5;
+            font-family: Georgia, serif;
+            line-height: 1;
+        }
+
+        /* 基础信息网格 */
+        #cen-profile-container .cen-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin-bottom: 22px;
+        }
+
+        @media (min-width: 360px) {
+            #cen-profile-container .cen-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px 14px;
+            }
+        }
+
+        #cen-profile-container .cen-item {
+            font-size: 12px;
+            line-height: 1.4;
+            color: rgba(245, 247, 250, 0.55);
+        }
+
+        #cen-profile-container .cen-item-label {
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 9px;
+            letter-spacing: 1.5px;
+            opacity: 0.7;
+            margin-bottom: 3px;
+        }
+
+        #cen-profile-container .cen-item-val {
+            color: #f5f7fa;
+            font-size: 13px;
+            font-weight: 400;
+        }
+
+        /* 描述段 */
+        #cen-profile-container .cen-desc {
+            font-size: 13px;
+            line-height: 1.75;
+            color: rgba(245, 247, 250, 0.78);
+            margin-bottom: 20px;
+        }
+
+        #cen-profile-container .cen-desc em {
+            color: rgba(255, 204, 153, 0.75);
+            font-style: italic;
+            font-size: 12px;
+        }
+
+        /* 行为模式 bullets */
+        #cen-profile-container .cen-bullets {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 20px 0;
+        }
+
+        #cen-profile-container .cen-bullets li {
+            font-size: 13px;
+            line-height: 1.65;
+            color: rgba(245, 247, 250, 0.78);
+            padding-left: 18px;
+            position: relative;
+            margin-bottom: 7px;
+        }
+
+        #cen-profile-container .cen-bullets li::before {
+            content: '▸';
+            position: absolute;
+            left: 0;
+            top: 0;
+            color: #ffcc99;
+            font-size: 11px;
+        }
+
+        /* 雷区 */
+        #cen-profile-container .cen-danger {
+            border: 1px solid rgba(255, 107, 107, 0.25);
+            background: rgba(255, 80, 80, 0.05);
+            padding: 14px 16px;
+            border-radius: 6px;
+            margin-top: 6px;
+            position: relative;
+        }
+
+        #cen-profile-container .cen-danger-title {
+            color: #ff7b7b;
+            font-size: 10px;
+            font-family: 'SF Mono', Menlo, monospace;
+            letter-spacing: 1.5px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #cen-profile-container .cen-danger-title::before {
+            content: '⚠';
+            font-size: 11px;
+        }
+
+        #cen-profile-container .cen-danger ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        #cen-profile-container .cen-danger li {
+            font-size: 12.5px;
+            color: rgba(245, 247, 250, 0.75);
+            line-height: 1.6;
+            padding-left: 14px;
+            position: relative;
+            margin-bottom: 4px;
+        }
+
+        #cen-profile-container .cen-danger li::before {
+            content: '—';
+            position: absolute;
+            left: 0;
+            color: rgba(255, 107, 107, 0.6);
+        }
+
+        /* ============ 关系卡 ============ */
+        #cen-profile-container .cen-rel-group {
+            margin-bottom: 22px;
+        }
+
+        #cen-profile-container .cen-rel-card {
+            display: flex;
+            gap: 12px;
+            padding: 11px 0;
+            border-bottom: 1px dashed rgba(255, 204, 153, 0.08);
+        }
+
+        #cen-profile-container .cen-rel-card:last-child {
+            border-bottom: none;
+        }
+
+        #cen-profile-container .cen-rel-tag {
+            flex-shrink: 0;
+            min-width: 48px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 10px;
+            letter-spacing: 1px;
+            color: #ffcc99;
+            border: 1px solid rgba(255, 204, 153, 0.3);
+            border-radius: 3px;
+            background: rgba(255, 204, 153, 0.04);
+        }
+
+        #cen-profile-container .cen-rel-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        #cen-profile-container .cen-rel-head {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 4px;
+            flex-wrap: wrap;
+        }
+
+        #cen-profile-container .cen-rel-name {
+            font-size: 13.5px;
+            font-weight: 500;
+            color: #f5f7fa;
+        }
+
+        #cen-profile-container .cen-rel-meta {
+            font-size: 11px;
+            color: rgba(245, 247, 250, 0.4);
+            font-family: 'SF Mono', Menlo, monospace;
+        }
+
+        #cen-profile-container .cen-rel-desc {
+            font-size: 12.5px;
+            line-height: 1.55;
+            color: rgba(245, 247, 250, 0.68);
+        }
+
+        /* ============ 时间轴 ============ */
+        #cen-profile-container .cen-timeline {
+            position: relative;
+            padding-left: 26px;
+            margin-top: 10px;
+        }
+
+        #cen-profile-container .cen-timeline::before {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 4px;
+            bottom: 4px;
+            width: 1px;
+            background: linear-gradient(180deg, rgba(255, 204, 153, 0.5), rgba(255, 204, 153, 0.05));
+        }
+
+        #cen-profile-container .cen-tl-item {
+            position: relative;
+            margin-bottom: 18px;
+        }
+
+        #cen-profile-container .cen-tl-item:last-child {
+            margin-bottom: 4px;
+        }
+
+        #cen-profile-container .cen-tl-item::before {
+            content: '';
+            position: absolute;
+            left: -23px;
+            top: 5px;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #ffcc99;
+            box-shadow: 0 0 8px rgba(255, 204, 153, 0.4);
+        }
+
+        #cen-profile-container .cen-tl-item.major::before {
+            width: 11px;
+            height: 11px;
+            left: -24px;
+            top: 4px;
+            background: #ffcc99;
+            box-shadow: 0 0 12px rgba(255, 204, 153, 0.7);
+        }
+
+        #cen-profile-container .cen-tl-age {
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 10px;
+            color: #ffcc99;
+            letter-spacing: 1.5px;
+            margin-bottom: 4px;
+            display: inline-block;
+            padding: 2px 7px;
+            background: rgba(255, 204, 153, 0.08);
+            border-radius: 3px;
+        }
+
+        #cen-profile-container .cen-tl-text {
+            font-size: 12.5px;
+            line-height: 1.65;
+            color: rgba(245, 247, 250, 0.78);
+            margin-top: 5px;
+        }
+
+        #cen-profile-container .cen-tl-outro {
+            margin-top: 18px;
+            padding: 12px 14px;
+            background: rgba(255, 204, 153, 0.04);
+            border-radius: 6px;
+            border-left: 2px solid rgba(255, 204, 153, 0.4);
+            font-size: 12.5px;
+            line-height: 1.6;
+            color: rgba(245, 247, 250, 0.7);
+            font-style: italic;
+        }
+
+        /* 战绩条 */
+        #cen-profile-container .cen-resume-strip {
+            margin: 2px 0 4px;
+        }
+
+        #cen-profile-container .cen-resume-strip span {
+            display: block;
+            font-size: 12.5px;
+            color: rgba(245, 247, 250, 0.72);
+            padding: 8px 0;
+            border-bottom: 1px dashed rgba(255, 204, 153, 0.1);
+        }
+
+        #cen-profile-container .cen-resume-strip span:last-child {
+            border-bottom: none;
+        }
+
+        #cen-profile-container .cen-resume-strip b {
+            display: inline-block;
+            min-width: 64px;
+            color: #ffcc99;
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 11px;
+            letter-spacing: 1px;
+            margin-right: 10px;
+        }
+
+        /* ============ 黑匣子 ============ */
+        #cen-profile-container .cen-blind-box {
+            position: relative;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #cen-profile-container .cen-blind-content {
+            filter: blur(8px);
+            opacity: 0.35;
+            transition: filter 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.6s;
+            pointer-events: none;
+            user-select: none;
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 12px;
+            padding-bottom: 12px;
+        }
+
+        #cen-profile-container .cen-blind-content.warning {
+            filter: blur(4px);
+            opacity: 0.55;
+        }
+
+        #cen-profile-container .cen-blind-content.unlocked {
+            filter: blur(0);
+            opacity: 1;
+            pointer-events: auto;
+            user-select: auto;
+        }
+
+        #cen-profile-container .cen-blind-item {
+            margin-bottom: 14px;
+            padding: 11px 14px;
+            background: rgba(255, 255, 255, 0.02);
+            border-left: 1px solid rgba(255, 204, 153, 0.25);
+            border-radius: 0 4px 4px 0;
+        }
+
+        #cen-profile-container .cen-blind-num {
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 9px;
+            color: rgba(255, 204, 153, 0.7);
+            letter-spacing: 1.5px;
+            margin-bottom: 5px;
+        }
+
+        #cen-profile-container .cen-blind-name {
+            font-size: 13px;
+            color: #ffcc99;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        #cen-profile-container .cen-blind-desc {
+            font-size: 12.5px;
+            line-height: 1.7;
+            color: rgba(245, 247, 250, 0.78);
+        }
+
+        /* 滑块区 */
+        #cen-profile-container .cen-slider-area {
+            flex-shrink: 0;
+            margin-top: 14px;
+            padding: 14px 16px;
+            background: rgba(20, 20, 25, 0.7);
+            border: 1px dashed rgba(255, 204, 153, 0.25);
+            border-radius: 6px;
+            text-align: center;
+            backdrop-filter: blur(5px);
+        }
+
+        #cen-profile-container .cen-status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        #cen-profile-container .cen-status-text {
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 10px;
+            color: rgba(245, 247, 250, 0.4);
+            letter-spacing: 1.5px;
+            transition: color 0.3s;
+        }
+
+        #cen-profile-container .cen-status-text.warn {
+            color: #ffb84d;
+        }
+
+        #cen-profile-container .cen-status-text.ok {
+            color: #ffcc99;
+            text-shadow: 0 0 8px rgba(255, 204, 153, 0.4);
+        }
+
+        #cen-profile-container .cen-status-pct {
+            font-family: 'SF Mono', Menlo, monospace;
+            font-size: 10px;
+            color: rgba(255, 204, 153, 0.6);
+            letter-spacing: 1px;
+        }
+
+        #cen-profile-container .cen-range {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.08);
+            outline: none;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        #cen-profile-container .cen-range::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 28px;
+            height: 14px;
+            background: linear-gradient(180deg, #ffd9b3, #ffcc99);
+            border-radius: 2px;
+            cursor: pointer;
+            box-shadow: 0 0 12px rgba(255, 204, 153, 0.5);
+            transition: transform 0.1s;
+        }
+
+        #cen-profile-container .cen-range::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+
+        #cen-profile-container .cen-range::-moz-range-thumb {
+            width: 28px;
+            height: 14px;
+            background: #ffcc99;
+            border-radius: 2px;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 12px rgba(255, 204, 153, 0.5);
+        }
+    </style>
+
+    <div class="cen-profile-block" aria-label="角色档案">
+    <div class="cen-flip-scene">
+        <div class="cen-flip-card" id="cen-flip-card">
+    
+            <!-- 正面：角色卡 -->
+            <div class="cen-face cen-face-front" id="cen-face-front" role="button" tabindex="0" aria-label="点击查看角色详情">
+                <div class="cen-card-bg"></div>
+                <div class="cen-corner tl"></div>
+                <div class="cen-corner br"></div>
+                <div class="cen-card-top">
+                    <div class="cen-card-top-l">
+                        <div class="cen-dot"></div>
+                        <span>ONLINE</span>
+                    </div>
+                    <span>2026 SEASON</span>
+                </div>
+                <div class="cen-card-body">
+                    <div class="cen-team">VOLTA RACING</div>
+                    <div class="cen-num">17</div>
+                    <div class="cen-name">RAN CHENG</div>
+                    <div class="cen-name-cn">程 冉</div>
+                    <div class="cen-card-stats">
+                        <div>
+                            <div class="cen-card-stat-label">AGE / NATIONALITY</div>
+                            <div class="cen-card-stat-val">24 岁 / 中国</div>
+                        </div>
+                        <div>
+                            <div class="cen-card-stat-label">PHYSICAL</div>
+                            <div class="cen-card-stat-val">192cm / 82kg</div>
+                        </div>
+                        <div>
+                            <div class="cen-card-stat-label">CAREER</div>
+                            <div class="cen-card-stat-val">GT3 @ Volta #17</div>
+                        </div>
+                        <div>
+                            <div class="cen-card-stat-label">MBTI</div>
+                            <div class="cen-card-stat-val">ISTP-A</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="cen-flip-hint">点击查看档案</div>
+            </div>
+    
+            <!-- 背面：详情 -->
+            <div class="cen-face cen-face-back">
+                <div class="cen-back-header">
+                    <button type="button" class="cen-flip-back-btn" id="cen-flip-back-btn">← 角色卡</button>
+                </div>
+                <div class="cen-detail-body">
+    
+                    <!-- 导航 -->
+                    <div class="cen-nav">
+                        <div class="cen-nav-btn active" data-en="ARCHIVE" onclick="cenSwitchTab(0)">档案</div>
+                        <div class="cen-nav-btn" data-en="NETWORK" onclick="cenSwitchTab(1)">关系</div>
+                        <div class="cen-nav-btn" data-en="TIMELINE" onclick="cenSwitchTab(2)">履历</div>
+                        <div class="cen-nav-btn" data-en="BLACK BOX" onclick="cenSwitchTab(3)">黑匣子</div>
+                    </div>
+    
+                    <!-- ============ TAB 1: 档案 ============ -->
+                    <div class="cen-panel cen-scroll active" id="cen-tab-0">
+    
+                        <div class="cen-quote">我没有什么非做不可的事,但这件事我做的时候不想停下来。</div>
+    
+                        <div class="cen-section-title">长什么样</div>
+                        <div class="cen-desc">
+                            192。肩宽腰窄,深棕色眼睛,黑棕色头发。<br>
+                            不笑的时候压迫感拉满,一笑全归零。<br>
+                            穿衣不贵但挑质感:oversize、纯色卫衣、工装、几条还行的牛仔。
+                        </div>
+    
+                        <div class="cen-section-title">大概是个什么人</div>
+                        <ul class="cen-bullets">
+                            <li>在车上 0.2 秒能感觉出后轴不对,问他为什么,他也说不清</li>
+                            <li>怕。所以练得比谁都多。风险在他这儿是道工程题,不是命</li>
+                            <li>对陌生人客气,对熟人放飞;嘴炮密度可观,且对所有人均等地骚</li>
+                            <li><em>"这哥们儿真好聊"聊完发现啥也没问出来</em></li>
+                        </ul>
+    
+                        <div class="cen-danger">
+                            <div class="cen-danger-title">PROHIBITED ZONE / 雷区</div>
+                            <ul>
+                                <li>煽情、强行升华、"我以为你是 XX 样的人"</li>
+                                <li>拿安全规程不当回事</li>
+                                <li>不懂装懂</li>
+                            </ul>
+                        </div>
+    
+                    </div>
+    
+                    <!-- ============ TAB 2: 关系 ============ -->
+                    <div class="cen-panel cen-scroll" id="cen-tab-1">
+    
+                        <div class="cen-section-title">家族</div>
+                        <div class="cen-rel-group">
+                            <div class="cen-rel-card">
+                                <div class="cen-rel-tag">父亲</div>
+                                <div class="cen-rel-body">
+                                    <div class="cen-rel-head"><span class="cen-rel-name">程向东</span><span
+                                            class="cen-rel-meta">52 ·
+                                            东升集团老大</span></div>
+                                    <div class="cen-rel-desc">中式大爹,鳏夫。家庭群里全是养生推送和"秋裤穿了没"。嘴上说"比赛我不看,心脏受不了",赛后回放一帧不落。</div>
+                                </div>
+                            </div>
+                            <div class="cen-rel-card">
+                                <div class="cen-rel-tag">哥哥</div>
+                                <div class="cen-rel-body">
+                                    <div class="cen-rel-head"><span class="cen-rel-name">程遇</span><span
+                                            class="cen-rel-meta">29 ·
+                                            程总</span></div>
+                                    <div class="cen-rel-desc">妈走后当半个家长把他拉扯大。标准精英,话少,外表 INTJ、内里 ISFJ 的闷骚男。</div>
+                                </div>
+                            </div>
+                        </div>
+    
+                        <div class="cen-section-title">车队</div>
+                        <div class="cen-rel-group">
+                            <div class="cen-rel-card">
+                                <div class="cen-rel-tag">挚友</div>
+                                <div class="cen-rel-body">
+                                    <div class="cen-rel-head"><span class="cen-rel-name">Luca Romano-Wu</span><span
+                                            class="cen-rel-meta">24 · 中意混血</span></div>
+                                    <div class="cen-rel-desc">队友。输了哭，赢了亲遍全场,头盔一戴六亲不认的攻击型车手。正统青训出身。</div>
+                                </div>
+                            </div>
+                            <div class="cen-rel-card">
+                                <div class="cen-rel-tag">挚友</div>
+                                <div class="cen-rel-body">
+                                    <div class="cen-rel-head"><span class="cen-rel-name">James "Jamie"
+                                            Whitmore</span><span class="cen-rel-meta">26 · 利物浦</span></div>
+                                    <div class="cen-rel-desc">队友,力量型。利物浦死忠,Pub 选手，烂梗王。</div>
+                                </div>
+                            </div>
+                            <div class="cen-rel-card">
+                                <div class="cen-rel-tag">老板</div>
+                                <div class="cen-rel-body">
+                                    <div class="cen-rel-head"><span class="cen-rel-name">Roberto</span><span
+                                            class="cen-rel-meta">50+ · 车队 BOSS</span></div>
+                                    <div class="cen-rel-desc">当年在模拟器里被程冉套了一圈,不信邪找上门,试车当场签人。私下叫他"Ranni",亦父亦师亦友。</div>
+                                </div>
+                            </div>
+                            <div class="cen-rel-card">
+                                <div class="cen-rel-tag">同事</div>
+                                <div class="cen-rel-body">
+                                    <div class="cen-rel-head"><span class="cen-rel-name">Tom · Elena · Giulia ·
+                                            Pietro</span><span class="cen-rel-meta">数据 · 工程 · 理疗 · 公关</span></div>
+                                    <div class="cen-rel-desc">专业、克制、互相尊重。公关 Pietro 每次都求他发微博前给看一眼,他每次"好",每次都不给看。</div>
+                                </div>
+                            </div>
+                        </div>
+    
+                        <div class="cen-section-title">二子</div>
+                        <div class="cen-rel-group">
+                            <div class="cen-rel-card">
+                                <div class="cen-rel-tag">大儿子</div>
+                                <div class="cen-rel-body">
+                                    <div class="cen-rel-head"><span class="cen-rel-name">蒙扎</span><span
+                                            class="cen-rel-meta">橘白 ·
+                                            已绝育</span></div>
+                                    <div class="cen-rel-desc">Monza 赛道边停车场捡的。胖、憨、吃饭第一名。</div>
+                                </div>
+                            </div>
+                            <div class="cen-rel-card">
+                                <div class="cen-rel-tag">二儿子</div>
+                                <div class="cen-rel-body">
+                                    <div class="cen-rel-head"><span class="cen-rel-name">斯帕</span><span
+                                            class="cen-rel-meta">黑猫 ·
+                                            已绝育</span></div>
+                                    <div class="cen-rel-desc">Spa 站后台捡的。瘦长、神经质、跳得贼高,专治蒙扎,能把哥哥按在地上摩擦。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+    
+                    </div>
+    
+                    <!-- ============ TAB 3: 履历 ============ -->
+                    <div class="cen-panel cen-scroll" id="cen-tab-2">
+    
+                        <div class="cen-section-title">他怎么一路开上来的</div>
+    
+                        <div class="cen-desc">
+                            江浙潮男,东升集团的二少爷。<strong
+                                style="color:#ffcc99;">五岁那年妈妈出车祸走了</strong>那时候他太小,没留下完整的记忆。爸爸一头扎进公司,大五岁的哥哥当半个家长把他带大。听着像苦情剧开头,他本人讲起来通常就一句:"挺好的,我哥菜烧得不错。"
+                        </div>
+    
+                        <div class="cen-desc">
+                            工科天赋显形得早,18 岁顺理成章去 CMU 念电子工程。大一闲得发慌,在 iRacing 上开了直播,ID <strong
+                                style="color:#ffcc99;">@今天不学了</strong>。iRacing这波捡到鬼了。他爸以为他在打游戏，没管。
+                        </div>
+    
+                        <div class="cen-desc">
+                            19 岁在直播里把Roberto套了圈，Roberto邀请他去试车。试车当天车队当场拍了青训合同,<strong
+                                style="color:#ffcc99;">他考虑了五分钟。</strong>然后回 CMU 办了休学,瞒了他爸两个月。
+                        </div>
+    
+                        <div class="cen-desc">
+                            纸终归包不住火。老程气到断卡:好端端的学校说不读就不读,何况老婆就是车祸走的。那一年他靠模拟器奖金、青训补贴和第一笔小代言撑过来,哥哥转的钱被他原封退回。直到程遇飞去意大利看了一场比赛,回家跟老头讲了一个钟头。第二天老程来电话,第一句是:<em>"在那边吃得怎么样。"</em>
+                        </div>
+    
+                        <div class="cen-section-title">战绩 </div>
+                        <div class="cen-resume-strip">
+                            <span><b>19</b> 休学,进 Volta 青训</span>
+                            <span><b>19–21</b> GT4 一路往上爬</span>
+                            <span><b>22</b> 升 GT3,下半赛季开窍</span>
+                            <span><b>23</b> 首登 GT3 分站冠军领奖台</span>
+                            <span><b>24 · NOW</b> Volta 现役主力 · #17</span>
+                        </div>
+    
+                        <div class="cen-tl-outro">
+                            野路子上来的。F1/F2 体系里的人私下叫他"模拟器选手""网红",他知道。<br>
+                            "那个体系不要我,我也不去强求。GT 我开得很爽。"
+                        </div>
+    
+                    </div>
+    
+                    <!-- ============ TAB 4: 黑匣子 ============ -->
+                    <div class="cen-panel" id="cen-tab-3">
+                        <div class="cen-blind-box">
+    
+                            <div class="cen-section-title">BLACK BOX · 只有他自己回放过</div>
+    
+                            <div class="cen-blind-content cen-scroll" id="cen-blind-content">
+    
+                                <div class="cen-blind-item">
+                                    <div class="cen-blind-num">REC 01</div>
+                                    <div class="cen-blind-name">「还行。」</div>
+                                    <div class="cen-blind-desc">他几乎对所有事都这么答。他对"不还行"的阈值高到离谱,等自己发现不对劲,通常已经过载了。</div>
+                                </div>
+    
+                                <div class="cen-blind-item">
+                                    <div class="cen-blind-num">REC 02</div>
+                                    <div class="cen-blind-name">报喜不报忧。</div>
+                                    <div class="cen-blind-desc">生病、受伤、难过都先自己咽下去。小时候没人事无巨细地问到底,这把锁后来也没人配过钥匙。</div>
+                                </div>
+    
+                                <div class="cen-blind-item">
+                                    <div class="cen-blind-num">REC 03</div>
+                                    <div class="cen-blind-name">「不用麻烦。」</div>
+                                    <div class="cen-blind-desc">哥哥从小给得太多,他练成了什么都自己解决。别人想对他好,他第一反应是"不用麻烦"。</div>
+                                </div>
+    
+                                <div class="cen-blind-item">
+                                    <div class="cen-blind-num">REC 04 · 损坏</div>
+                                    <div class="cen-blind-name">关于妈妈,关于老程。</div>
+                                    <div class="cen-blind-desc">有一段他自己也不去回放。他不问"你为什么不来现场",老程也没说过"我为你骄傲"。说了就得面对。<strong
+                                            style="color:#ffcc99;">他知道这块在那,只是暂时不打算动。</strong></div>
+                                </div>
+    
+                            </div>
+    
+                            <!-- 滑块区 -->
+                            <div class="cen-slider-area">
+                                <div class="cen-status-row">
+                                    <div class="cen-status-text" id="cen-status-text">SYSTEM LOCKED · 拖动滑块,强行覆写安全协议</div>
+                                    <div class="cen-status-pct" id="cen-status-pct">0%</div>
+                                </div>
+                                <input type="range" class="cen-range" id="cen-range" min="0" max="100" value="0">
+                            </div>
+    
+                        </div>
+                    </div>
+    
+                </div>
+            </div>
+    
+        </div>
+    </div>
+    </div>
+
+    <script>
+        (function () {
+            const container = document.getElementById('cen-profile-container');
+            if (!container) return;
+
+            const flipCard = container.querySelector('#cen-flip-card');
+            const faceFront = container.querySelector('#cen-face-front');
+            const flipBackBtn = container.querySelector('#cen-flip-back-btn');
+            const btns = container.querySelectorAll('.cen-nav-btn');
+            const panels = container.querySelectorAll('.cen-panel');
+            const slider = container.querySelector('#cen-range');
+            const blindContent = container.querySelector('#cen-blind-content');
+            const statusText = container.querySelector('#cen-status-text');
+            const statusPct = container.querySelector('#cen-status-pct');
+
+            function setFlipped(flipped) {
+                if (!flipCard) return;
+                flipCard.classList.toggle('is-flipped', flipped);
+            }
+
+            if (faceFront) {
+                faceFront.addEventListener('click', function () {
+                    setFlipped(true);
+                });
+                faceFront.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setFlipped(true);
+                    }
+                });
+            }
+
+            if (flipBackBtn) {
+                flipBackBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    setFlipped(false);
+                });
+            }
+
+
+            // 论坛折叠：同时只展开一帖
+            const bfThreads = container.querySelectorAll('details.bf-thread');
+            bfThreads.forEach(function (thread) {
+                thread.addEventListener('toggle', function () {
+                    if (!thread.open) return;
+                    bfThreads.forEach(function (other) {
+                        if (other !== thread) other.open = false;
+                    });
+                });
+            });
+
+            // Tab 切换
+            window.cenSwitchTab = function (index) {
+                btns.forEach(b => b.classList.remove('active'));
+                panels.forEach(p => p.classList.remove('active'));
+                btns[index].classList.add('active');
+                panels[index].classList.add('active');
+            };
+
+            // 三段式滑块解锁
+            if (slider && blindContent && statusText && statusPct) {
+                slider.addEventListener('input', function (e) {
+                    const val = parseInt(e.target.value);
+                    statusPct.innerText = val + '%';
+
+                    if (val > 90) {
+                        blindContent.classList.add('unlocked');
+                        blindContent.classList.remove('warning');
+                        statusText.innerText = 'ACCESS GRANTED · 数据已解密';
+                        statusText.classList.add('ok');
+                        statusText.classList.remove('warn');
+                    } else if (val > 30) {
+                        blindContent.classList.add('warning');
+                        blindContent.classList.remove('unlocked');
+                        statusText.innerText = 'WARNING · 正在尝试访问机密档案';
+                        statusText.classList.add('warn');
+                        statusText.classList.remove('ok');
+                    } else {
+                        blindContent.classList.remove('unlocked', 'warning');
+                        statusText.innerText = 'SYSTEM LOCKED · 拖动滑块覆写安全协议';
+                        statusText.classList.remove('ok', 'warn');
+                    }
+                });
+
+                // 松手回弹/吸附
+                slider.addEventListener('change', function (e) {
+                    const val = parseInt(e.target.value);
+                    if (val > 90) {
+                        e.target.value = 100;
+                        statusPct.innerText = '100%';
+                    } else {
+                        e.target.value = 0;
+                        statusPct.innerText = '0%';
+                        blindContent.classList.remove('unlocked', 'warning');
+                        statusText.innerText = 'SYSTEM LOCKED · 拖动滑块覆写安全协议';
+                        statusText.classList.remove('ok', 'warn');
+                    }
+                });
+            }
+        })();
+    </script>
+
+    <section class="cen-forum" aria-label="论坛">
+    <p class="cen-forum-heading">NETWORK / <strong>舆论场</strong></p>
+    <p class="cen-forum-hint">点击标题展开 · 楼内独立滚动</p>
+    <div class="bf-feed">
+<details class="bf-thread bf-thread-f1">
+                    <summary class="bf-thread-summary">
+                        <span class="bf-chevron" aria-hidden="true"></span>
+                        <div class="bf-summary-body">
+                            <span class="bf-board">F1吧</span>
+                            <h2 class="bf-title">【李涛】程冉就是个网红 真有人觉得他强？</h2>
+                            <div class="bf-meta">
+                            <span class="bf-meta-hot">🔥 热帖</span>
+                            <span>回复 187</span>
+                            <span>浏览 4.2万</span>
+                            <span>10-18 23:41</span>
+                        </div>
+                            <p class="bf-teaser">模拟器转职业、蹭红利、靠脸圈钱？楼里吵翻了，楼主还神预言了自己下一句……</p>
+                        </div>
+                    </summary>
+                    <div class="bf-reply-panel">
+                    <div class="bf-reply-list"><div class="bf-floor bf-floor-op">
+                            <div class="bf-floor-side">
+                                <div class="bf-avatar" style="--av-bg:#fde8e8;--av-fg:#c01e2f">黑</div>
+                                <span class="bf-floor-id">楼主</span>
+                            </div>
+                            <div class="bf-floor-main">
+                                <div class="bf-floor-top"><span class="bf-nick">专号发帖别杠</span><span class="bf-time">23:41</span></div>
+                                <div class="bf-body">
+                                    <p>我开个号专门发这个，别说我蹭热度。</p>
+                                    <p>模拟器转职业，蹭中国车手红利吃饭，长得就不像开车的，靠女粉圈钱。我说一句别喷，楼里 GT3 粉理性讨论，我们就事论事。</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e8f0fe;--av-fg:#1a5fb4">1</div><span class="bf-floor-id">1L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">理性吃瓜人</span><span class="bf-time">23:42</span></div><div class="bf-body">不喷，但你确实没看比赛</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e8f5e9;--av-fg:#2e7d32">2</div><span class="bf-floor-id">2L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">bro本ro</span><span class="bf-time">23:43</span></div><div class="bf-body">bro 味溢出来了，GT3 分站冠军不是 P 的，自己看回放</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#fff3e0;--av-fg:#e65100">3</div><span class="bf-floor-id">3L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">F1唯一真神</span><span class="bf-time">23:44</span></div><div class="bf-body">那种小比赛，真厉害去 F1 啊</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#f3e5f5;--av-fg:#7b1fa2">4</div><span class="bf-floor-id">4L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">斯帕常驻民</span><span class="bf-time">23:45</span></div><div class="bf-body">？GT3 也叫小比赛？楼上比利时人？</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e0f7fa;--av-fg:#00838f">5</div><span class="bf-floor-id">5L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">刚入坑的小白</span><span class="bf-time">23:46</span></div><div class="bf-body">救命，比利时人是什么梗</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#fce4ec;--av-fg:#ad1457">6</div><span class="bf-floor-id">6L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">斯帕常驻民</span><span class="bf-time">23:48</span></div>
+                                <div class="bf-body">去年斯帕站，程冉最后三圈连超四个，把一个比利时本土车手挤到草地上了。那哥们采访说 "This is not racing"，程冉回 "对，这是超车"。</div>
+                            </div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#fff8e1;--av-fg:#f9a825">7</div><span class="bf-floor-id">7L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">嘴替专业户</span><span class="bf-time">23:49</span></div><div class="bf-body">笑死，这哥们嘴是真的欠</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e8eaf6;--av-fg:#3949ab">8</div><span class="bf-floor-id">8L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">颜值经济学</span><span class="bf-time">23:51</span></div><div class="bf-body">程冉输在长相上了。他要是丑的话，在这早就被吹成下一个汉密尔顿了</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#efebe9;--av-fg:#5d4037">9</div><span class="bf-floor-id">9L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">8L 附议</span><span class="bf-time">23:52</span></div><div class="bf-body"><span class="bf-ref">@8L</span> 说到点子上了</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#ffebee;--av-fg:#c62828">10</div><span class="bf-floor-id">10L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">酸柠檬成精</span><span class="bf-time">23:54</span></div><div class="bf-body">他爸超有钱，买个席位给他玩玩罢了</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e3f2fd;--av-fg:#1565c0">11</div><span class="bf-floor-id">11L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">路人甲不服</span><span class="bf-time">23:55</span></div><div class="bf-body">你家有钱给你买席位你能跑下来吗，酸鸡</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#f1f8e9;--av-fg:#558b2f">12</div><span class="bf-floor-id">12L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">酸柠檬成精</span><span class="bf-time">23:55</span></div><div class="bf-body">跑啊</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#fff3e0;--av-fg:#ef6c00">13</div><span class="bf-floor-id">13L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">预言家本家</span><span class="bf-time">23:56</span></div><div class="bf-body">赌五毛楼主下一句是「开赛车的有几个不是富二代」</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#fde8e8;--av-fg:#c01e2f">14</div><span class="bf-floor-id">14L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">专号发帖别杠</span><span class="bf-time">23:56</span></div><div class="bf-body">开赛车的有几个不是富二代</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#f3e5f5;--av-fg:#8e24aa">15</div><span class="bf-floor-id">15L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">笑到缺氧</span><span class="bf-time">23:57</span></div><div class="bf-body">我笑得难受，谁来管一下</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e0f2f1;--av-fg:#00695c">16</div><span class="bf-floor-id">16L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">草系训练师</span><span class="bf-time">23:58</span></div><div class="bf-body">草（一种植物）</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e8eaf6;--av-fg:#283593">17</div><span class="bf-floor-id">17L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">车载党</span><span class="bf-time">00:12</span></div><div class="bf-body">说真的，我以前也觉得他网红，直到去年看了一场富士站车载。出 T13 的那个角度没有人会那样切，没有人。</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#fff8e1;--av-fg:#ff8f00">18</div><span class="bf-floor-id">18L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">Luca 颜粉</span><span class="bf-time">00:18</span></div><div class="bf-body">黑程冉还没有黑 Luca 有意思呢，好歹 Luca 还给点反馈，上次在 ig 和黑粉对线了 20 层楼</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#fce4ec;--av-fg:#d81b60">19</div><span class="bf-floor-id">19L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">吃瓜存档</span><span class="bf-time">00:22</span></div><div class="bf-body">上次有个营销号黑他，他点赞了，营销号当场删博</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e3f2fd;--av-fg:#0277bd">22</div><span class="bf-floor-id">22L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">吃瓜存档</span><span class="bf-time">00:35</span></div><div class="bf-body">哈哈哈哈哈哈哈我记得这事</div></div>
+                        </div>
+                        <div class="bf-floor bf-floor-ad">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#eceff1;--av-fg:#90a4ae">23</div><span class="bf-floor-id">23L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">系统推广</span><span class="bf-time">00:36</span></div><div class="bf-body">【震惊！男人四十还在熬夜！老中医一招教你……】</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#ffebee;--av-fg:#b71c1c">24</div><span class="bf-floor-id">24L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">吧务呢</span><span class="bf-time">00:37</span></div><div class="bf-body">？管理员呢</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#f1f8e9;--av-fg:#33691e">25</div><span class="bf-floor-id">25L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">蹲楼主</span><span class="bf-time">00:41</span></div><div class="bf-body">不是，楼主好久没出来了</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e8f5e9;--av-fg:#2e7d32">26</div><span class="bf-floor-id">26L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">隔壁吧情报</span><span class="bf-time">00:42</span></div><div class="bf-body">已经去隔壁发新帖了</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#fff3e0;--av-fg:#e65100">27</div><span class="bf-floor-id">27L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">蹲楼主</span><span class="bf-time">00:43</span></div><div class="bf-body">什么新帖，你怎么知道的</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e8eaf6;--av-fg:#3949ab">28</div><span class="bf-floor-id">28L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">隔壁吧情报</span><span class="bf-time">00:44</span></div>
+                                <div class="bf-body">分享链接：<span class="bf-link-card">【理性讨论】吴陆卡真的是顺直男吗</span></div>
+                            </div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e0f7fa;--av-fg:#00838f">29</div><span class="bf-floor-id">29L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">草系训练师</span><span class="bf-time">00:45</span></div><div class="bf-body">草</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#f3e5f5;--av-fg:#7b1fa2">30</div><span class="bf-floor-id">30L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">笑到缺氧</span><span class="bf-time">00:45</span></div><div class="bf-body">草</div></div>
+                        </div>
+                    </div>
+                    </div>
+                </details>
+
+                <details class="bf-thread bf-thread-gossip">
+                    <summary class="bf-thread-summary">
+                        <span class="bf-chevron" aria-hidden="true"></span>
+                        <div class="bf-summary-body">
+                            <span class="bf-board">八卦专楼</span>
+                            <h2 class="bf-title">程冉的恋情真的有人在追吗.jpg</h2>
+                            <div class="bf-meta">
+                            <span>回复 203</span>
+                            <span>浏览 6.8万</span>
+                            <span>11-02 14:20</span>
+                        </div>
+                            <p class="bf-teaser">半年街拍只有猫粮、乐高和中餐馆——显微镜女孩发问：这张脸到底用来干嘛的？</p>
+                        </div>
+                    </summary>
+                    <div class="bf-reply-panel">
+                    <div class="bf-reply-list"><div class="bf-floor bf-floor-op">
+                            <div class="bf-floor-side">
+                                <div class="bf-avatar" style="--av-bg:#fce8f3;--av-fg:#c01e6b">八</div>
+                                <span class="bf-floor-id">楼主</span>
+                            </div>
+                            <div class="bf-floor-main">
+                                <div class="bf-floor-top"><span class="bf-nick">显微镜女孩</span><span class="bf-time">14:20</span></div>
+                                <div class="bf-body">
+                                    <p>我整理了一下近半年程冉被拍到的所有照片：</p>
+                                    <ol class="bf-op-list">
+                                        <li>博洛尼亚某超市 · 推车里：猫粮×4、牛奶、鸡胸肉</li>
+                                        <li>博洛尼亚某路边 · 蹲在地上看店主的猫，看了 26 分钟</li>
+                                        <li>中餐馆「老地方」· 一个人，点了三个菜</li>
+                                        <li>中餐馆「川味居」· 和 Luca、Jamie 三个人</li>
+                                        <li>中餐馆「福满楼」· 一个人</li>
+                                        <li>乐高店</li>
+                                        <li>超市 · 又是猫粮</li>
+                                        <li>中餐馆「老地方」</li>
+                                    </ol>
+                                    <p><strong>请问，这人，到底，在，哪里，谈恋爱？？</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e8f0fe;--av-fg:#1a5fb4">1</div><span class="bf-floor-id">1L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">几何课代表</span><span class="bf-time">14:21</span></div><div class="bf-body">他的生活轨迹是猫、乐高、中餐，三角形闭环</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#fff3e0;--av-fg:#e65100">2</div><span class="bf-floor-id">2L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">恨铁不成钢</span><span class="bf-time">14:22</span></div><div class="bf-body">我的爸呀大哥，你到底在用这张脸干嘛啊</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#f3e5f5;--av-fg:#7b1fa2">3</div><span class="bf-floor-id">3L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">颜狗落泪</span><span class="bf-time">14:23</span></div><div class="bf-body">心疼这张脸，真的</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e0f7fa;--av-fg:#00838f">4</div><span class="bf-floor-id">4L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">路人乙</span><span class="bf-time">14:24</span></div><div class="bf-body">他知道自己长得好看吗</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e8f5e9;--av-fg:#2e7d32">5</div><span class="bf-floor-id">5L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">切片搬运工</span><span class="bf-time">14:25</span></div><div class="bf-body">他知道。他直播被问最帅在哪，他说「这问题让我一时选不出来」</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#efebe9;--av-fg:#5d4037">6</div><span class="bf-floor-id">6L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">沉默的大多数</span><span class="bf-time">14:26</span></div><div class="bf-body">…………</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#fce4ec;--av-fg:#ad1457">7</div><span class="bf-floor-id">7L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">认真提问</span><span class="bf-time">14:28</span></div><div class="bf-body">那他为什么不谈恋爱</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e3f2fd;--av-fg:#1565c0">8</div><span class="bf-floor-id">8L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">老粉</span><span class="bf-time">14:29</span></div><div class="bf-body">他说没遇到</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#fff8e1;--av-fg:#f9a825">9</div><span class="bf-floor-id">9L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">赛车圣经</span><span class="bf-time">14:30</span></div><div class="bf-body">车手就应该这样，心中无女人，开车自然神</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#f1f8e9;--av-fg:#558b2f">10</div><span class="bf-floor-id">10L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">猫奴联盟</span><span class="bf-time">14:31</span></div><div class="bf-body">心中有猫，开车封神</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e8eaf6;--av-fg:#3949ab">11</div><span class="bf-floor-id">11L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">意媒翻译组</span><span class="bf-time">14:35</span></div>
+                                <div class="bf-body">
+                                    <p>意大利某狗仔上周发推，说跟了程冉一整天——</p>
+                                    <p>早上 7 点起床跑步，8 点回家喂猫，9 点去车队，中午吃食堂；下午训练，晚上回家拼乐高，11 点关灯。</p>
+                                    <div class="bf-quote">狗仔原话："This is the most boring celebrity I have ever followed in my entire career."</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#ffebee;--av-fg:#c62828">12</div><span class="bf-floor-id">12L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">笑到缺氧</span><span class="bf-time">14:36</span></div><div class="bf-body">哈哈哈哈哈哈哈哈哈哈</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e0f2f1;--av-fg:#00695c">13</div><span class="bf-floor-id">13L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">打工人共鸣</span><span class="bf-time">14:37</span></div><div class="bf-body">可怜的狗仔，这个月奖金没了</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#fff3e0;--av-fg:#ef6c00">14</div><span class="bf-floor-id">14L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">经典句式</span><span class="bf-time">14:38</span></div><div class="bf-body">他不会是 gay 吧</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#f3e5f5;--av-fg:#8e24aa">15</div><span class="bf-floor-id">15L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">闹钟成精</span><span class="bf-time">14:38</span></div><div class="bf-body">来了</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e8f0fe;--av-fg:#1a5fb4">16</div><span class="bf-floor-id">16L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">吧规熟读</span><span class="bf-time">14:39</span></div><div class="bf-body">每次到不了 15 楼必出现这句，像闹钟一样</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#fce4ec;--av-fg:#d81b60">17</div><span class="bf-floor-id">17L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">CP 脑</span><span class="bf-time">14:41</span></div><div class="bf-body">他和吴陆卡是不是一对啊，你看他俩多腻</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#fff8e1;--av-fg:#ff8f00">18</div><span class="bf-floor-id">18L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">辟谣搬运</span><span class="bf-time">14:43</span></div>
+                                <div class="bf-body">Luca 自己在 ins story 回过这事，原话是「我和 Jamie 在一起都不会和 Ran 在一起，他太气人了」</div>
+                            </div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e3f2fd;--av-fg:#0277bd">19</div><span class="bf-floor-id">19L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">认真提问</span><span class="bf-time">14:45</span></div><div class="bf-body">所以他到底什么取向</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#e8f5e9;--av-fg:#33691e">20</div><span class="bf-floor-id">20L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">老粉</span><span class="bf-time">14:46</span></div><div class="bf-body">人家说了，没遇到</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#ffebee;--av-fg:#e91e63">21</div><span class="bf-floor-id">21L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">梦女本女</span><span class="bf-time">14:47</span></div><div class="bf-body">老公！</div></div>
+                        </div>
+                        <div class="bf-floor">
+                            <div class="bf-floor-side"><div class="bf-avatar" style="--av-bg:#f1f8e9;--av-fg:#689f38">22</div><span class="bf-floor-id">22L</span></div>
+                            <div class="bf-floor-main"><div class="bf-floor-top"><span class="bf-nick">梦女本女</span><span class="bf-time">14:48</span></div>
+                                <div class="bf-body">
+                                    <p>我现在的精神状态：</p>
+                                    <div class="bf-status-block">
+                                        <span>看到他笑 → 老公</span>
+                                        <span>看到他发猫 → 老公</span>
+                                        <span>看到他超车 → 老公</span>
+                                        <span>看到他直播跑调 → 儿砸！</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                </details>
+    </div>
+    </section>
+</div>
