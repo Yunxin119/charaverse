@@ -25,3 +25,5 @@ npm run lint       # eslint .
 npm run build
 ```
 Before finishing any phase: typecheck, build, and `npm audit --omit=dev` must have no critical.
+
+**Never run `next build` while `next dev` is running.** Both rewrite `next-env.d.ts` (dev points it at `.next/dev/types`, build at `.next/types`); with both alive the file flips on every request, Turbopack recompiles, and the browser full-reloads in a loop (looks like a flickering page). Stop the dev preview first, then build; if the loop already started, stop everything, `rm -rf .next`, and start dev again.
