@@ -4,13 +4,16 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Plus, Search, MessageCircle, Pencil, Palette, MoreHorizontal, Trash2, Globe, Lock, Sparkles } from 'lucide-react'
+import { Plus, Search, MessageCircle, Pencil, Palette, MoreHorizontal, Trash2, Globe, Lock, Sparkles, Upload, FileJson, ImageDown } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Chip, IconButton, PosterCard, PosterTitle, CardSkeleton } from '@/components/glass'
 import { CharacterCard, characterToCardData } from '@/components/cards/CharacterCard'
+import { ImportCardDialog } from '@/components/cards/ImportCardDialog'
+import { downloadCharacterJson, downloadCharacterPng } from '@/lib/cards/exportBrowser'
 import { useAuth } from '@/providers/AuthProvider'
 import type { Character } from '@/app/lib/supabase'
 import { useCharacters, useDeleteCharacter } from '@/queries'
@@ -37,6 +40,24 @@ export default function CharactersPage() {
   const [query, setQuery] = useState('')
   const [visibility, setVisibility] = useState<Visibility>('all')
   const [sortBy, setSortBy] = useState<SortKey>('updated_at')
+  const [importOpen, setImportOpen] = useState(false)
+
+  const exportJson = (c: Character) => {
+    try {
+      downloadCharacterJson(c)
+      toast.success(`已导出「${c.name}」的 JSON 角色卡`)
+    } catch (e) {
+      toast.error((e as Error).message || '导出失败，请重试')
+    }
+  }
+  const exportPng = async (c: Character) => {
+    try {
+      await downloadCharacterPng(c)
+      toast.success(`已导出「${c.name}」的 PNG 角色卡`)
+    } catch (e) {
+      toast.error((e as Error).message || '导出失败，请重试')
+    }
+  }
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -74,10 +95,14 @@ export default function CharactersPage() {
           <h1 className="font-display text-3xl font-semibold">我的角色</h1>
           <p className="mt-1 text-sm text-cv-fg-muted">{total > 0 ? `${total} 个角色 · 点卡片上的「聊天」继续最近的对话` : '创建你的第一个角色，开始属于它的宇宙。'}</p>
         </div>
-        <Button asChild variant="accent">
-          <Link href="/characters/new"><Plus />新建角色</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="neu" onClick={() => setImportOpen(true)} disabled={!user}><Upload />导入角色</Button>
+          <Button asChild variant="accent">
+            <Link href="/characters/new"><Plus />新建角色</Link>
+          </Button>
+        </div>
       </header>
+      {user && <ImportCardDialog open={importOpen} onOpenChange={setImportOpen} userId={user.id} />}
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
@@ -161,6 +186,9 @@ export default function CharactersPage() {
                       <DropdownMenuItem asChild><Link href={`/characters/${c.id}/edit`}><Pencil />编辑</Link></DropdownMenuItem>
                       <DropdownMenuItem asChild><Link href={`/characters/${c.id}/skin`}><Palette />皮肤</Link></DropdownMenuItem>
                       <DropdownMenuItem asChild><Link href={`/characters/${c.id}/edit?section=publish`}>{c.is_public ? <><Globe />发布设置</> : <><Globe />发布到探索</>}</Link></DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => exportJson(c)}><FileJson />导出 JSON</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => void exportPng(c)}><ImageDown />导出 PNG 卡</DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem variant="destructive" onClick={() => void remove(c)}><Trash2 />删除角色</DropdownMenuItem>
                     </DropdownMenuContent>

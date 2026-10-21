@@ -12,6 +12,8 @@ interface Props {
   onChange: (v: string) => void
   alternates: string[]
   onAlternatesChange: (v: string[]) => void
+  exampleDialogue: string
+  onExampleDialogueChange: (v: string) => void
 }
 
 const MACROS: { token: string; label: string }[] = [
@@ -19,7 +21,7 @@ const MACROS: { token: string; label: string }[] = [
   { token: '{{user}}', label: '用户名' },
 ]
 
-export function OpeningSection({ value, onChange, alternates, onAlternatesChange }: Props) {
+export function OpeningSection({ value, onChange, alternates, onAlternatesChange, exampleDialogue, onExampleDialogueChange }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null)
 
   const insert = (token: string) => {
@@ -58,6 +60,11 @@ export function OpeningSection({ value, onChange, alternates, onAlternatesChange
           </Field>
         ))}
         <Button type="button" size="sm" variant="neu" disabled={alternates.length >= 20} onClick={() => onAlternatesChange([...alternates, ''])}><Plus /> 添加备选开场白</Button>
+      </GlassPanel>
+      <GlassPanel className="mt-4 space-y-2">
+        <Field id="cf-example" label="对话示例（可选）" hint="几段「{{user}}: … / {{char}}: …」的示范，教模型说话方式。只有当预设里启用了「对话示例」占位条目才会注入。">
+          <Textarea id="cf-example" value={exampleDialogue} onChange={(e) => onExampleDialogueChange(e.target.value)} className="min-h-32 font-mono text-xs" placeholder={'<START>\n{{user}}: 今天还跑吗？\n{{char}}: 看雨停不停。'} />
+        </Field>
       </GlassPanel>
     </section>
   )

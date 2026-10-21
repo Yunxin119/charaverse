@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Brain, History, MoreHorizontal, Settings2, GitBranch, ChevronDown, Palette, MessagesSquare } from 'lucide-react'
+import { ArrowLeft, Brain, History, MoreHorizontal, Settings2, GitBranch, ChevronDown, Palette, MessagesSquare, Download } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { IconButton } from '@/components/glass'
@@ -16,9 +16,11 @@ interface Props {
   presetLabel?: string
   onOpenSettings: () => void
   onNewBranchFromEnd?: () => void
+  /** opens the export dialog (rendered by ChatView) */
+  onExport?: () => void
 }
 
-export function ChatHeader({ sessionId, character, title, modelLabel, presetLabel, onOpenSettings, onNewBranchFromEnd }: Props) {
+export function ChatHeader({ sessionId, character, title, modelLabel, presetLabel, onOpenSettings, onNewBranchFromEnd, onExport }: Props) {
   const router = useRouter()
   return (
     <header id="cv_chat_header" className="sticky top-0 z-20 px-3 pt-3 sm:px-5 sm:pt-4">
@@ -52,6 +54,7 @@ export function ChatHeader({ sessionId, character, title, modelLabel, presetLabe
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild><Link href={`/chat/${sessionId}/memory`}><Brain />记忆与摘要</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link href={`/chat/${sessionId}/history`}><History />完整历史</Link></DropdownMenuItem>
+            {onExport && <DropdownMenuItem onClick={onExport}><Download />导出对话</DropdownMenuItem>}
             <DropdownMenuSeparator />
             {onNewBranchFromEnd && <DropdownMenuItem onClick={onNewBranchFromEnd}><GitBranch />从当前进度分支</DropdownMenuItem>}
             <DropdownMenuItem asChild><Link href={`/characters/${character.id}/edit`}><Settings2 />编辑角色卡</Link></DropdownMenuItem>

@@ -112,6 +112,7 @@ export async function POST(request: NextRequest) {
       memoryTable: ctx.memoryTable,
       summaries: ctx.summaries,
       worldInfo: lore ? { before: lore.before, after: lore.after } : undefined,
+      dialogueExamples: card.exampleDialogue,
       history: kept,
       ensureUserLast: !!extraUserMessage || needsUserLast(conn) || body.action === 'opening',
       continueUserMessage:

@@ -50,6 +50,8 @@ export interface CharacterDraft {
   initialMessage: string
   /** extra opening lines; the first message becomes swipeable between all of them */
   alternateGreetings: string[]
+  /** example dialogue (optional; used by the dialogueExamples preset marker) */
+  exampleDialogue: string
   keywords: string[]
   age: string
   gender: Gender | ''
@@ -70,7 +72,7 @@ export function newModule(type: ModuleType): DraftModule {
 }
 
 export function emptyDraft(): CharacterDraft {
-  return { name: '', avatar_url: '', description: '', personality: '', introduction: '', initialMessage: '', alternateGreetings: [], keywords: [], age: '', gender: '', modules: [], lorebook: EMPTY_LOREBOOK }
+  return { name: '', avatar_url: '', description: '', personality: '', introduction: '', initialMessage: '', alternateGreetings: [], exampleDialogue: '', keywords: [], age: '', gender: '', modules: [], lorebook: EMPTY_LOREBOOK }
 }
 
 /** Tolerant: a missing or malformed column becomes an empty book instead of blocking the form. */
@@ -133,6 +135,7 @@ export function draftFromCharacter(c: Character): CharacterDraft {
     introduction: str(basic.introduction),
     initialMessage: str(basic.initialMessage),
     alternateGreetings: Array.isArray(basic.alternateGreetings) ? basic.alternateGreetings.filter((g): g is string => typeof g === 'string' && !!g.trim()) : [],
+    exampleDialogue: str(basic.exampleDialogue),
     keywords: Array.isArray(basic.keywords) ? basic.keywords.filter((k): k is string => typeof k === 'string' && !!k.trim()) : [],
     age: str(basic.age),
     gender: isGender(basic.gender) ? basic.gender : '',
@@ -177,6 +180,7 @@ export function buildPromptTemplate(draft: CharacterDraft, existing?: unknown): 
       introduction: draft.introduction,
       initialMessage: draft.initialMessage,
       alternateGreetings: draft.alternateGreetings.map((g) => g.trim()).filter(Boolean),
+      exampleDialogue: draft.exampleDialogue,
       keywords: draft.keywords,
       age: draft.age.trim(),
       gender: draft.gender,

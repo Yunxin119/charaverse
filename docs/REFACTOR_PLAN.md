@@ -321,6 +321,12 @@ docs/                       # 本文件 + design/
 - [ ] **需要你手动执行**：Supabase SQL editor 跑 `supabase/migrations/0006_rate_limits.sql`（`rate_limits` 表 + `consume_rate_limit` 函数）。不跑也能用（内存兜底），但多实例部署时限流不准
 - 验收：`tsc` / `eslint` / `next build` / 116 测试全绿 ✅；旧 `x-api-key` 兼容层已删；`@types/node` 升到 22 后 `npm install` 不再需要 `--legacy-peer-deps`；浏览器响应头能看到 CSP、连续快速发 31 条消息会收到 429 —— **待你实测**
 
+### 迭代 3（2026-10-21）
+- [x] 角色卡导入导出：`lib/cards`（PNG tEXt 块读写、通用卡 v1/v2/v3 ↔ 我们的格式，`extensions.charaverse` 无损往返）；导出 JSON / PNG 卡，导入 JSON / PNG 含世界书与头像
+- [x] 聊天记录导入导出：`lib/chatlog`（JSON 无损、通用 JSONL、Markdown）；聊天页导出，角色主页导入成新对话
+- [x] 角色卡新增「对话示例」字段，喂给预设的 `dialogueExamples` 占位
+- [x] 摘要任务 prompt 可编辑（`/settings/tasks`）；日记功能移除
+
 ### 迭代 2（2026-10-21）
 - [x] 全部界面 / 文档 / 注释去掉第三方前端与第三方作者的名字；第三方美化卡样本从仓库移除，测试改用自写样本
 - [x] 多开场白：角色卡 `basic_info.alternateGreetings[]`，开新对话时第一条消息可左右切换
@@ -336,7 +342,6 @@ docs/                       # 本文件 + design/
 ### Backlog（不排期）
 - API key 加密同步（多设备）
 - 世界书 / lorebook（`ContextManager` 已留参数）
-- 角色卡导入导出：主流角色扮演前端 PNG/JSON (`chara_card_v2`) 互通
 - 语音 / 图片消息、贴纸（如果真要，重新设计，不恢复旧代码）
 - 评论系统恢复（走 RLS 直连，不要 API 路由）
 - 关注作者 / 分享海报（`src/migrate.md` 的建议）

@@ -26,6 +26,7 @@ import { ChatHeader } from './ChatHeader'
 import { MessageList } from './MessageList'
 import { Composer } from './Composer'
 import { ChatSettingsSheet } from './ChatSettingsSheet'
+import { ExportChatDialog } from './ExportChatDialog'
 import type { MessageActionHandlers } from './MessageActions'
 
 export function ChatView({ sessionId }: { sessionId: string }) {
@@ -74,6 +75,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const [inspiring, setInspiring] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const autoSummary = useAutoSummary({
@@ -195,6 +197,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         modelLabel={modelId ? conn.displayName(modelId) : undefined}
         presetLabel={presetLabel}
         onOpenSettings={() => setSettingsOpen(true)}
+        onExport={() => setExportOpen(true)}
         onNewBranchFromEnd={messages.length ? () => branch.mutate({ sessionId, messageId: messages[messages.length - 1].id }, { onSuccess: (id) => router.push(`/chat/${id}`) }) : undefined}
       />
 
@@ -257,6 +260,17 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         saving={updateSettings.isPending || updateTitle.isPending}
         onSave={saveSettings}
         onClearMessages={clearMessages}
+      />
+
+      <ExportChatDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        sessionId={sessionId}
+        title={session.title}
+        characterName={card.name}
+        characterId={character.id}
+        userName={userSpeaker.name}
+        settings={settings}
       />
     </div>
   )

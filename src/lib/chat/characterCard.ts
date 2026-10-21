@@ -18,6 +18,8 @@ export interface CharacterCard {
   initialMessage?: string
   /** all opening lines: initialMessage first, then alternates (non-empty) */
   greetings: string[]
+  /** example dialogue block fed to the dialogueExamples preset marker */
+  exampleDialogue?: string
   customCss?: string
   introduction?: string
 }
@@ -73,6 +75,7 @@ export function parseCharacterCard(character: { name?: string; prompt_template?:
     userName,
     initialMessage: str(basic.initialMessage),
     greetings: [str(basic.initialMessage), ...(Array.isArray(basic.alternateGreetings) ? (basic.alternateGreetings as unknown[]).map(str) : [])].filter((g): g is string => !!g),
+    exampleDialogue: str(basic.exampleDialogue),
     customCss: str(tpl.custom_css),
     introduction: str(basic.introduction),
   }

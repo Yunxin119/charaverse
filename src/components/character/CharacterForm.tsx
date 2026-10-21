@@ -165,7 +165,7 @@ export function CharacterForm({ mode, character }: Props) {
         <div className="min-w-0">
           {active === 'basic' && <BasicInfoSection draft={draft} errors={shown} onChange={set} />}
           {active === 'modules' && <ModulesSection modules={draft.modules} error={shown.content} onChange={(m) => set('modules', m)} />}
-          {active === 'opening' && <OpeningSection value={draft.initialMessage} onChange={(v) => set('initialMessage', v)} alternates={draft.alternateGreetings} onAlternatesChange={(v) => set('alternateGreetings', v)} />}
+          {active === 'opening' && <OpeningSection value={draft.initialMessage} onChange={(v) => set('initialMessage', v)} alternates={draft.alternateGreetings} onAlternatesChange={(v) => set('alternateGreetings', v)} exampleDialogue={draft.exampleDialogue} onExampleDialogueChange={(v) => set('exampleDialogue', v)} />}
           {active === 'lorebook' && <LorebookSection value={draft.lorebook} onChange={(v) => set('lorebook', v)} characterName={draft.name.trim() || undefined} />}
           {active === 'skin' && <SkinSection characterId={editing ? character?.id : undefined} />}
           {active === 'publish' && (
