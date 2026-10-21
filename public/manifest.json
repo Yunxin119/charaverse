@@ -1,11 +1,11 @@
 {
-  "name": "CharaVerse - AI Role-Playing Universe",
+  "name": "CharaVerse",
   "short_name": "CharaVerse",
-  "description": "Enter your AI role-playing universe. Create, chat, and share with unique AI characters.",
+  "description": "你的角色，有自己的宇宙。创建人设、导入预设与皮肤，用你自己的模型和 API Key 开始对话。",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#3b82f6",
+  "background_color": "#f2dece",
+  "theme_color": "#41140e",
   "orientation": "portrait-primary",
   "scope": "/",
   "categories": ["entertainment", "social", "games"],
@@ -58,20 +58,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable any"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "/screenshots/desktop-screenshot.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide"
-    },
-    {
-      "src": "/screenshots/mobile-screenshot.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow"
     }
   ]
 }

@@ -6,6 +6,7 @@ import { QueryProvider } from "@/providers/QueryProvider";
 import { ThemeProvider, ThemeScript } from "./contexts/ThemeContext";
 import { AppShell } from "@/components/shell";
 import { ThemeSync } from "@/components/theme/ThemeSync";
+import { AppToaster } from "@/components/shell/AppToaster";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -19,7 +20,7 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: { default: "CharaVerse", template: "%s · CharaVerse" },
   description: "创建、聊天、分享属于你的 AI 角色。",
-  icons: { icon: "/favicon.ico", apple: "/icons/icon-192x192.png" },
+  icons: { icon: [{ url: "/favicon.svg", type: "image/svg+xml" }, { url: "/favicon.ico" }], apple: "/apple-touch-icon.png" },
   formatDetection: { telephone: false },
   openGraph: {
     type: "website",
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <AuthProvider>
               <ThemeSync />
               <AppShell>{children}</AppShell>
+              <AppToaster />
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>

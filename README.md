@@ -1,497 +1,229 @@
-📋 CharaVerse API 轮询功能开发计划
+# CharaVerse
 
-Phase 1: 数据结构重构 (Data Architecture)
+酒馆（SillyTavern）风格的 AI 角色聊天 Web 应用：自带 API key、流式回复、可导入酒馆预设与主题、作者可做角色皮肤，并带长期记忆与日记。
 
-Step 1.1: 重新设计 API 配置数据结构
-// 新的 API 配置接口
-interface ApiConfig {
-id: string;
-name: string; // 用户自定义名称，如 "Gemini-主力", "Gemini-备用 1"
-provider: 'deepseek' | 'gemini' | 'openai' | 'custom';
-apiKey: string;
-isActive: boolean; // 是否启用
-priority: number; // 优先级 (0-10)
+## 核心特性
 
-    // 轮询相关
-    lastUsedAt: number; // 上次使用时间戳
-    errorCount: number; // 连续错误次数
-    isHealthy: boolean; // 健康状态
+- **BYOK（自带 key）**：API key 只存在浏览器 localStorage，每次请求随 `x-cv-connection` 请求头发给本站 `/api/*` 代理，服务端只做鉴权、校验、转发、限流，不落库、不打日志。
+- **流式聊天**：基于 Vercel AI SDK `streamText`，支持发送 / 角色开场 / 重新生成（多候选 swipe）/ 续写 / 灵感 / 分支会话。
+- **酒馆式预设**：Prompt 条目可排序、开关、marker 占位；直接导入酒馆 chat-completion 预设 JSON；用户级默认 + 会话级覆盖。
+- **主题导入**：整站颜色、圆角、字体、玻璃参数都是 `--cv-*` token，一份 JSON 即可换肤；内置 Warm Glass Light / Dark、Carbon Neon、Sage Paper。
+- **角色皮肤**：作者 CSS 经真正的 CSS 解析器清洗并限定在 `#cv_chat_root`；酒馆格式正则脚本改写显示层；HTML 块在沙箱 iframe 里渲染（酒馆美化卡可直接跑）。
+- **长期记忆**：自动摘要 + 8 类记忆表（人物 / 事件 / 设定 / 情感 / 时空 / 关系 / 任务约定 / 重要物品）+ 记忆版本与删除回滚（Postgres 函数单事务）。
+- **日记**：按会话由模型生成角色日记，可重新生成。
+- **发布即快照**：公开角色卡是作者点「发布」时冻结的副本，作者之后改稿不会实时作用到别人的聊天。
 
-    // 可选的自定义配置
-    baseUrl?: string; // 自定义API endpoint
-    model?: string; // 指定模型
+## 技术栈
 
+| 层 | 选择 |
+|---|---|
+| 框架 | Next.js 16（App Router，`src/proxy.ts` 做路由守卫）+ React 19 |
+| 样式 | Tailwind v4 `@theme` 映射 `--cv-*` token，设计系统「Warm Glass」（液态玻璃 + 新拟物 + 海报块），shadcn/Radix 原子组件已重做样式 |
+| 后端 | Supabase：Auth（`@supabase/ssr` cookie session）、Postgres（所有表开 RLS）、Storage（`avatars` / `character-assets` / `chat-backgrounds`） |
+| LLM | Vercel AI SDK 7（`ai` + `@ai-sdk/openai-compatible` / `openai` / `google` / `deepseek` / `anthropic`） |
+| 状态 | TanStack Query（服务端数据）+ Zustand（API 连接等 UI 状态） |
+| 校验 / 测试 | zod 4、vitest 5 |
+
+## 快速开始
+
+### 1. 环境变量
+
+新建 `.env.local`：
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+```
+
+LLM key 不需要配置在服务端，用户在「我的 → API 连接」里自己填。
+
+### 2. 安装依赖
+
+```bash
+npm install
+```
+
+### 3. 数据库
+
+在 Supabase 控制台的 SQL editor 里**按顺序**执行（全部幂等，可重复跑）：
+
+1. `supabase/hotfix/p0_rls_storage.sql` — 补 RLS、Storage 改成 owner-only、删泄露消息的 `get_incremental_messages`、新增 `character_likes` 表与 `toggle_character_like` RPC
+2. `supabase/migrations/0002_chat_v2.sql` — 消息 `swipes` / `meta`、`chat_sessions.settings`、`user_presets` 表、`chat-backgrounds` bucket、两个 swipe RPC
+3. `supabase/migrations/0003_skins_themes.sql` — `characters.skin`（回填旧 `custom_css`）、`user_themes` 表
+4. `supabase/migrations/0004_publish_snapshot.sql` — `published_snapshot` / `published_at`（回填已公开角色）
+5. `supabase/migrations/0005_memory_fixes.sql` — 记忆表列类型修正、`delete_summary_with_rollback` 函数
+6. `supabase/migrations/0006_rate_limits.sql` — `rate_limits` 表 + `consume_rate_limit` 函数（没跑时服务端自动退到进程内计数）
+
+跑 hotfix 前建议先导出一份现有策略对照：`select * from pg_policies order by schemaname, tablename, policyname;`
+
+`0001_baseline.sql` 不在仓库里：它是 v1 时期线上 schema 的 dump，由你用 Supabase CLI 从自己的项目生成（新项目目前没有现成的 baseline 可用，需要先有一个带 v1 表结构的库）：
+
+```bash
+npx supabase login
+npx supabase link --project-ref <project-ref>
+npx supabase db dump --schema public -f supabase/migrations/0001_baseline.sql
+npx supabase gen types typescript --linked > src/types/database.ts   # 可选，尚未接入代码
+```
+
+### 4. 启动
+
+```bash
+npm run dev
+```
+
+打开 http://localhost:3000，注册账号（邮箱 + 密码）→ 我的 → API 连接 → 添加 key → 创建角色 → 开聊。
+
+## 目录结构
+
+```
+src/
+  app/                    路由与 layout；页面组件尽量薄
+    api/chat/             流式聊天（唯一 LLM 出口）、branch、memory、summary
+    api/connections/test  连接测试（8 token ping）
+    api/diary/            日记生成 / 重生成
+    chat/[sessionId]/     聊天页 + memory / history / diary 子页
+    characters/           我的角色、新建、[id]/edit、[id]/skin
+    character/public/[id] 公开角色页（只读快照）
+    explore/ user/[id]/   探索、作者主页
+    settings/             资料 hub + connections / appearance / presets
+    templates/ login/     提示词模板库、登录
+    lib/                  旧的 Supabase 客户端导出与实体类型（仍在使用）
+  components/
+    chat/                 ChatView、MessageList/Bubble、Composer、Markdown、HtmlBlockFrame、SkinStyle
+    presets/ skins/ theme/  预设编辑器、皮肤编辑器、主题导入
+    memory/ history/ diary/ 记忆表单（schema 驱动）、摘要时间线、历史、日记
+    character/            CharacterForm（新建/编辑合一）、发布、快照
+    glass/ ui/ shell/     Glass/Neu/Poster 面、shadcn 原子、AppShell + 导航
+  lib/
+    llm/                  connection（请求头编解码）、providers（AI SDK 模型解析）、complete
+    prompt/               presets（schema + 酒馆导入）、assemble（预设 × 角色卡 × 记忆 → messages）、macros、tokens
+    skins/                sanitizeCss、regexScripts、htmlBlocks、schema、docs（选择器文档 + 预设）
+    theme/                schema、builtin、applyTheme
+    chat/ memory/         会话设置、上下文加载、记忆表格式、记忆类型 schema
+    connections/          已保存连接的模型与旧配置迁移
+    server/               auth（requireUser）、llmGuards（SSRF）、rateLimit
+    supabase/             browser / server 客户端
+  hooks/ queries/ stores/ useChatStream、useAutoSummary；TanStack Query hooks；Zustand 连接 store
+  providers/ styles/      AuthProvider、QueryProvider；tokens.css
+  proxy.ts                Next 16 路由守卫（未登录重定向 /login）
+supabase/
+  migrations/             0002–0006（0001 baseline 由你 dump）
+  hotfix/                 p0_rls_storage.sql
+docs/
+  REFACTOR_PLAN.md        架构决策 A1–A16、设计系统、phase tracker
+  design/tokens-preview.html  token 预览页
+  skin-samples/           酒馆美化卡样本（测试也用）
+```
+
+## 安全模型
+
+- **key 不入库**：连接信息只在浏览器 localStorage（`cv.connections`），服务端只在单次请求内持有，不写 DB、不进日志、不进 URL、不进错误信息。
+- **`x-cv-connection` 请求头**：`base64url(JSON { kind, apiKey, baseUrl?, model, label? })`，服务端用 zod 解码校验；`/api/*` 另需 `Authorization: Bearer <Supabase JWT>`（`requireUser`），页面则由 `proxy.ts` 的 cookie session 守卫。
+- **SSRF 守卫**：`assertSafeBaseUrl` 只放行 https、拒绝 IP 字面量 / localhost / `.local` / `.internal` / 云元数据 / 带账号密码或 `?#` 的 URL；模型名走白名单正则；上游错误体只摘取 `error.message` 并截断，不回显。
+- **限流**：每用户固定窗口，chat 30 次/分、摘要 6、日记 6、连接测试 12（`consume_rate_limit`，RPC 不可用时退到进程内计数）。
+- **RLS**：每张表 owner-only；Storage 对象只能由上传者改删；点赞走 `toggle_character_like` RPC，客户端不能直接改别人的行。
+- **CSS 作用域清洗**：css-tree 解析成 AST → 丢弃 `@import` / 危险属性 / `expression()` / `javascript:` → `url()` 只允许 Supabase Storage、少数图床与作者自填的 `allowedUrlHosts` → 每条选择器加 `#cv_chat_root` 前缀后再序列化。
+- **iframe 沙箱**：作者 / 模型输出的 HTML 只在 `<iframe sandbox="allow-scripts">`（无 `allow-same-origin`）+ `srcdoc` 里渲染，带独立 meta CSP（`connect-src 'none'`、`form-action 'none'`），高度经 postMessage 回传；主文档从不插入作者 HTML。
+- **快照发布**：探索页、公开角色页、他人开聊、复制角色只读 `published_snapshot`；作者草稿改动需重新发布才可见。
+- **Markdown 白名单**：消息里的 `<img>` 只允许 Supabase Storage 与本站域名，其他来源不加载（防零点击外泄）；链接统一 `rel="noopener noreferrer nofollow"`；不启用 rehype-raw。
+- **安全头**：`next.config.ts` 下发 CSP、HSTS（生产）、nosniff、`X-Frame-Options: DENY`、Referrer-Policy、Permissions-Policy。
+- **记忆写回校验**：模型返回的记忆条目经 zod 校验、限制数量与长度后才入库，防投毒与膨胀。
+
+## 定制
+
+### 主题 JSON（我的 → 外观 → 导入）
+
+schema 在 `src/lib/theme/schema.ts`，只需写要覆盖的键，其余回退到内置 Warm Glass：
+
+```json
+{
+  "name": "My Theme",
+  "version": 1,
+  "mode": "dark",
+  "tokens": { "bg": "#1c1410", "fg": "#f2dece", "primary": "#9c4233", "accent": "#e07a4c" },
+  "glass": { "blur": 18, "saturate": 1.6 },
+  "radius": { "sm": 10, "md": 16, "lg": 24, "xl": 32 },
+  "fonts": { "body": "system-ui", "display": "Fraunces, serif", "mono": "SF Mono" },
+  "chat": { "bubbleStyle": "glass", "density": "cozy", "customCss": "" }
 }
+```
 
-interface ApiPoolConfig {
-mode: 'single' | 'active_only' | 'round_robin';
-pools: {
-[provider: string]: ApiConfig[];
-};
-roundRobinState: {
-[provider: string]: number; // 当前轮询索引
-};
+可用 token 键：`bg` `bg-elevated` `bg-sunken` `fg` `fg-muted` `fg-subtle` `primary` `primary-hover` `primary-fg` `secondary` `secondary-fg` `accent` `accent-fg` `accent-2` `accent-3` `border` `border-strong` `ring` `success` `warning` `danger` `info` `glass-bg` `glass-bg-strong` `glass-border` `neu-light` `neu-dark` `ambient-1` `ambient-2`。颜色接受 hex / rgb(a) / hsl(a) / oklch / color-mix。
+
+### 预设 JSON（我的 → 预设 → 导入）
+
+schema 在 `src/lib/prompt/presets.ts`。酒馆 chat-completion 预设会被自动识别并转换；本站格式的最小例子：
+
+```json
+{
+  "name": "我的预设",
+  "version": 1,
+  "prompts": [
+    { "id": "main", "name": "主提示", "role": "system", "content": "来玩角色扮演，你将完全成为{{char}}……", "enabled": true },
+    { "id": "charDescription", "marker": true, "enabled": true },
+    { "id": "personaDescription", "marker": true, "enabled": true },
+    { "id": "summaries", "marker": true, "enabled": true },
+    { "id": "memoryTable", "marker": true, "enabled": true },
+    { "id": "chatHistory", "marker": true, "enabled": true },
+    { "id": "jailbreak", "role": "system", "content": "…", "enabled": false,
+      "injection": { "position": "absolute", "depth": 2, "role": "system" } }
+  ],
+  "sampling": { "temperature": 1, "top_p": 0.95, "max_tokens": 4096 },
+  "formatting": { "assistantPrefill": "" }
 }
+```
 
-Step 1.2: localStorage 数据迁移
-// utils/apiMigration.ts
-const migrateApiConfig = () => {
-// 将现有的单 key 格式迁移到新的多 key 格式
-const oldGemini = localStorage.getItem('api_key_gemini');
-if (oldGemini && !localStorage.getItem('api_pool_config')) {
-const newConfig: ApiPoolConfig = {
-mode: 'single',
-pools: {
-gemini: [{
-id: generateId(),
-name: 'Gemini 默认',
-provider: 'gemini',
-apiKey: oldGemini,
-isActive: true,
-priority: 5,
-lastUsedAt: 0,
-errorCount: 0,
-isHealthy: true
-}]
-},
-roundRobinState: { gemini: 0 }
-};
-localStorage.setItem('api_pool_config', JSON.stringify(newConfig));
-}
-};
+- marker 条目由本站数据填充：`charDescription` `charPersonality` `scenario` `charModules` `personaDescription` `memoryTable` `summaries` `chatHistory` `worldInfoBefore` `worldInfoAfter` `dialogueExamples`（后三者预留）。
+- 普通条目按顺序进入 messages；`injection.position: "absolute"` 的条目按 `depth` 插进聊天历史（酒馆 in-chat 注入）。
+- 支持宏 `{{char}}` `{{user}}` `{{date}}` `{{time}}` `{{newline}}` `{{trim}}` 等（`src/lib/prompt/macros.ts`）。
+- 上限：200 条、单条 50k 字、整体 300k 字。
 
-Phase 2: UI 界面重构 (User Interface)
+### 角色皮肤（角色 → 编辑 → 外观皮肤，或 `/characters/<id>/skin`）
 
-Step 2.1: 设置页面 UI 改造
-// app/settings/page.tsx - 新增 API 池管理 UI
-const ApiPoolManager = ({ provider }: { provider: string }) => {
-return (
-<Card className="space-y-4">
+`characters.skin` 结构：`{ version: 1, css, regexScripts[], renderHtml, allowedUrlHosts[] }`。
 
-<div className="flex items-center justify-between">
-<h3 className="text-lg font-semibold">{provider.toUpperCase()} API 池</h3>
+CSS 只作用于聊天页，常用选择器（完整列表见编辑器侧栏 / `src/lib/skins/docs.ts`）：
 
-          {/* 模式选择器 */}
-          <Select value={mode} onValueChange={setMode}>
-            <SelectItem value="single">单API模式</SelectItem>
-            <SelectItem value="active_only">多API选择模式</SelectItem>
-            <SelectItem value="round_robin">轮询模式</SelectItem>
-          </Select>
-        </div>
+| 选择器 | 说明 |
+|---|---|
+| `#cv_chat_root` | 聊天页根容器，所有规则都会被限定在它里面 |
+| `#cv_background_image` / `#cv_background_overlay` | 背景图层 / 遮罩 |
+| `#cv_chat_header` / `#cv_chat_body` / `#cv_messages_container` | 顶部栏 / 滚动区 / 消息列表 |
+| `.cv_message_row_ai` / `.cv_message_row_user` | AI / 用户消息行 |
+| `.cv_ai_message_bubble` / `.cv_user_message_bubble` | 气泡 |
+| `.cv_message_avatar` / `.cv-markdown` | 头像 / 气泡内 Markdown |
+| `#cv_chat_input_box` / `#cv_chat_input_textarea` / `#cv_send_button` | 输入框 / 文本域 / 发送键 |
 
-        {/* API列表 */}
-        <div className="space-y-3">
-          {apis.map((api, index) => (
-            <div key={api.id} className="flex items-center space-x-3 p-3 border rounded-lg">
-              {/* 健康状态指示器 */}
-              <div className={`w-3 h-3 rounded-full ${
-                api.isHealthy ? 'bg-green-500' : 'bg-red-500'
-              }`} />
+正则脚本字段（对齐酒馆，可直接导入酒馆 regex JSON）：
 
-              {/* API名称和key输入 */}
-              <div className="flex-1 space-y-2">
-                <Input
-                  placeholder="API名称 (如: Gemini-主力)"
-                  value={api.name}
-                  onChange={(e) => updateApiName(api.id, e.target.value)}
-                />
-                <Input
-                  type="password"
-                  placeholder="API Key"
-                  value={api.apiKey}
-                  onChange={(e) => updateApiKey(api.id, e.target.value)}
-                />
-              </div>
+| 字段 | 说明 |
+|---|---|
+| `find` | 正则源码（不含两侧 `/`） |
+| `flags` | `gimsuy` 子集，默认 `g` |
+| `replace` | 替换串，支持 `$1…$9` `$&` `$<name>` `{{match}}` |
+| `trimStrings` | 替换前先从匹配中剔除的子串 |
+| `target` | `ai` / `user` / `both`，默认 `ai` |
+| `renderAsHtml` | 输出视为 HTML，交给沙箱 iframe 渲染 |
+| `enabled` | 开关 |
 
-              {/* 控制按钮 */}
-              <div className="flex items-center space-x-2">
-                {mode === 'active_only' && (
-                  <Switch
-                    checked={api.isActive}
-                    onCheckedChange={(checked) => toggleApiActive(api.id, checked)}
-                  />
-                )}
+`renderHtml: true` 时，AI 回复里的 `<div>` / `<section>` / `<style>` 等块级原始 HTML 也会被切出送进沙箱。
 
-                {mode === 'round_robin' && (
-                  <Badge variant="outline">
-                    优先级: {api.priority}
-                  </Badge>
-                )}
+## 开发
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => testApiConnection(api.id)}
-                >
-                  <Zap className="w-4 h-4" />
-                  测试
-                </Button>
+```bash
+npm run dev         # next dev（turbopack）
+npm run typecheck   # tsc --noEmit
+npm run lint        # eslint .
+npm run test        # vitest run（116 个用例：prompt 组装、预设导入、CSS 清洗、正则脚本、皮肤样本、SSRF 守卫等）
+npm run build       # next build
+```
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeApi(api.id)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
+**不要在 `next dev` 运行时跑 `next build`**：两者都会改写 `next-env.d.ts`，同时存在会让 Turbopack 反复重编译、浏览器无限刷新。先停掉 dev 再 build；已经进入循环就全部停掉，`rm -rf .next` 后重新 dev。
 
-        {/* 添加新API按钮 */}
-        <Button
-          variant="outline"
-          onClick={() => addNewApi(provider)}
-          className="w-full"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          添加新的 {provider.toUpperCase()} API
-        </Button>
+架构决策（A1–A16）、设计系统 token 表、每个 phase 的任务与验收都在 `docs/REFACTOR_PLAN.md`；约定见 `CLAUDE.md`。v1 代码、SQL 与设计笔记归档在 git tag `v1-archive`。
 
-        {/* 轮询模式额外配置 */}
-        {mode === 'round_robin' && (
-          <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-            <h4 className="font-medium mb-2">轮询配置</h4>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">失败重试次数:</span>
-                <Input
-                  type="number"
-                  className="w-20"
-                  min="1"
-                  max="5"
-                  value={retryCount}
-                  onChange={(e) => setRetryCount(Number(e.target.value))}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">健康检查间隔:</span>
-                <Select value={healthCheckInterval} onValueChange={setHealthCheckInterval}>
-                  <SelectItem value="5m">5分钟</SelectItem>
-                  <SelectItem value="15m">15分钟</SelectItem>
-                  <SelectItem value="30m">30分钟</SelectItem>
-                </Select>
-              </div>
-            </div>
-          </div>
-        )}
-      </Card>
-    );
+## 明确不做的事
 
-};
-
-Phase 3: 核心轮询逻辑 (Core Logic)
-
-Step 3.1: API 选择器服务
-// lib/apiSelector.ts
-class ApiSelector {
-private config: ApiPoolConfig;
-
-    constructor() {
-      this.config = this.loadConfig();
-    }
-
-    // 根据模式选择API
-    selectApi(provider: string): ApiConfig | null {
-      const pool = this.config.pools[provider] || [];
-
-      switch (this.config.mode) {
-        case 'single':
-          return pool.find(api => api.isActive) || pool[0] || null;
-
-        case 'active_only':
-          const activeApis = pool.filter(api => api.isActive && api.isHealthy);
-          return activeApis.length > 0 ? activeApis[0] : null;
-
-        case 'round_robin':
-          return this.selectRoundRobin(provider);
-
-        default:
-          return null;
-      }
-    }
-
-    // 轮询选择逻辑
-    private selectRoundRobin(provider: string): ApiConfig | null {
-      const pool = this.config.pools[provider] || [];
-      const healthyApis = pool.filter(api => api.isActive && api.isHealthy);
-
-      if (healthyApis.length === 0) return null;
-
-      // 获取当前轮询索引
-      let currentIndex = this.config.roundRobinState[provider] || 0;
-
-      // 确保索引在有效范围内
-      if (currentIndex >= healthyApis.length) {
-        currentIndex = 0;
-      }
-
-      const selectedApi = healthyApis[currentIndex];
-
-      // 更新轮询索引
-      this.config.roundRobinState[provider] = (currentIndex + 1) % healthyApis.length;
-
-      // 更新使用时间
-      selectedApi.lastUsedAt = Date.now();
-
-      this.saveConfig();
-      return selectedApi;
-    }
-
-    // 标记API错误
-    markApiError(apiId: string) {
-      Object.values(this.config.pools).forEach(pool => {
-        const api = pool.find(a => a.id === apiId);
-        if (api) {
-          api.errorCount++;
-          // 连续3次错误就标记为不健康
-          if (api.errorCount >= 3) {
-            api.isHealthy = false;
-          }
-        }
-      });
-      this.saveConfig();
-    }
-
-    // 标记API成功
-    markApiSuccess(apiId: string) {
-      Object.values(this.config.pools).forEach(pool => {
-        const api = pool.find(a => a.id === apiId);
-        if (api) {
-          api.errorCount = 0;
-          api.isHealthy = true;
-          api.lastUsedAt = Date.now();
-        }
-      });
-      this.saveConfig();
-    }
-
-}
-
-export const apiSelector = new ApiSelector();
-
-Step 3.2: 聊天 API 重构
-// app/api/chat/route.ts - 重构以支持 API 轮询
-export async function POST(request: Request) {
-try {
-const { model, systemPrompt, messages, sessionId, userMessage } = await request.json();
-
-      // 解析provider
-      const provider = model.split('-')[0]; // 如 'gemini-3-pro-preview' -> 'gemini'
-
-      // 选择API
-      const selectedApi = apiSelector.selectApi(provider);
-
-      if (!selectedApi) {
-        return Response.json(
-          { error: `没有可用的${provider} API` },
-          { status: 400 }
-        );
-      }
-
-      console.log(`🔄 使用API: ${selectedApi.name} (ID: ${selectedApi.id})`);
-
-      try {
-        // 调用AI API
-        const response = await callAiApi({
-          apiConfig: selectedApi,
-          model,
-          messages,
-          systemPrompt
-        });
-
-        // 标记成功
-        apiSelector.markApiSuccess(selectedApi.id);
-
-        return Response.json({
-          content: response.content,
-          apiUsed: selectedApi.name // 返回使用的API信息
-        });
-
-      } catch (apiError) {
-        console.error(`❌ API ${selectedApi.name} 调用失败:`, apiError);
-
-        // 标记错误
-        apiSelector.markApiError(selectedApi.id);
-
-        // 在轮询模式下，尝试使用下一个API
-        if (apiSelector.getMode() === 'round_robin') {
-          const fallbackApi = apiSelector.selectApi(provider);
-          if (fallbackApi && fallbackApi.id !== selectedApi.id) {
-            console.log(`🔄 回退到API: ${fallbackApi.name}`);
-
-            try {
-              const fallbackResponse = await callAiApi({
-                apiConfig: fallbackApi,
-                model,
-                messages,
-                systemPrompt
-              });
-
-              apiSelector.markApiSuccess(fallbackApi.id);
-              return Response.json({
-                content: fallbackResponse.content,
-                apiUsed: fallbackApi.name,
-                fallbackUsed: true
-              });
-            } catch (fallbackError) {
-              apiSelector.markApiError(fallbackApi.id);
-            }
-          }
-        }
-
-        throw apiError;
-      }
-
-    } catch (error) {
-      return Response.json(
-        { error: error.message },
-        { status: 500 }
-      );
-    }
-
-}
-
-Phase 4: 健康监控与故障恢复 (Health Monitoring)
-
-Step 4.1: 健康检查服务
-// lib/healthChecker.ts
-class HealthChecker {
-private checkInterval: NodeJS.Timeout | null = null;
-
-    startMonitoring() {
-      this.checkInterval = setInterval(() => {
-        this.performHealthChecks();
-      }, 15 * 60 * 1000); // 每15分钟检查一次
-    }
-
-    stopMonitoring() {
-      if (this.checkInterval) {
-        clearInterval(this.checkInterval);
-        this.checkInterval = null;
-      }
-    }
-
-    private async performHealthChecks() {
-      const config = apiSelector.getConfig();
-
-      for (const [provider, pool] of Object.entries(config.pools)) {
-        for (const api of pool) {
-          if (!api.isHealthy && api.errorCount >= 3) {
-            // 对不健康的API进行恢复测试
-            const isHealthy = await this.testApiHealth(api);
-            if (isHealthy) {
-              api.isHealthy = true;
-              api.errorCount = 0;
-              console.log(`✅ API ${api.name} 已恢复健康`);
-            }
-          }
-        }
-      }
-
-      apiSelector.saveConfig();
-    }
-
-    private async testApiHealth(api: ApiConfig): Promise<boolean> {
-      try {
-        // 发送一个简单的测试请求
-        const testResponse = await fetch('/api/test-connection', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            provider: api.provider,
-            apiKey: api.apiKey,
-            baseUrl: api.baseUrl
-          })
-        });
-
-        return testResponse.ok;
-      } catch {
-        return false;
-      }
-    }
-
-}
-
-export const healthChecker = new HealthChecker();
-
-Phase 5: 用户体验优化 (UX Enhancement)
-
-Step 5.1: 聊天界面状态显示
-// 在聊天页面显示当前使用的 API 信息
-const ApiStatusIndicator = () => {
-const [currentApi, setCurrentApi] = useState<string>('');
-const [apiMode, setApiMode] = useState<string>('single');
-
-    return (
-      <div className="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400">
-        <div className="flex items-center space-x-1">
-          <div className="w-2 h-2 rounded-full bg-green-500" />
-          <span>使用: {currentApi || '默认API'}</span>
-        </div>
-
-        {apiMode === 'round_robin' && (
-          <Badge variant="outline" className="text-xs">
-            轮询模式
-          </Badge>
-        )}
-      </div>
-    );
-
-};
-
-Step 5.2: 实时通知系统
-// 当 API 切换或出现错误时显示 toast 通知
-const useApiNotifications = () => {
-useEffect(() => {
-const handleApiSwitch = (event: CustomEvent) => {
-toast.success(`已切换到: ${event.detail.apiName}`);
-};
-
-      const handleApiError = (event: CustomEvent) => {
-        toast.error(`API错误: ${event.detail.apiName}, 正在尝试备用API`);
-      };
-
-      window.addEventListener('apiSwitch', handleApiSwitch);
-      window.addEventListener('apiError', handleApiError);
-
-      return () => {
-        window.removeEventListener('apiSwitch', handleApiSwitch);
-        window.removeEventListener('apiError', handleApiError);
-      };
-    }, []);
-
-};
-
-Phase 6: 测试与部署 (Testing & Deployment)
-
-Step 6.1: 单元测试
-// **tests**/apiSelector.test.ts
-describe('ApiSelector', () => {
-test('single mode selects first active API', () => {
-// 测试单 API 模式
-});
-
-    test('round_robin mode rotates through APIs', () => {
-      // 测试轮询模式
-    });
-
-    test('handles API failures gracefully', () => {
-      // 测试错误处理
-    });
-
-});
-
-Step 6.2: 渐进式部署
-
-1. 先部署数据迁移逻辑，确保现有用户无感知
-2. 逐步开放新功能，默认保持单 API 模式
-3. 提供用户引导，介绍新功能的使用方法
-
-📊 预期效果
-
-- 速度提升: 轮询模式可以避开 API 限流，理论提升 30-50%响应速度
-- 可靠性: 故障自动切换，可用性从 95%提升到 99%+
-- 成本优化: 分散请求到多个账户，避免单账户配额限制
-- 用户体验: 透明的 API 管理，无感知的故障恢复
+- 手机 App / PWA / IM 式手机聊天：网页保持响应式即可（A13）。
+- 多角色「剧本」模式 / 群聊（A15）。
+- 贴纸系统（旧实现已删，若需要会重新设计）。

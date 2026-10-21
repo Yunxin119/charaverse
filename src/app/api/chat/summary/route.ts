@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { completeText } from '@/lib/llm/complete'
-import { connectionFromRequest } from '@/lib/llm/legacyHeaders'
+import { CONNECTION_HEADER, decodeConnection } from '@/lib/llm/connection'
 import { z } from 'zod'
 import { requireUser } from '@/lib/server/auth'
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/server/rateLimit'
 
 interface SummaryGenerateRequest {
   sessionId: string
@@ -65,8 +66,10 @@ export async function POST(request: NextRequest) {
     const auth = await requireUser(request)
     if (!auth) return NextResponse.json({ error: '请先登录' }, { status: 401 })
     const { user, supabase } = auth
+    const limited = await enforceRateLimit(supabase, user.id, RATE_LIMITS.summary)
+    if (limited) return limited
 
-    if (!connectionFromRequest(request.headers)) {
+    if (!decodeConnection(request.headers.get(CONNECTION_HEADER))) {
       return NextResponse.json({ error: '缺少模型连接信息（API Key）' }, { status: 400 })
     }
 
@@ -385,7 +388,7 @@ ${conversationText}
     }
 
     // 调用模型生成摘要（直接走 lib/llm，不再 HTTP 回调自己）
-    const connection = connectionFromRequest(request.headers)
+    const connection = decodeConnection(request.headers.get(CONNECTION_HEADER))
     if (!connection) {
       return NextResponse.json({ error: '缺少模型连接信息' }, { status: 400 })
     }

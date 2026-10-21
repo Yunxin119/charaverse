@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/lib/server/auth'
-import { connectionFromRequest } from '@/lib/llm/legacyHeaders'
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/server/rateLimit'
+import { CONNECTION_HEADER, decodeConnection } from '@/lib/llm/connection'
 import { conversationTurns, diaryErrorResponse, writeDiary, type SourceMessage } from '../_lib/diary'
 
 const MIN_NEW_MESSAGES = 3
@@ -14,8 +15,10 @@ export async function POST(request: NextRequest) {
   const auth = await requireUser(request)
   if (!auth) return NextResponse.json({ error: '请先登录' }, { status: 401 })
   const { user, supabase } = auth
+  const limited = await enforceRateLimit(supabase, user.id, RATE_LIMITS.diary)
+  if (limited) return limited
 
-  const connection = connectionFromRequest(request.headers)
+  const connection = decodeConnection(request.headers.get(CONNECTION_HEADER))
   if (!connection) return NextResponse.json({ error: '没有可用的模型连接，请先在设置里配置 API' }, { status: 400 })
 
   let sessionId: string | undefined

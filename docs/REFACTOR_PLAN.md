@@ -11,8 +11,8 @@
 | P2 | 聊天核心重写：流式、预设驱动的 prompt 组装、消息组件 | 1.5 天 | ✅ 2026-10-20（已实测） |
 | P3 | 可定制化：预设导入/管理、主题导入、作者皮肤、HTML 块沙箱 | 1.5 天 | ✅ 2026-10-20（已实测） |
 | P4 | 其余页面换皮 + API 连接管理合并 | 1 天 | ✅ 2026-10-21（已实测） |
-| P5 | 记忆 / 摘要 / 日记：schema 驱动重建 | 1 天 | 🟡 2026-10-21 代码完成，待你跑 0005 迁移 + 实测 |
-| P6 | 加固：限流、日志、CSP、测试、性能 | 0.5 天 | ⬜ |
+| P5 | 记忆 / 摘要 / 日记：schema 驱动重建 | 1 天 | ✅ 2026-10-21（已实测） |
+| P6 | 加固：限流、日志、CSP、测试、性能 | 0.5 天 | 🟡 2026-10-21 代码完成，待你跑 0006 迁移 + 实测 |
 
 状态图例：⬜ 未开始 · 🟡 进行中 · ✅ 完成 · ⏸ 暂缓
 
@@ -91,9 +91,9 @@
 |---|---|---|---|
 | A1 | 框架版本 | 升到 **Next 16 最新 + React 19.2**（升级失败则退到 15.5.x 最新补丁） | 当前版本有 critical RCE；反正 UI 要重写，一步到位 |
 | A2 | 状态管理 | **去掉 Redux** → 服务端数据用 TanStack Query，客户端 UI 状态用 Zustand | chatSlice+enhancedChatSlice 2k 行本来就要重写；Query 自带缓存/重试/乐观更新 |
-| A3 | 鉴权 | `@supabase/ssr` + `middleware.ts`（cookie session），API route 一律 `getUser()` | 现在页面守卫全在客户端，API 无鉴权 |
-| A4 | LLM 层 | **Vercel AI SDK**（`ai` + `@ai-sdk/openai-compatible` / `google` / `deepseek`），服务端 `streamText`，客户端 `useChat` | 一套代码覆盖所有 provider + 流式 + 工具调用；删掉 3 份复制 |
-| A5 | BYOK 模型 | key 继续留在客户端（IndexedDB/localStorage，不进 DB），每次请求带 `x-cv-key` header；**服务端只做鉴权 + 校验 + 转发 + 限流**，不落盘不打日志 | 隐私承诺不变；后续可选「加密同步到 Supabase」多设备 |
+| A3 | 鉴权 | `@supabase/ssr` + `src/proxy.ts`（Next 16 的 middleware，cookie session），API route 一律 `requireUser()` | 现在页面守卫全在客户端，API 无鉴权 |
+| A4 | LLM 层 | **Vercel AI SDK 7**（`ai` + `@ai-sdk/openai-compatible` / `openai` / `google` / `deepseek` / `anthropic`），服务端 `streamText`，客户端自写 `useChatStream` 解析 UI message stream | 一套代码覆盖所有 provider + 流式；删掉 3 份复制 |
+| A5 | BYOK 模型 | key 留在客户端（zustand + localStorage，不进 DB），每次请求带 `x-cv-connection` header（base64url JSON：kind / apiKey / baseUrl / model）；**服务端只做鉴权 + 校验 + 转发 + 限流**，不落盘不打日志 | 隐私承诺不变；后续可选「加密同步到 Supabase」多设备 |
 | A6 | `baseUrl` 安全 | 服务端校验：必须 https、禁止 IP 字面量/私网/localhost/云元数据、禁止 `?#`、路径固定拼接；可选 host allowlist | 堵 SSRF |
 | A7 | 数据库 | 用 Supabase CLI 建 `supabase/migrations/0001_baseline.sql`，根目录全部 SQL 归档；`supabase gen types` 生成 `types/database.ts` 作为唯一类型来源 | 结束 3 份类型 + 33 个零散 SQL |
 | A8 | 主题系统 | 三层：① **App 主题** = `--cv-*` token JSON（可导入/导出，像酒馆主题）② **聊天皮肤** = 作者的 CSS（+可选 HTML 模板）作用于 `#cv_chat_root` ③ **消息内 HTML 块** = 正则脚本 → sandboxed iframe | 见 §5 |
@@ -128,11 +128,11 @@ src/
     memory/                 # MemoryCard, MemoryForm (schema 驱动), SummaryTimeline
     theme/                  # ThemeProvider, ThemeImportDialog, SkinEditor
   lib/
-    supabase/{client,server,middleware}.ts
-    llm/{providers.ts, resolveConnection.ts, guards.ts}   # AI SDK 封装 + baseUrl 校验
+    supabase/{client,server}.ts          # + src/proxy.ts 路由守卫
+    llm/{providers.ts, connection.ts, complete.ts, useConnection.ts}   # AI SDK 封装；守卫在 server/llmGuards.ts
     prompt/{buildSystemPrompt.ts, context.ts, memoryTable.ts}
-    theme/{tokens.ts, schema.ts, sanitizeCss.ts, applyTheme.ts}
-    skins/{regexScripts.ts, htmlBlock.ts}
+    theme/{builtin.ts, schema.ts, applyTheme.ts}
+    skins/{schema.ts, sanitizeCss.ts, regexScripts.ts, htmlBlocks.ts, docs.ts}
     connections/            # 统一的 API 连接模型（替代 apiManager/useApiConfig/Relay*）
   stores/                   # zustand: ui, connections, chatSettings
   queries/                  # TanStack Query hooks: useSession, useMessages, useCharacter...
@@ -206,7 +206,7 @@ docs/                       # 本文件 + design/
       "injection": { "position": "absolute", "depth": 2, "role": "system" } }
   ],
   "sampling": { "temperature": 0.9, "top_p": 0.95, "frequency_penalty": 0, "presence_penalty": 0, "max_tokens": 2048 },
-  "formatting": { "wrapUserMessage": "", "assistantPrefill": "" } }
+  "formatting": { "assistantPrefill": "" } }   // 另有 sampling.top_k 与 source（导入来源）
 ```
 - **marker 条目**是占位符，组装时用我们自己的数据填：`charDescription` / `charPersonality` / `scenario`（角色卡模块）、`personaDescription`（用户人设）、`memoryTable`、`summaries`、`worldInfo`（预留）、`chatHistory`、`dialogueExamples`（预留）。
 - **普通条目**就是作者写的文本，按 `prompts[]` 顺序进 messages；`injection.position: absolute` 的条目按 `depth` 插进历史里（酒馆 in-chat 注入）。
@@ -307,17 +307,19 @@ docs/                       # 本文件 + design/
 - [x] 日记：入口恢复（header 菜单），复用 `lib/llm`，删 2 份复制的 provider 代码
 - [x] 修 schema 不一致：`chat_memories.session_id` text→uuid，`summary_id`/message id int→bigint
 - [ ] **需要你手动执行**：Supabase SQL editor 跑 `supabase/migrations/0005_memory_fixes.sql`（列类型修正 + `delete_summary_with_rollback` 函数）。不跑的话删除摘要会报错
-- 验收：memory 页 193 行（组件化）✅；`tsc` / `eslint` / `next build` / 91 测试全绿 ✅；自动摘要 + 记忆深化闭环 —— **待你实测**（聊到阈值后看记忆页是否出现新摘要和记忆）
+- 验收：memory 页 193 行（组件化）✅；`tsc` / `eslint` / `next build` / 测试全绿 ✅；自动摘要 + 记忆深化闭环已实测 ✅
 
 ### P6 · 加固 & 收尾（0.5 天）
-- [ ] 限流：Upstash Ratelimit（或 Supabase 表计数）按 user 每分钟 N 次 `/api/chat`；body 大小、`max_tokens` 上限可配
-- [ ] `next.config` headers：CSP（`frame-src 'self' blob:`、`img-src` allowlist）、HSTS、`X-Frame-Options`、Referrer-Policy
-- [ ] 日志：`lib/log.ts`，生产只打 level ≥ warn，永不打 body / key；删剩余 `console.log`
-- [ ] 错误边界 + toast（sonner）统一
-- [ ] 测试：vitest 覆盖 `buildSystemPrompt`、`sanitizeCss`、`guards`（SSRF 用例）、`regexScripts`；Playwright 一条冒烟
-- [ ] favicon / 社交分享图换新色 `#41140e`
-- [ ] 性能：消息列表虚拟化、图片 `next/image`、字体 preload、`backdrop-filter` 在低端机降级（`@supports` + `prefers-reduced-transparency`）
-- [ ] 删 `docs/legacy-*`（或归档到 git tag `v1-archive`）
+- [x] 限流：Postgres 函数 `consume_rate_limit`（固定窗口，`rate_limits` 表）+ 内存兜底；chat 30/min、summary 6/min、diary 6/min、连接测试 12/min；body ≤ 20k 字、`max_tokens` 由预设决定（≤ 65536）
+- [x] `next.config` headers：CSP（script 仅 self + inline、connect 仅 self + Supabase、frame-src self/blob、frame-ancestors none）、HSTS（生产）、nosniff、X-Frame-Options DENY、Referrer-Policy、Permissions-Policy
+- [x] 日志：`lib/log.ts`，生产只打 level ≥ warn；`src` 里已无 `console.log`（测试除外）
+- [x] 错误边界（`error.tsx` / `global-error.tsx` / `not-found.tsx`）+ toast（sonner，`AppToaster`）统一
+- [x] 测试：vitest 116 个用例，覆盖 assemble / presets（含酒馆导入）/ macros / tokens / sanitizeCss / regexScripts / 真实皮肤样本 / SSRF guards / 连接头编码 / 角色卡解析 / 记忆表格式化（Playwright 冒烟未做：需要测试账号，留 backlog）
+- [x] favicon.svg / icon-base.svg / manifest 换新色，8 个 PNG 图标 + apple-touch-icon + favicon.ico 已从新 SVG 重新生成
+- [~] 性能：消息按 40 条分页懒加载（虚拟化留 backlog）、字体走 `next/font`、`prefers-reduced-transparency` / `prefers-reduced-motion` 降级已在 tokens.css
+- [x] 旧代码 / SQL / 笔记归档到 git tag `v1-archive`，`docs/legacy-*` 已删；README 重写
+- [ ] **需要你手动执行**：Supabase SQL editor 跑 `supabase/migrations/0006_rate_limits.sql`（`rate_limits` 表 + `consume_rate_limit` 函数）。不跑也能用（内存兜底），但多实例部署时限流不准
+- 验收：`tsc` / `eslint` / `next build` / 116 测试全绿 ✅；旧 `x-api-key` 兼容层已删；`@types/node` 升到 22 后 `npm install` 不再需要 `--legacy-peer-deps`；浏览器响应头能看到 CSP、连续快速发 31 条消息会收到 429 —— **待你实测**
 
 ### Backlog（不排期）
 - API key 加密同步（多设备）

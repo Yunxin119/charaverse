@@ -2,9 +2,9 @@
 
 import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Camera, User, Settings, Upload } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Camera, Users, Loader2 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { PosterCard, PosterTitle, Chip, IconButton } from '@/components/glass'
 import { uploadUserBanner } from '../lib/avatarUpload'
 
 interface UserBannerProps {
@@ -17,6 +17,7 @@ interface UserBannerProps {
   onBannerUpdate?: (newBannerUrl: string) => void
 }
 
+/** Profile hero: poster block (or the user's banner image) with avatar, name, bio and counts. */
 export function UserBanner({
   username,
   avatar,
@@ -47,109 +48,75 @@ export function UserBanner({
   }
 
   const triggerFileSelect = () => {
-    if (!canEdit) return
+    if (!canEdit || isUploading) return
     fileInputRef.current?.click()
   }
 
+  const initial = username?.charAt(0)?.toUpperCase() || 'U'
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: -20 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-      className="relative -mx-4 -mt-6 mb-8"
+      transition={{ duration: 0.24, ease: [0.2, 0.8, 0.2, 1] }}
+      className="group relative"
     >
-      {/* Banner背景 */}
-      <div className="w-full aspect-[2.5/1] overflow-hidden relative group">
-        {bannerUrl ? (
-          <>
-            <img
-              src={bannerUrl}
-              alt="用户Banner"
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-          </>
-        ) : (
-          <>
-            {/* 默认渐变背景 */}
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500">
-              <div className="absolute inset-0 opacity-60">
-                <div className="absolute top-0 left-1/4 w-64 h-64 bg-white rounded-full blur-3xl"></div>
-                <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-white rounded-full blur-3xl"></div>
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-white rounded-full blur-2xl"></div>
-              </div>
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-          </>
-        )}
-
-        {/* 上传按钮 - 只有可编辑时显示 */}
-        {canEdit && (
-          <Button
-            onClick={triggerFileSelect}
-            disabled={isUploading}
-            variant="ghost"
-            size="sm"
-            className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white border-white/20 group-hover:opacity-100 opacity-0 transition-opacity duration-200"
-          >
-            {isUploading ? (
-              <Upload className="w-4 h-4 animate-pulse" />
-            ) : (
-              <Camera className="w-4 h-4" />
-            )}
-          </Button>
-        )}
-
-        {/* 用户信息 - 位于Banner底部 */}
-        <div className="absolute bottom-0 left-0 right-0 p-6">
-          <div className="flex items-end space-x-4">
-            {/* 用户头像 */}
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2, duration: 0.4 }}
-              className="relative"
-            >
-              <Avatar className="w-20 h-20 border-4 border-white shadow-xl">
-                <AvatarImage src={avatar} alt={username} />
-                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xl font-bold">
-                  {username?.charAt(0)?.toUpperCase() || 'U'}
-                </AvatarFallback>
-              </Avatar>
-            </motion.div>
-
-            {/* 用户信息 */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3, duration: 0.4 }}
-              className="flex-1 min-w-0 pb-2"
-            >
-              <h1 className="text-2xl font-bold text-white drop-shadow-lg mb-1">
-                {username || '未设置用户名'}
-              </h1>
-              {bio ? (
-                <p className="text-white/90 text-sm drop-shadow mb-2 line-clamp-2">
-                  {bio}
-                </p>
-              ) : (
-                <p className="text-white/90 text-sm drop-shadow mb-2 line-clamp-2">
-                  暂无简介
-                </p>
+      <PosterCard tone="ink" image={bannerUrl || undefined} className="flex min-h-56 flex-col justify-end p-5 sm:min-h-64 sm:p-7">
+        {/* 顶部：品牌标签 + 上传按钮 */}
+        <div className="absolute inset-x-5 top-5 flex items-center justify-between sm:inset-x-7 sm:top-7">
+          <span className="font-mono text-[11px] uppercase tracking-[0.2em] opacity-70">Profile</span>
+          {canEdit && (
+            <div className="flex items-center gap-2">
+              {!bannerUrl && (
+                <Chip tone="outline" className="hidden border-white/20 bg-white/10 text-[var(--cv-cream-200)] sm:inline-flex">
+                  添加个人横幅
+                </Chip>
               )}
-              <div className="flex items-center space-x-4 text-white/80 text-sm">
-                <div className="flex items-center space-x-1">
-                  <User className="w-4 h-4" />
-                  <span>{charactersCount} 个角色</span>
-                </div>
-              </div>
-            </motion.div>
-          </div>
+              <IconButton
+                label={bannerUrl ? '更换横幅' : '上传横幅'}
+                variant="glass"
+                size="sm"
+                onClick={triggerFileSelect}
+                disabled={isUploading}
+                className="text-[var(--cv-cream-200)]"
+              >
+                {isUploading ? <Loader2 className="animate-spin" /> : <Camera />}
+              </IconButton>
+            </div>
+          )}
         </div>
 
-        {/* 渐变遮罩 - 确保文字可读性 */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-      </div>
+        {/* 底部：头像 + 用户信息 */}
+        <div className="flex items-end gap-4 pt-16">
+          <motion.div
+            initial={{ scale: 0.85, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.12, duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
+            className="shrink-0"
+          >
+            <Avatar className="size-20 ring-4 ring-[var(--cv-cream-200)] shadow-[0_16px_40px_-16px_rgba(0,0,0,0.7)] sm:size-24">
+              <AvatarImage src={avatar} alt={username} className="object-cover" />
+              <AvatarFallback className="bg-cv-accent font-display text-2xl font-semibold text-cv-accent-fg">{initial}</AvatarFallback>
+            </Avatar>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.18, duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
+            className="min-w-0 flex-1 pb-1"
+          >
+            <PosterTitle className="truncate text-2xl sm:text-3xl">{username || '未设置用户名'}</PosterTitle>
+            <p className="mt-1 line-clamp-2 text-sm opacity-80">{bio || '暂无简介'}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Chip tone="outline" className="border-white/20 bg-white/10 text-[var(--cv-cream-200)]">
+                <Users className="size-3.5" />
+                {charactersCount} 个角色
+              </Chip>
+            </div>
+          </motion.div>
+        </div>
+      </PosterCard>
 
       {/* 隐藏的文件上传input */}
       <input
@@ -165,18 +132,6 @@ export function UserBanner({
         }}
         className="hidden"
       />
-
-      {/* 上传提示 - 仅在没有banner且可编辑时显示 */}
-      {canEdit && !bannerUrl && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="absolute top-4 left-4 bg-black/20 backdrop-blur-sm rounded-lg px-3 py-1"
-        >
-          <p className="text-white text-xs">点击右上角添加个人横幅</p>
-        </motion.div>
-      )}
     </motion.div>
   )
 }

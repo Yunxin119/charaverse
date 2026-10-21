@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, Sparkles, AlertCircle, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { useAuth } from '@/providers/AuthProvider'
 import { useCharacter, useMessages, useProfile, useSession, usePresets } from '@/queries'
 import {
@@ -75,11 +76,9 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [inspiring, setInspiring] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
-
   const autoSummary = useAutoSummary({
     sessionId, userId, characterName: card?.name ?? '角色', every: settings.context.autoSummaryEvery, headers,
-    onDone: (ok) => { if (ok) { setToast('已自动整理剧情摘要与记忆'); setTimeout(() => setToast(null), 3500) } },
+    onDone: (ok) => { if (ok) toast.success('已自动整理剧情摘要与记忆') },
   })
 
   const busy = stream.isStreaming || editMessage.isPending || deleteMessages.isPending || deleteFrom.isPending || selectSwipe.isPending || branch.isPending
@@ -226,9 +225,6 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         }
       />
 
-      {toast && (
-        <div className="pointer-events-none absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-full glass-strong px-4 py-1.5 text-xs text-cv-fg-muted">{toast}</div>
-      )}
       {(stream.error || notice) && (
         <div className="mx-auto mb-1 flex w-[min(100%-1.5rem,48rem)] items-center gap-2 rounded-cv-md border border-cv-danger/30 bg-[color-mix(in_oklab,var(--cv-danger)_10%,var(--cv-bg-elevated))] px-3 py-2 text-sm text-cv-danger">
           <AlertCircle className="size-4 shrink-0" />

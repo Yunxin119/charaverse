@@ -2,9 +2,9 @@
 
 import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Camera, Upload, X, RefreshCw } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Camera, Upload, RefreshCw } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { IconButton } from '@/components/glass'
 import { cn } from '@/lib/utils'
 
 interface AvatarUploadProps {
@@ -17,12 +17,13 @@ interface AvatarUploadProps {
 }
 
 const sizeClasses = {
-  sm: 'w-16 h-16',
-  md: 'w-24 h-24',
-  lg: 'w-32 h-32',
-  xl: 'w-40 h-40'
+  sm: 'size-16 text-lg',
+  md: 'size-24 text-2xl',
+  lg: 'size-32 text-3xl',
+  xl: 'size-40 text-4xl'
 }
 
+/** Click-to-upload avatar: neu ring, hover camera veil, preview while uploading. */
 export function AvatarUpload({
   currentAvatar,
   fallbackText = '头像',
@@ -51,30 +52,21 @@ export function AvatarUpload({
       return
     }
 
+    // 创建预览URL
+    const preview = URL.createObjectURL(file)
     try {
       setIsUploading(true)
-      
-      // 创建预览URL
-      const preview = URL.createObjectURL(file)
       setPreviewUrl(preview)
 
       // 上传文件
-      const newAvatarUrl = await onUpload(file)
-      
-      // 清理预览URL
-      URL.revokeObjectURL(preview)
-      setPreviewUrl(null)
-      
+      await onUpload(file)
     } catch (error) {
       console.error('上传失败:', error)
       alert(error instanceof Error ? error.message : '上传失败，请重试')
-      
-      // 清理预览URL
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl)
-        setPreviewUrl(null)
-      }
     } finally {
+      // 清理预览URL
+      URL.revokeObjectURL(preview)
+      setPreviewUrl(null)
       setIsUploading(false)
       // 清空input值，允许重新选择同一文件
       if (fileInputRef.current) {
@@ -90,154 +82,71 @@ export function AvatarUpload({
   }
 
   const displayAvatar = previewUrl || currentAvatar
+  const interactive = !disabled && !isUploading
 
   return (
     <div className={cn('relative inline-block', className)}>
       {/* 头像显示区域 */}
       <motion.div
-        whileHover={!disabled && !isUploading ? { scale: 1.05 } : {}}
-        whileTap={!disabled && !isUploading ? { scale: 0.95 } : {}}
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        aria-label={currentAvatar ? '更换头像' : '上传头像'}
+        aria-disabled={disabled || isUploading || undefined}
+        whileHover={interactive ? { scale: 1.04 } : {}}
+        whileTap={interactive ? { scale: 0.96 } : {}}
         className={cn(
-          'relative group',
+          'group relative rounded-full p-1 neu outline-none focus-visible:ring-2 focus-visible:ring-cv-ring',
           sizeClasses[size],
-          disabled ? 'cursor-not-allowed' : 'cursor-pointer'
+          disabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
         )}
         onClick={handleClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            handleClick()
+          }
+        }}
       >
-        <Avatar className={cn('w-full h-full border-2 border-slate-200', sizeClasses[size])}>
+        <Avatar className="size-full ring-1 ring-cv-glass-border">
           <AvatarImage src={displayAvatar} className="object-cover" />
-          <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+          <AvatarFallback className="bg-cv-primary font-display font-semibold text-cv-primary-fg">
             {fallbackText.charAt(0)}
           </AvatarFallback>
         </Avatar>
 
         {/* 上传遮罩 - 只在非禁用且非上传状态时显示 */}
-        {!disabled && (
-          <div className={cn(
-            'absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 transition-opacity duration-200',
-            !isUploading && 'group-hover:opacity-100'
-          )}>
-            {isUploading ? (
-              <RefreshCw className="w-6 h-6 text-white animate-spin" />
-            ) : (
-              <Camera className="w-6 h-6 text-white" />
-            )}
+        {interactive && (
+          <div className="absolute inset-1 flex items-center justify-center rounded-full bg-[color-mix(in_oklab,var(--cv-ink-900)_55%,transparent)] text-[var(--cv-cream-200)] opacity-0 transition-opacity duration-(--cv-dur-fast) group-hover:opacity-100 group-focus-visible:opacity-100">
+            <Camera className="size-[1.1em]" />
           </div>
         )}
 
         {/* 加载状态 */}
         {isUploading && (
-          <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center">
+          <div className="absolute inset-1 flex items-center justify-center rounded-full bg-[color-mix(in_oklab,var(--cv-ink-900)_65%,transparent)] text-[var(--cv-cream-200)]">
             <div className="text-center">
-              <RefreshCw className="w-6 h-6 text-white animate-spin mx-auto mb-1" />
-              <span className="text-xs text-white">上传中...</span>
+              <RefreshCw className="mx-auto mb-1 size-[1em] animate-spin" />
+              <span className="font-mono text-[10px] tracking-wider">上传中…</span>
             </div>
           </div>
         )}
       </motion.div>
 
-      {/* 上传按钮（可选） */}
+      {/* 上传按钮（仅 xl） */}
       {size === 'xl' && (
-        <Button
-          variant="outline"
+        <IconButton
+          label="上传头像"
+          variant="accent"
           size="sm"
-          className="absolute -bottom-2 -right-2 rounded-full w-8 h-8 p-0"
+          className="absolute -bottom-1 -right-1"
           onClick={handleClick}
           disabled={disabled || isUploading}
         >
-          <Upload className="w-4 h-4" />
-        </Button>
+          <Upload />
+        </IconButton>
       )}
 
       {/* 隐藏的文件input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFileSelect}
-        className="hidden"
-        disabled={disabled || isUploading}
-      />
-    </div>
-  )
-}
-
-// 简化版本，用于表单中
-export function SimpleAvatarUpload({
-  currentAvatar,
-  onUpload,
-  className = '',
-  disabled = false
-}: {
-  currentAvatar?: string
-  onUpload: (file: File) => Promise<string>
-  className?: string
-  disabled?: boolean
-}) {
-  const [isUploading, setIsUploading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    if (!file.type.startsWith('image/')) {
-      alert('请选择图片文件')
-      return
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      alert('图片文件不能超过10MB')
-      return
-    }
-
-    try {
-      setIsUploading(true)
-      await onUpload(file)
-    } catch (error) {
-      console.error('上传失败:', error)
-      alert(error instanceof Error ? error.message : '上传失败，请重试')
-    } finally {
-      setIsUploading(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    }
-  }
-
-  return (
-    <div className={cn('flex items-center space-x-3', className)}>
-      <Avatar className="w-16 h-16">
-        <AvatarImage src={currentAvatar} />
-        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-          头像
-        </AvatarFallback>
-      </Avatar>
-      
-      <div className="flex-1">
-        <Button
-          variant="outline"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={disabled || isUploading}
-          className="w-full"
-        >
-          {isUploading ? (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              上传中...
-            </>
-          ) : (
-            <>
-              <Upload className="w-4 h-4 mr-2" />
-              {currentAvatar ? '更换头像' : '上传头像'}
-            </>
-          )}
-        </Button>
-        <p className="text-xs text-slate-500 mt-1">
-          支持 JPG、PNG 格式，最大 10MB
-        </p>
-      </div>
-
       <input
         ref={fileInputRef}
         type="file"

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateText } from 'ai'
 import { requireUser } from '@/lib/server/auth'
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/server/rateLimit'
 import { GuardError, summarizeUpstreamError } from '@/lib/server/llmGuards'
 import { CONNECTION_HEADER, decodeConnection } from '@/lib/llm/connection'
 import { resolveModel } from '@/lib/llm/providers'
@@ -12,6 +13,8 @@ export const maxDuration = 30
 export async function POST(request: NextRequest) {
   const auth = await requireUser(request)
   if (!auth) return NextResponse.json({ error: '请先登录' }, { status: 401 })
+  const limited = await enforceRateLimit(auth.supabase, auth.user.id, RATE_LIMITS.connectionTest)
+  if (limited) return limited
   const conn = decodeConnection(request.headers.get(CONNECTION_HEADER))
   if (!conn) return NextResponse.json({ error: '连接信息不合法' }, { status: 400 })
 

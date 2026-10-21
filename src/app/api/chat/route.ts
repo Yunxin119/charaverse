@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { streamText, type ModelMessage } from 'ai'
 import { z } from 'zod'
 import { requireUser } from '@/lib/server/auth'
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/server/rateLimit'
 import { GuardError, summarizeUpstreamError } from '@/lib/server/llmGuards'
 import { CONNECTION_HEADER, decodeConnection } from '@/lib/llm/connection'
 import { needsUserLast, resolveModel } from '@/lib/llm/providers'
@@ -40,6 +41,8 @@ export async function POST(request: NextRequest) {
   const auth = await requireUser(request)
   if (!auth) return NextResponse.json({ error: '请先登录' }, { status: 401 })
   const { user, supabase } = auth
+  const limited = await enforceRateLimit(supabase, user.id, RATE_LIMITS.chat)
+  if (limited) return limited
 
   const conn = decodeConnection(request.headers.get(CONNECTION_HEADER))
   if (!conn) return NextResponse.json({ error: '没有可用的模型连接，请先在设置里配置 API' }, { status: 400 })
