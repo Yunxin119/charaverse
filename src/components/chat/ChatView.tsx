@@ -16,6 +16,7 @@ import { parseSessionSettings, type SessionSettings } from '@/lib/chat/settings'
 import { parseCharacterCard } from '@/lib/chat/characterCard'
 import { BUILTIN_DEFAULT_PRESET } from '@/lib/prompt/presets'
 import { parseSkin } from '@/lib/skins/schema'
+import { parseSnapshot } from '@/components/character/snapshot'
 import { SkinStyle } from './SkinStyle'
 import { Button } from '@/components/ui/button'
 import { PosterCard, PosterTitle } from '@/components/glass'
@@ -35,7 +36,13 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const sessionQ = useSession(sessionId)
   const session = sessionQ.data
   const characterQ = useCharacter(session?.character_id)
-  const character = characterQ.data
+  // Non-owners chat with the published snapshot, never the author's live draft (plan A12)
+  const character = useMemo(() => {
+    const row = characterQ.data
+    if (!row || !userId || row.user_id === userId) return row
+    const snap = parseSnapshot(row.published_snapshot)
+    return snap ? { ...row, name: snap.name, avatar_url: snap.avatar_url ?? row.avatar_url, prompt_template: snap.prompt_template, skin: snap.skin ?? {} } : row
+  }, [characterQ.data, userId])
   const profileQ = useProfile(userId)
   const presetsQ = usePresets(userId)
   const messagesQ = useMessages(sessionId)
@@ -50,7 +57,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   }, [messagesQ.data])
 
   const conn = useConnection()
-  const modelId = settings.model ?? conn.availableModels[0]
+  const modelId = settings.model ?? conn.defaultModel
   const headers = useMemo(() => conn.headersFor(modelId), [conn, modelId])
 
   const stream = useChatStream(sessionId)
@@ -79,12 +86,12 @@ export function ChatView({ sessionId }: { sessionId: string }) {
 
   const requireHeaders = useCallback((): Record<string, string> | null => {
     if (!headers) {
-      setNotice(conn.availableModels.length ? '请先在会话设置里选择一个模型' : '还没有配置任何 API Key，去「我的 → API」添加')
+      setNotice(conn.options.length ? '请先在会话设置里选择一个模型' : '还没有配置任何 API 连接，去「我的 → API 连接」添加')
       setSettingsOpen(true)
       return null
     }
     return headers
-  }, [headers, conn.availableModels.length])
+  }, [headers, conn.options.length])
 
   const runSafe = useCallback(async (opts: Parameters<typeof stream.run>[0]) => {
     try { return await stream.run(opts) } catch { return '' }
@@ -248,7 +255,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         userId={userId}
         title={session.title ?? ''}
         settings={settings}
-        models={conn.availableModels.map((id) => ({ id, label: conn.displayName(id) }))}
+        models={conn.options.map((o) => ({ id: o.ref, label: o.label }))}
         presets={presetsQ.data ?? []}
         builtinPresetName={BUILTIN_DEFAULT_PRESET.name}
         saving={updateSettings.isPending || updateTitle.isPending}

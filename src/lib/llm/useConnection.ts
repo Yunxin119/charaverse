@@ -1,57 +1,48 @@
 'use client'
 
-import { useCallback } from 'react'
-import { useApiConfig } from '@/app/lib/useApiConfig'
+import { useCallback, useEffect, useMemo } from 'react'
+import { useConnectionsStore, listModelOptions, resolveModelRef, defaultModelRef } from '@/stores/connections'
 import { type Connection, encodeConnection, CONNECTION_HEADER } from './connection'
 
 /**
- * Adapter from the legacy model-id based config (useApiConfig / localStorage) to a
- * Connection header. Replaced by the unified connections store in P4.
+ * Model selection for the chat: options come from the saved connections store;
+ * `resolve(stored)` accepts new `<connId>/<model>` refs and legacy model ids.
  */
-export function inferKind(modelId: string, baseUrl?: string): Connection['kind'] {
-  if (modelId.startsWith('named-relay-') || baseUrl) return 'openai-compatible'
-  if (modelId.startsWith('gemini')) return 'google'
-  if (modelId.startsWith('deepseek')) return 'deepseek'
-  if (modelId.startsWith('claude')) return 'anthropic'
-  return 'openai'
-}
-
 export function useConnection() {
-  const api = useApiConfig()
+  const connections = useConnectionsStore((s) => s.connections)
+  const legacyRefMap = useConnectionsStore((s) => s.legacyRefMap)
+  const hydrated = useConnectionsStore((s) => s.hydrated)
+  const runMigration = useConnectionsStore((s) => s.runMigration)
+
+  useEffect(() => { if (hydrated) runMigration() }, [hydrated, runMigration])
+
+  const options = useMemo(() => listModelOptions(connections), [connections])
+  const availableModels = useMemo(() => options.map((o) => o.ref), [options])
 
   const resolve = useCallback(
-    (modelId: string | undefined): Connection | null => {
-      if (!modelId) return null
-      try {
-        const cfg = api.getModelConfig(modelId)
-        if (!cfg.apiKey) return null
-        const kind = inferKind(modelId, cfg.baseUrl)
-        return {
-          kind,
-          apiKey: cfg.apiKey,
-          baseUrl: kind === 'openai-compatible' ? cfg.baseUrl : undefined,
-          model: kind === 'openai-compatible' ? cfg.modelName || modelId : modelId,
-          label: api.getModelDisplayName(modelId),
-        }
-      } catch {
-        return null
-      }
-    },
-    [api]
+    (stored: string | undefined | null): Connection | null => resolveModelRef(stored, connections, legacyRefMap)?.connection ?? null,
+    [connections, legacyRefMap]
   )
-
+  const displayName = useCallback(
+    (stored: string | undefined | null): string => resolveModelRef(stored, connections, legacyRefMap)?.label ?? (stored ?? '未选择模型'),
+    [connections, legacyRefMap]
+  )
   const headersFor = useCallback(
-    (modelId: string | undefined): Record<string, string> | null => {
-      const c = resolve(modelId)
+    (stored: string | undefined | null): Record<string, string> | null => {
+      const c = resolve(stored)
       return c ? { [CONNECTION_HEADER]: encodeConnection(c) } : null
     },
     [resolve]
   )
+  const hasAnyApiConfig = useCallback(() => options.length > 0, [options.length])
 
   return {
-    availableModels: api.availableModels,
-    hasAnyApiConfig: api.hasAnyApiConfig,
-    displayName: api.getModelDisplayName,
+    hydrated,
+    options,
+    availableModels,
+    defaultModel: defaultModelRef(connections),
+    hasAnyApiConfig,
+    displayName,
     resolve,
     headersFor,
   }

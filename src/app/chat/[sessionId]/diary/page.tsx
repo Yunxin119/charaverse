@@ -29,18 +29,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { supabase, type Diary, type ChatSession, type Character } from '@/app/lib/supabase'
 import { useAuth } from '@/providers/AuthProvider'
-
-interface NamedRelayConfig {
-  id: string
-  name: string
-  baseUrl: string
-  apiKey: string
-  modelName: string
-  description?: string
-  supportsThinking?: boolean
-  thinkingBudgetMode?: 'auto' | 'manual'
-  thinkingBudget?: number
-}
+import { useConnection } from '@/lib/llm/useConnection'
+import { parseSessionSettings } from '@/lib/chat/settings'
 
 interface DiaryPageData {
   session: ChatSession | null
@@ -74,59 +64,7 @@ export default function DiaryPage() {
   const [isRegenerating, setIsRegenerating] = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState<number | null>(null)
 
-  // 获取模型对应的API密钥
-  const getApiKeyForModel = (model: string): string | null => {
-    if (model.startsWith('deepseek')) return localStorage.getItem('api_key_deepseek')
-    if (model.startsWith('gemini')) return localStorage.getItem('api_key_gemini')
-    if (model.startsWith('gpt')) return localStorage.getItem('api_key_openai')
-    
-    // 处理命名中转配置
-    if (model.startsWith('named-relay-')) {
-      const configId = model.replace('named-relay-', '')
-      const savedNamedConfigs = localStorage.getItem('named_relay_configs')
-      if (savedNamedConfigs) {
-        try {
-          const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs)
-          const config = namedConfigs.find(c => c.id === configId)
-          return config?.apiKey || null
-        } catch (e) {
-          console.warn('Failed to parse named relay configs')
-        }
-      }
-    }
-    
-    return null
-  }
-
-  // 获取模型的完整配置（包括中转API的baseUrl）
-  const getModelConfig = (model: string) => {
-    // 命名中转配置
-    if (model.startsWith('named-relay-')) {
-      const configId = model.replace('named-relay-', '')
-      const savedNamedConfigs = localStorage.getItem('named_relay_configs')
-      if (savedNamedConfigs) {
-        try {
-          const namedConfigs: NamedRelayConfig[] = JSON.parse(savedNamedConfigs)
-          const config = namedConfigs.find(c => c.id === configId)
-          if (config) {
-            return {
-              apiKey: config.apiKey,
-              baseUrl: config.baseUrl,
-              modelName: config.modelName,
-              isRelay: true
-            }
-          }
-        } catch (e) {
-          console.warn('Failed to parse named relay configs')
-        }
-      }
-    }
-    
-    return {
-      apiKey: getApiKeyForModel(model),
-      isRelay: false
-    }
-  }
+  const conn = useConnection()
 
   // 获取页面数据
   const fetchData = async () => {
@@ -190,12 +128,10 @@ export default function DiaryPage() {
     try {
       setData(prev => ({ ...prev, generating: true, error: null }))
 
-      // 从 localStorage 获取 API 配置
-      const model = localStorage.getItem(`chat_model_${sessionId}`) || 'deepseek-chat'
-      const modelConfig = getModelConfig(model)
-
-      if (!modelConfig.apiKey) {
-        throw new Error('请先在设置中配置对应的 API Key')
+      const sessionModel = parseSessionSettings(data.session?.settings).model
+      const connHeaders = conn.headersFor(sessionModel ?? conn.defaultModel)
+      if (!connHeaders) {
+        throw new Error('请先在「我的 → API 连接」添加 API 连接')
       }
 
       // 获取用户session token
@@ -207,14 +143,7 @@ export default function DiaryPage() {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
-        'x-api-key': modelConfig.apiKey,
-        'x-model': model
-      }
-
-      // 如果是中转API，添加额外的headers
-      if (modelConfig.isRelay) {
-        headers['x-base-url'] = modelConfig.baseUrl || ''
-        headers['x-actual-model'] = modelConfig.modelName || ''
+        ...connHeaders,
       }
 
       const response = await fetch('/api/diary/generate', {
@@ -364,12 +293,10 @@ export default function DiaryPage() {
     try {
       setIsRegenerating(diaryId)
 
-      // 获取API配置
-      const model = localStorage.getItem(`chat_model_${sessionId}`) || 'deepseek-chat'
-      const modelConfig = getModelConfig(model)
-
-      if (!modelConfig.apiKey) {
-        throw new Error('请先在设置中配置对应的 API Key')
+      const sessionModel = parseSessionSettings(data.session?.settings).model
+      const connHeaders = conn.headersFor(sessionModel ?? conn.defaultModel)
+      if (!connHeaders) {
+        throw new Error('请先在「我的 → API 连接」添加 API 连接')
       }
 
       // 获取用户session token
@@ -381,14 +308,7 @@ export default function DiaryPage() {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
-        'x-api-key': modelConfig.apiKey,
-        'x-model': model
-      }
-
-      // 如果是中转API，添加额外的headers
-      if (modelConfig.isRelay) {
-        headers['x-base-url'] = modelConfig.baseUrl || ''
-        headers['x-actual-model'] = modelConfig.modelName || ''
+        ...connHeaders,
       }
 
       const response = await fetch(`/api/diary/${diaryId}/regenerate`, {

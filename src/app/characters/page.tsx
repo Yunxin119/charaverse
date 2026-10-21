@@ -1,421 +1,182 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import Link from 'next/link'
-import { 
-  Plus, 
-  Search, 
-  Filter,
-  Edit,
-  MessageCircle,
-  Eye,
-  EyeOff,
-  Trash2,
-  MoreHorizontal,
-  Calendar,
-  Users,
-  Globe,
-  Lock
-} from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
+import { Plus, Search, MessageCircle, Pencil, Palette, MoreHorizontal, Trash2, Globe, Lock, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Chip, IconButton, PosterCard, PosterTitle, CardSkeleton } from '@/components/glass'
+import { CharacterCard, characterToCardData } from '@/components/cards/CharacterCard'
 import { useAuth } from '@/providers/AuthProvider'
-import { supabase } from '../lib/supabase'
-import type { Character } from '../lib/supabase'
+import type { Character } from '@/app/lib/supabase'
+import { useCharacters, useDeleteCharacter } from '@/queries'
+import { cn } from '@/lib/utils'
+
+type Visibility = 'all' | 'public' | 'private'
+type SortKey = 'updated_at' | 'created_at' | 'name'
+
+const VISIBILITY: { id: Visibility; label: string }[] = [
+  { id: 'all', label: '全部' },
+  { id: 'public', label: '公开' },
+  { id: 'private', label: '私人' },
+]
+
+const listVariants = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } }
+const itemVariants = { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.24, ease: [0.2, 0.8, 0.2, 1] as const } } }
 
 export default function CharactersPage() {
   const { user } = useAuth()
   const router = useRouter()
-  
-  const [characters, setCharacters] = useState<Character[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState('all') // all, public, private
-  const [sortBy, setSortBy] = useState('created_at') // created_at, name, updated_at
+  const characters = useCharacters(user?.id)
+  const del = useDeleteCharacter(user?.id)
 
-  useEffect(() => {
-    if (!user) return
-    
-    fetchCharacters()
-  }, [user, router])
+  const [query, setQuery] = useState('')
+  const [visibility, setVisibility] = useState<Visibility>('all')
+  const [sortBy, setSortBy] = useState<SortKey>('updated_at')
 
-  const fetchCharacters = async () => {
-    if (!user) return
-    
-    setIsLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from('characters')
-        .select('*')
-        .eq('user_id', user.id)
-        .order(sortBy, { ascending: false })
-
-      if (error) throw error
-      setCharacters(data || [])
-    } catch (error) {
-      console.error('获取角色列表失败:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // 切换角色公开状态
-  const togglePublic = async (characterId: number, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('characters')
-        .update({ is_public: !currentStatus })
-        .eq('id', characterId)
-
-      if (error) throw error
-      
-      // 更新本地状态
-      setCharacters(prev => 
-        prev.map(char => 
-          char.id === characterId 
-            ? { ...char, is_public: !currentStatus }
-            : char
-        )
-      )
-    } catch (error) {
-      console.error('更新角色状态失败:', error)
-    }
-  }
-
-  // 删除角色
-  const deleteCharacter = async (characterId: number) => {
-    if (!confirm('确定要删除这个角色吗？此操作无法撤销。')) return
-    
-    try {
-      const { error } = await supabase
-        .from('characters')
-        .delete()
-        .eq('id', characterId)
-
-      if (error) throw error
-      
-      // 更新本地状态
-      setCharacters(prev => prev.filter(char => char.id !== characterId))
-    } catch (error) {
-      console.error('删除角色失败:', error)
-    }
-  }
-
-  // 处理聊天按钮点击
-  const handleChatClick = (characterId: number) => {
-    if (!user) return
-    // /chat/new 会复用该角色最近的会话，没有则创建
-    router.push(`/chat/new?characterId=${characterId}`)
-  }
-
-  // 过滤和搜索角色
-  const filteredCharacters = characters.filter(character => {
-    const matchesSearch = character.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         character.prompt_template?.basic_info?.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    const matchesFilter = filterType === 'all' || 
-                         (filterType === 'public' && character.is_public) ||
-                         (filterType === 'private' && !character.is_public)
-    
-    return matchesSearch && matchesFilter
-  })
-
-  // 格式化日期
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
-    
-    if (diffInHours < 1) return '刚刚'
-    if (diffInHours < 24) return `${diffInHours}小时前`
-    if (diffInHours < 24 * 7) return `${Math.floor(diffInHours / 24)}天前`
-    
-    return date.toLocaleDateString('zh-CN', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
+  const list = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const rows = (characters.data ?? []).filter((c) => {
+      if (visibility === 'public' && !c.is_public) return false
+      if (visibility === 'private' && c.is_public) return false
+      if (!q) return true
+      const basic = c.prompt_template?.basic_info ?? {}
+      return c.name.toLowerCase().includes(q) || String(basic.introduction ?? basic.description ?? '').toLowerCase().includes(q)
     })
-  }
+    return [...rows].sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name, 'zh-CN')
+      const ka = (a as Character & { updated_at?: string })[sortBy] ?? a.created_at
+      const kb = (b as Character & { updated_at?: string })[sortBy] ?? b.created_at
+      return String(kb).localeCompare(String(ka))
+    })
+  }, [characters.data, query, visibility, sortBy])
 
-  // 获取角色关键词
-  const getCharacterKeywords = (character: Character) => {
-    return character.prompt_template?.basic_info?.keywords || []
-  }
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-        duration: 0.3
-      }
+  const remove = async (c: Character) => {
+    if (!confirm(`删除角色「${c.name}」？相关对话也会一并删除，此操作无法撤销。`)) return
+    try {
+      await del.mutateAsync(c.id)
+    } catch {
+      alert('删除失败，请重试')
     }
   }
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.4 }
-    }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center space-y-4">
-          <div className="w-8 h-8 mx-auto animate-spin rounded-full border-2 border-slate-900 border-t-transparent" />
-          <p className="text-slate-600">加载角色中...</p>
-        </div>
-      </div>
-    )
-  }
+  const total = characters.data?.length ?? 0
+  const filtered = total > 0 && list.length === 0
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="space-y-6 max-w-7xl mx-auto"
-    >
-      {/* Header */}
-      <motion.div variants={itemVariants}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">我的角色</h1>
-            <p className="text-slate-600 dark:text-slate-300 mt-1">管理你创建的所有AI角色 ({characters.length}个角色)</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <Button asChild className="bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900 text-white">
-              <Link href="/characters/new">
-                <Plus className="w-4 h-4 mr-2" />
-                <span className="hidden sm:inline">创建新角色</span>
-                <span className="sm:hidden">创建</span>
-              </Link>
-            </Button>
-          </div>
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-3xl font-semibold">我的角色</h1>
+          <p className="mt-1 text-sm text-cv-fg-muted">{total > 0 ? `${total} 个角色 · 点卡片上的「聊天」继续最近的对话` : '创建你的第一个角色，开始属于它的宇宙。'}</p>
         </div>
-      </motion.div>
+        <Button asChild variant="accent">
+          <Link href="/characters/new"><Plus />新建角色</Link>
+        </Button>
+      </header>
 
-      {/* Search and Filter Bar */}
-      <motion.div variants={itemVariants}>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              {/* Search */}
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <Input
-                  placeholder="搜索角色名称或描述..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              
-              {/* Filter */}
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-full md:w-48">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部角色</SelectItem>
-                  <SelectItem value="public">公开角色</SelectItem>
-                  <SelectItem value="private">私人角色</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              {/* Sort */}
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-full md:w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="created_at">创建时间</SelectItem>
-                  <SelectItem value="name">角色名称</SelectItem>
-                  <SelectItem value="updated_at">更新时间</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute inset-y-0 left-4 my-auto size-4 text-cv-fg-subtle" />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索名称或介绍…" className="pl-11" aria-label="搜索角色" />
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="neu-in inline-flex rounded-full p-1" role="tablist" aria-label="可见性">
+            {VISIBILITY.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                role="tab"
+                aria-selected={visibility === v.id}
+                onClick={() => setVisibility(v.id)}
+                className={cn('rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors', visibility === v.id ? 'bg-cv-bg-elevated text-cv-fg shadow-neu-sm' : 'text-cv-fg-muted hover:text-cv-fg')}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
+            <SelectTrigger className="w-28" aria-label="排序"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="updated_at">最近更新</SelectItem>
+              <SelectItem value="created_at">创建时间</SelectItem>
+              <SelectItem value="name">名称</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-      {/* Characters Grid */}
-      {filteredCharacters.length === 0 ? (
-        <motion.div variants={itemVariants}>
-          <Card className="border-slate-200/60">
-            <CardContent className="py-12 px-4 text-center">
-              <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center">
-                <Users className="w-10 h-10 text-slate-400 dark:text-slate-500" />
-              </div>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                {searchQuery || filterType !== 'all' ? '没有找到匹配的角色' : '还没有创建角色'}
-              </h3>
-              <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm leading-relaxed max-w-sm mx-auto">
-                {searchQuery || filterType !== 'all' 
-                  ? '试试调整搜索条件或筛选选项'
-                  : '创建你的第一个AI角色，开始精彩的对话体验'
-                }
-              </p>
-              {(!searchQuery && filterType === 'all') && (
-                <Button asChild className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-full px-6">
-                  <Link href="/characters/new">
-                    <Plus className="w-4 h-4 mr-2" />
-                    创建新角色
-                  </Link>
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {filteredCharacters.map((character, index) => (
-            <motion.div
-              key={character.id}
-              variants={itemVariants}
-              custom={index}
-            >
-              <Card className="hover:shadow-lg transition-all duration-200 group border-slate-200/60 dark:border-slate-700 dark:bg-slate-800">
-                <CardContent className="p-4 sm:p-6">
-                  {/* Character Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-3 flex-1 min-w-0">
-                      <Avatar className="w-12 h-12 sm:w-14 sm:h-14 ring-2 ring-slate-100">
-                        <AvatarImage src={character.avatar_url} />
-                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-medium">
-                          {character.name[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-slate-900 dark:text-white truncate text-base sm:text-lg">
-                          {character.name}
-                        </h3>
-                        <div className="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400 mt-1">
-                          <Calendar className="w-3 h-3" />
-                          <span>{formatDate(character.created_at)}</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Actions Dropdown */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                          <Link href={`/characters/${character.id}/edit`}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            编辑角色
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => togglePublic(character.id, character.is_public)}>
-                          {character.is_public ? (
-                            <>
-                              <EyeOff className="w-4 h-4 mr-2" />
-                              设为私人
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="w-4 h-4 mr-2" />
-                              设为公开
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => deleteCharacter(character.id)}
-                          className="text-red-600 focus:text-red-600"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          删除角色
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-
-                  {/* Character Introduction & Keywords */}
-                  <div className="mb-4 space-y-3">
-                    {/* 角色说明 */}
-                    <div>
-                      <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-3 leading-relaxed">
-                        {character.prompt_template?.basic_info?.introduction || 
-                         character.prompt_template?.basic_info?.description || 
-                         '这个角色还没有添加说明...'}
-                      </p>
-                    </div>
-                    
-                    {/* Keywords */}
-                    {getCharacterKeywords(character).length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {getCharacterKeywords(character).slice(0, 4).map((keyword: string, idx: number) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800"
-                          >
-                            {keyword}
-                          </span>
-                        ))}
-                        {getCharacterKeywords(character).length > 4 && (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600">
-                            +{getCharacterKeywords(character).length - 4}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Status and Actions */}
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-700">
-                    <div className="flex items-center space-x-2">
-                      {character.is_public ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
-                          <Globe className="w-3 h-3 mr-1" />
-                          公开
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
-                          <Lock className="w-3 h-3 mr-1" />
-                          私人
-                        </span>
-                      )}
-                    </div>
-                    
-                                          <div className="flex space-x-2">
-                        <Button asChild size="sm" variant="outline" className="h-8 px-3 text-xs">
-                          <Link href={`/characters/${character.id}/edit`}>
-                            <Edit className="w-3 h-3 mr-1.5" />
-                            编辑
-                          </Link>
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
-                          onClick={() => handleChatClick(character.id)}
-                        >
-                          <MessageCircle className="w-3 h-3 mr-1.5" />
-                          聊天
-                        </Button>
-                      </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+      {characters.isLoading && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
         </div>
       )}
-    </motion.div>
+
+      {characters.isError && (
+        <PosterCard tone="ink" className="text-center">
+          <PosterTitle>加载失败</PosterTitle>
+          <p className="mt-2 text-sm opacity-80">网络或权限问题，稍后再试。</p>
+          <Button variant="glass" size="sm" className="mt-4" onClick={() => characters.refetch()}>重试</Button>
+        </PosterCard>
+      )}
+
+      {characters.isSuccess && total === 0 && (
+        <PosterCard tone="ink" className="flex min-h-64 flex-col items-start justify-between p-6 sm:p-8">
+          <span className="flex size-10 items-center justify-center rounded-cv-sm bg-cv-accent text-white shadow-[0_10px_24px_-10px_var(--cv-accent)]"><Sparkles className="size-5" /></span>
+          <div className="mt-8">
+            <PosterTitle className="text-3xl sm:text-4xl">还没有角色。</PosterTitle>
+            <p className="mt-2 max-w-sm text-sm opacity-80">写一段人设、挑一张封面，几分钟就能开始第一段对话。也可以去「探索」把别人的角色复制过来改。</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button asChild variant="accent"><Link href="/characters/new"><Plus />新建角色</Link></Button>
+              <Button asChild variant="glass"><Link href="/explore">去探索</Link></Button>
+            </div>
+          </div>
+        </PosterCard>
+      )}
+
+      {characters.isSuccess && filtered && (
+        <div className="glass rounded-cv-lg p-8 text-center text-sm text-cv-fg-muted">没有匹配的角色，换个关键词试试。</div>
+      )}
+
+      {characters.isSuccess && list.length > 0 && (
+        <motion.div variants={listVariants} initial="hidden" animate="visible" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {list.map((c) => (
+            <motion.div key={c.id} variants={itemVariants} layout>
+              <CharacterCard
+                data={characterToCardData(c)}
+                variant="poster"
+                className="h-full"
+                chips={c.is_public ? <Chip tone="success" className="bg-cv-success text-white"><Globe className="size-3" />已发布</Chip> : <Chip tone="outline" className="border-white/25 bg-white/15 text-white"><Lock className="size-3" />私人</Chip>}
+                menu={
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <IconButton label="更多操作" variant="glass" size="sm" className="text-white"><MoreHorizontal /></IconButton>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="min-w-40">
+                      <DropdownMenuItem asChild><Link href={`/characters/${c.id}/edit`}><Pencil />编辑</Link></DropdownMenuItem>
+                      <DropdownMenuItem asChild><Link href={`/characters/${c.id}/skin`}><Palette />皮肤</Link></DropdownMenuItem>
+                      <DropdownMenuItem asChild><Link href={`/characters/${c.id}/edit?section=publish`}>{c.is_public ? <><Globe />发布设置</> : <><Globe />发布到探索</>}</Link></DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem variant="destructive" onClick={() => void remove(c)}><Trash2 />删除角色</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                }
+                footer={
+                  <>
+                    <Button size="sm" variant="accent" onClick={() => router.push(`/chat/new?characterId=${c.id}`)}><MessageCircle />聊天</Button>
+                    <Button asChild size="sm" variant="glass" className="text-white"><Link href={`/characters/${c.id}/edit`}><Pencil />编辑</Link></Button>
+                    <Button asChild size="sm" variant="glass" className="text-white"><Link href={`/characters/${c.id}/skin`}><Palette />皮肤</Link></Button>
+                  </>
+                }
+              />
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
+    </div>
   )
-} 
+}

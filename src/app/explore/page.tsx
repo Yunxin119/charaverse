@@ -1,462 +1,164 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, type MouseEvent } from 'react'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { useRouter } from 'next/navigation'
-import { 
-  Search, 
-  Filter, 
-  Heart, 
-  MessageCircle, 
-  Clock, 
-  TrendingUp,
-  Globe,
-  Users,
-  Star
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { supabase } from '../lib/supabase'
+import { useQuery } from '@tanstack/react-query'
+import { Heart, Search, Compass } from 'lucide-react'
+import { supabase } from '@/app/lib/supabase'
+import { usePublicCharacters, useToggleLike, type PublicCharacter, type PublicSort } from '@/queries/usePublic'
 import { useAuth } from '@/providers/AuthProvider'
+import { PosterCard, PosterTitle, Chip } from '@/components/glass'
+import { cn } from '@/lib/utils'
 
-interface PublicCharacter {
-  id: number
-  name: string
-  avatar_url?: string
-  prompt_template: any
-  is_public: boolean
-  likes_count: number
-  created_at: string
-  user_id: string
-  profiles?: {
-    username?: string
-  }
-}
+const TONES = ['primary', 'ink', 'accent', 'secondary'] as const
+const SORTS: { id: PublicSort; label: string }[] = [
+  { id: 'latest', label: '最新' },
+  { id: 'likes', label: '最热' },
+]
 
 export default function ExplorePage() {
-  const { user } = useAuth()
-  const router = useRouter()
-  
-  const [characters, setCharacters] = useState<PublicCharacter[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState('likes_count') // likes_count, created_at
-  const [filterType, setFilterType] = useState('all') // all, trending, recent
+  const [q, setQ] = useState('')
+  const [sort, setSort] = useState<PublicSort>('latest')
+  const [tag, setTag] = useState<string | undefined>()
+  const list = usePublicCharacters({ q, sort, tag })
+  const authors = useAuthorNames(list.data)
 
-  useEffect(() => {
-    if (!user) return
-    
-    fetchPublicCharacters()
-  }, [user, router, sortBy, filterType])
+  return (
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+      <header className="mb-6">
+        <h1 className="font-display text-3xl font-semibold">探索</h1>
+        <p className="mt-1 text-sm text-cv-fg-muted">别人发布的角色。看到喜欢的，直接开聊，或者复制一份到自己的角色库里改。</p>
+      </header>
 
-  const fetchPublicCharacters = async () => {
-    if (!user) return
-    
-    setIsLoading(true)
-    try {
-      let query = supabase
-        .from('characters')
-        .select('*')
-        .eq('is_public', true)
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <label className="neu-in flex flex-1 items-center gap-2 rounded-full px-4 py-2.5">
+          <Search className="size-4 shrink-0 text-cv-fg-subtle" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="搜索名字、简介或关键词"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-cv-fg-subtle"
+          />
+        </label>
+        <div className="neu-in inline-flex self-start rounded-full p-1">
+          {SORTS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setSort(s.id)}
+              className={cn('rounded-full px-4 py-1.5 text-sm font-semibold transition-colors', sort === s.id ? 'bg-cv-bg-elevated text-cv-fg shadow-neu-sm' : 'text-cv-fg-muted hover:text-cv-fg')}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      // 应用排序
-      if (sortBy === 'likes_count') {
-        query = query.order('likes_count', { ascending: false })
-      } else if (sortBy === 'created_at') {
-        query = query.order('created_at', { ascending: false })
-      }
+      {tag && (
+        <div className="mb-4 flex items-center gap-2 text-sm text-cv-fg-muted">
+          筛选：<Chip tone="accent" interactive onClick={() => setTag(undefined)}>{tag} ×</Chip>
+        </div>
+      )}
 
-      // 应用过滤
-      if (filterType === 'trending') {
-        query = query.gte('likes_count', 5) // 至少有5个赞的才算热门
-      } else if (filterType === 'recent') {
-        // 最近7天创建的角色
-        const sevenDaysAgo = new Date()
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-        query = query.gte('created_at', sevenDaysAgo.toISOString())
-      }
-
-      const { data: charactersData, error } = await query
-
-      if (error) throw error
-
-      // 获取用户信息
-      if (charactersData && charactersData.length > 0) {
-        const userIds = [...new Set(charactersData.map(char => char.user_id))]
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, username')
-          .in('id', userIds)
-
-        // 合并数据，添加更好的username fallback逻辑
-        const charactersWithProfiles = charactersData.map(character => {
-          const profile = profilesData?.find(profile => profile.id === character.user_id)
-          // 检查username是否存在且不为空字符串
-          const username = profile?.username?.trim()
-          return {
-            ...character,
-            profiles: {
-              ...profile,
-              // 改进fallback逻辑：如果没有username或username为空，显示友好的默认名称
-              username: username || '创作者'
-            }
-          }
-        })
-
-        setCharacters(charactersWithProfiles)
-      } else {
-        setCharacters([])
-      }
-    } catch (error) {
-      console.error('获取公开角色失败:', error)
-      setCharacters([])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // 点赞功能
-  const handleLike = async (characterId: number, currentLikes: number) => {
-    try {
-      // 点赞走 RPC（supabase/hotfix/p0_rls_storage.sql），客户端不能直接改别人的 characters 行
-      const { data: newCount, error } = await supabase.rpc('toggle_character_like', { p_character_id: characterId })
-
-      if (error) throw error
-
-      // 更新本地状态
-      setCharacters(prev =>
-        prev.map(char =>
-          char.id === characterId
-            ? { ...char, likes_count: typeof newCount === 'number' ? newCount : currentLikes + 1 }
-            : char
-        )
-      )
-    } catch (error) {
-      console.error('点赞失败:', error)
-    }
-  }
-
-  // 复制角色到我的角色库
-  const handleCopyCharacter = async (character: PublicCharacter) => {
-    try {
-      const { error } = await supabase
-        .from('characters')
-        .insert({
-          user_id: user!.id,
-          name: `${character.name} (副本)`,
-          avatar_url: character.avatar_url,
-          prompt_template: character.prompt_template,
-          is_public: false, // 复制的角色默认设为私有
-          likes_count: 0
-        })
-
-      if (error) throw error
-      
-      // 跳转到角色页面
-      router.push('/characters')
-    } catch (error) {
-      console.error('复制角色失败:', error)
-    }
-  }
-
-  // 开始聊天
-  const handleChatClick = async (characterId: number) => {
-    try {
-      // 创建新的聊天会话
-      const { data: session, error } = await supabase
-        .from('chat_sessions')
-        .insert({
-          user_id: user!.id,
-          character_id: characterId,
-          title: `与 ${characters.find(c => c.id === characterId)?.name} 的对话`
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-      
-      // 跳转到聊天页面
-      router.push(`/chat/${session.id}`)
-    } catch (error) {
-      console.error('创建聊天会话失败:', error)
-    }
-  }
-
-  // 过滤搜索结果
-  const filteredCharacters = characters.filter(character =>
-    character.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    character.profiles?.username?.toLowerCase().includes(searchQuery.toLowerCase())
+      {list.isLoading && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+      )}
+      {list.isError && <PosterCard tone="ink"><PosterTitle>加载失败</PosterTitle><p className="mt-2 text-sm opacity-80">{(list.error as Error).message}</p></PosterCard>}
+      {list.data && list.data.length === 0 && (
+        <PosterCard tone="secondary" className="min-h-56">
+          <Compass className="mb-3 size-8 opacity-80" />
+          <PosterTitle>{q || tag ? '没有匹配的角色' : '还没有人发布角色'}</PosterTitle>
+          <p className="mt-2 max-w-md text-sm opacity-80">{q || tag ? '换个关键词试试。' : '在角色编辑页点「发布」，你的角色就会出现在这里。'}</p>
+        </PosterCard>
+      )}
+      {list.data && list.data.length > 0 && (
+        <motion.div layout className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {list.data.map((c, i) => (
+            <motion.div key={c.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, delay: Math.min(i, 8) * 0.03 }}>
+              <CharacterCard character={c} author={authors[c.user_id]} tone={TONES[i % TONES.length]} onTag={setTag} />
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
+    </div>
   )
+}
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  }
+function CharacterCard({ character: c, author, tone, onTag }: { character: PublicCharacter; author?: string; tone: (typeof TONES)[number]; onTag: (t: string) => void }) {
+  const { user } = useAuth()
+  const like = useToggleLike()
+  const [optimistic, setOptimistic] = useState<number | null>(null)
+  const likes = optimistic ?? c.likes_count
+  const date = c.published_at ?? c.created_at
 
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        duration: 0.4,
-        ease: "easeOut" as const
-      }
-    }
+  const onLike = (e: MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!user || like.isPending) return
+    setOptimistic(likes + 1)
+    like.mutate(c.id, { onSettled: () => setOptimistic(null) })
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 pb-20">
-      {/* Header */}
-      <motion.div
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
-        className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-b border-slate-200/80 dark:border-slate-700/80 px-4 py-4 sticky top-0 z-30 shadow-sm"
-      >
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">
-                探索社区
-              </h1>
-              <p className="text-slate-600 dark:text-slate-400 text-sm">
-                发现其他创作者分享的精彩角色
-              </p>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400">
-                <Globe className="w-4 h-4" />
-                <span>{characters.length} 个公开角色</span>
-              </div>
-            </div>
-          </div>
+    <Link href={`/character/public/${c.id}`} className="group block h-full outline-none focus-visible:ring-2 focus-visible:ring-cv-ring rounded-cv-lg">
+      <PosterCard tone={tone} image={c.avatar_url ?? undefined} className="flex h-full min-h-64 flex-col justify-end transition-transform duration-(--cv-dur) ease-cv group-hover:[translate:0_-2px]">
+        <div className="flex items-start justify-between gap-2">
+          <PosterTitle className="line-clamp-2">{c.name}</PosterTitle>
+          <button
+            type="button"
+            onClick={onLike}
+            aria-label="点赞"
+            disabled={!user}
+            className="flex shrink-0 items-center gap-1 rounded-full bg-black/25 px-2.5 py-1 text-xs font-semibold backdrop-blur-sm transition-transform active:scale-95 disabled:opacity-70"
+          >
+            <Heart className={cn('size-3.5', optimistic !== null && 'fill-current')} />{likes}
+          </button>
         </div>
-      </motion.div>
-      
-      <main className="p-4">
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={containerVariants}
-          className="max-w-7xl mx-auto"
-        >
-          {/* Search and Filters */}
-          <motion.div variants={itemVariants} className="mb-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              {/* Search */}
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
-                <Input
-                  placeholder="搜索角色名称或创作者..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-slate-300 dark:focus:border-slate-600 dark:text-white"
-                />
-              </div>
+        <p className="mt-2 line-clamp-2 text-sm opacity-85">{c.introduction ?? '这位作者还没有写简介。'}</p>
+        {c.keywords.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {c.keywords.slice(0, 3).map((k) => (
+              <Chip key={k} tone="glass" interactive className="text-[11px]" onClick={(e) => { e.preventDefault(); onTag(k) }}>{k}</Chip>
+            ))}
+            {c.keywords.length > 3 && <Chip tone="glass" className="text-[11px]">+{c.keywords.length - 3}</Chip>}
+          </div>
+        )}
+        <div className="mt-3 flex items-center justify-between text-[11px] opacity-75">
+          <span className="truncate">by {author ?? '创作者'}</span>
+          <time dateTime={date}>{new Date(date).toLocaleDateString('zh-CN')}</time>
+        </div>
+      </PosterCard>
+    </Link>
+  )
+}
 
-              {/* Sort */}
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-full sm:w-48 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="dark:bg-slate-800 dark:border-slate-700">
-                  <SelectItem value="likes_count" className="dark:text-white dark:hover:bg-slate-700">
-                    <div className="flex items-center space-x-2">
-                      <TrendingUp className="w-4 h-4" />
-                      <span>按热度排序</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="created_at" className="dark:text-white dark:hover:bg-slate-700">
-                    <div className="flex items-center space-x-2">
-                      <Clock className="w-4 h-4" />
-                      <span>按时间排序</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+/** One cached lookup of the listed authors' usernames. */
+function useAuthorNames(list: PublicCharacter[] | undefined): Record<string, string> {
+  const ids = Array.from(new Set((list ?? []).map((c) => c.user_id))).sort()
+  const q = useQuery({
+    queryKey: ['profiles', 'names', ids],
+    enabled: ids.length > 0,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data } = await supabase.from('profiles').select('id, username').in('id', ids)
+      const out: Record<string, string> = {}
+      for (const p of data ?? []) if (p.username?.trim()) out[p.id as string] = p.username.trim()
+      return out
+    },
+  })
+  return q.data ?? {}
+}
 
-              {/* Filter */}
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-full sm:w-48 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="dark:bg-slate-800 dark:border-slate-700">
-                  <SelectItem value="all" className="dark:text-white dark:hover:bg-slate-700">全部角色</SelectItem>
-                  <SelectItem value="trending" className="dark:text-white dark:hover:bg-slate-700">热门角色</SelectItem>
-                  <SelectItem value="recent" className="dark:text-white dark:hover:bg-slate-700">最新角色</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </motion.div>
-
-          {/* Characters Grid */}
-          {isLoading ? (
-            <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {[...Array(8)].map((_, i) => (
-                <Card key={i} className="animate-pulse dark:bg-slate-800 dark:border-slate-700">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
-                      <div className="flex-1">
-                        <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4 mb-2"></div>
-                        <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2"></div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-20 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
-                    <div className="flex justify-between">
-                      <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-20"></div>
-                      <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-16"></div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </motion.div>
-          ) : filteredCharacters.length === 0 ? (
-            <motion.div variants={itemVariants} className="text-center py-12">
-              <div className="w-24 h-24 mx-auto mb-4 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
-                <Search className="w-12 h-12 text-slate-400 dark:text-slate-500" />
-              </div>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                {searchQuery ? '没有找到匹配的角色' : '暂无公开角色'}
-              </h3>
-              <p className="text-slate-600 dark:text-slate-400">
-                {searchQuery ? '尝试调整搜索条件' : '成为第一个分享角色的创作者吧！'}
-              </p>
-            </motion.div>
-          ) : (
-            <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredCharacters.map((character, index) => (
-                <motion.div
-                  key={character.id}
-                  variants={itemVariants}
-                  whileHover={{ y: -4 }}
-                  transition={{ duration: 0.2 }}
-                >
-                                     <Card className="h-full hover:shadow-lg transition-all duration-200 border-slate-200/80 hover:border-slate-300/80 dark:bg-slate-800/50 dark:border-slate-700/60 dark:hover:border-slate-600/60 backdrop-blur-sm">
-                     <CardHeader 
-                       className="pb-3 cursor-pointer"
-                       onClick={() => router.push(`/character/public/${character.id}`)}
-                     >
-                       <div className="flex items-center space-x-3">
-                         <Avatar className="w-12 h-12 ring-2 ring-slate-200/50 dark:ring-slate-700/50 shadow-lg">
-                           <AvatarImage src={character.avatar_url} alt={character.name} />
-                           <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
-                             {character.name.charAt(0)}
-                           </AvatarFallback>
-                         </Avatar>
-                         <div className="flex-1 min-w-0">
-                           <h3 className="font-semibold text-slate-900 dark:text-white truncate">
-                             {character.name}
-                           </h3>
-                           <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
-                             由 {character.profiles?.username} 创建
-                           </p>
-                         </div>
-                       </div>
-                     </CardHeader>
-                    
-                    <CardContent className="pt-0">
-                      {/* Character Introduction */}
-                      <div className="mb-4">
-                        <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-3 leading-relaxed">
-                          {character.prompt_template?.basic_info?.introduction || 
-                           character.prompt_template?.basic_info?.description || 
-                           '一个有趣的AI角色，快来开始对话吧！'}
-                        </p>
-                      </div>
-
-                      {/* Keywords */}
-                      {character.prompt_template?.basic_info?.keywords && character.prompt_template.basic_info.keywords.length > 0 && (
-                        <div className="mb-4">
-                          <div className="flex flex-wrap gap-1.5">
-                            {character.prompt_template.basic_info.keywords.slice(0, 3).map((keyword: string, idx: number) => (
-                              <span
-                                key={idx}
-                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800"
-                              >
-                                {keyword}
-                              </span>
-                            ))}
-                            {character.prompt_template.basic_info.keywords.length > 3 && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600">
-                                +{character.prompt_template.basic_info.keywords.length - 3}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Stats */}
-                      <div className="flex items-center justify-between mb-4 text-sm text-slate-500 dark:text-slate-400">
-                        <div className="flex items-center space-x-1">
-                          <Heart className="w-4 h-4" />
-                          <span>{character.likes_count}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Clock className="w-4 h-4" />
-                          <span>{new Date(character.created_at).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex space-x-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          className="flex-1 h-9 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
-                          onClick={() => handleCopyCharacter(character)}
-                        >
-                          <Star className="w-3 h-3 mr-1.5" />
-                          收藏
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          className="flex-1 h-9 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
-                          onClick={() => handleChatClick(character.id)}
-                        >
-                          <MessageCircle className="w-3 h-3 mr-1.5" />
-                          聊天
-                        </Button>
-                      </div>
-
-                      {/* Like Button */}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="w-full mt-2 h-8 text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20"
-                        onClick={() => handleLike(character.id, character.likes_count)}
-                      >
-                        <Heart className="w-4 h-4 mr-1.5" />
-                        点赞
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
-        </motion.div>
-      </main>
-
-      {/* Bottom Navigation */}
+function SkeletonCard() {
+  return (
+    <div className="glass min-h-64 animate-pulse rounded-cv-lg p-6">
+      <div className="mt-28 h-6 w-2/3 rounded-full bg-cv-fg/10" />
+      <div className="mt-3 h-3.5 w-full rounded-full bg-cv-fg/10" />
+      <div className="mt-2 h-3.5 w-4/5 rounded-full bg-cv-fg/10" />
+      <div className="mt-4 flex gap-1.5"><span className="h-5 w-12 rounded-full bg-cv-fg/10" /><span className="h-5 w-16 rounded-full bg-cv-fg/10" /></div>
     </div>
   )
 }

@@ -80,7 +80,7 @@ export function ChatSettingsSheet({ open, onOpenChange, sessionId, userId, title
             <Select value={draft.model ?? ''} onValueChange={(v) => set('model', v)}>
               <SelectTrigger className="w-full"><SelectValue placeholder="选择模型" /></SelectTrigger>
               <SelectContent>
-                {models.length === 0 && <div className="px-3 py-2 text-sm text-cv-fg-muted">还没有配置任何 API，去「我的 → API」添加</div>}
+                {models.length === 0 && <div className="px-3 py-2 text-sm text-cv-fg-muted">还没有配置任何 API 连接 · <a href="/settings/connections" className="text-cv-accent underline">去添加</a></div>}
                 {models.map((m) => <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>)}
               </SelectContent>
             </Select>

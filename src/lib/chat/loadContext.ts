@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { BUILTIN_DEFAULT_PRESET, parsePreset, type PresetFile } from '@/lib/prompt/presets'
+import { parseSnapshot } from '@/components/character/snapshot'
 import { parseCharacterCard, type CharacterCard } from './characterCard'
 import { formatMemoryTable, type MemoryRow } from './memoryTable'
 import { parseSessionSettings, type SessionSettings } from './settings'
@@ -14,7 +15,7 @@ export interface HistoryMessage {
 
 export interface ChatContext {
   session: { id: string; user_id: string; character_id: number; title: string | null; settings: SessionSettings }
-  character: { id: number; name: string; prompt_template: unknown }
+  character: { id: number; user_id: string; name: string; prompt_template: unknown; skin?: unknown; published_snapshot?: unknown }
   card: CharacterCard
   preset: PresetFile
   history: HistoryMessage[]
@@ -41,12 +42,21 @@ export async function loadChatContext(supabase: SupabaseClient, sessionId: strin
   if (session.user_id !== userId) throw new ContextError(403, '无权访问该会话')
   const settings = parseSessionSettings(session.settings)
 
-  const { data: character, error: cErr } = await supabase
+  const { data: row, error: cErr } = await supabase
     .from('characters')
-    .select('id, name, prompt_template')
+    .select('id, user_id, name, prompt_template, skin, published_snapshot')
     .eq('id', session.character_id)
     .single()
-  if (cErr || !character) throw new ContextError(404, '找不到角色')
+  if (cErr || !row) throw new ContextError(404, '找不到角色')
+
+  // Plan §3 A12: non-owners only ever see the frozen published snapshot; the live
+  // row is the author's private draft. Owners chat against their draft as before.
+  let character: ChatContext['character'] = row
+  if (row.user_id !== userId) {
+    const snap = parseSnapshot(row.published_snapshot)
+    if (!snap) throw new ContextError(403, '这个角色还没有发布')
+    character = { ...row, name: snap.name, prompt_template: snap.prompt_template, skin: snap.skin }
+  }
 
   const [preset, historyRows, summaries, memoryRows] = await Promise.all([
     loadPreset(supabase, userId, settings.presetId ?? null),

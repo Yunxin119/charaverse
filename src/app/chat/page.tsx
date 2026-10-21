@@ -1,424 +1,206 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { 
-  MessageCircle,
-  Search,
-  MoreHorizontal,
-  Clock,
-  ChevronRight,
-  Plus,
-  Edit3,
-  Trash2
-} from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
+import { useQueryClient } from '@tanstack/react-query'
+import { Search, MoreHorizontal, Pencil, Trash2, MessageSquare, ChevronRight, GitBranch, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { IconButton, PosterCard, PosterTitle, CardSkeleton } from '@/components/glass'
 import { useAuth } from '@/providers/AuthProvider'
-import { supabase } from '../lib/supabase'
+import { useSessions, qk, type SessionWithCharacter } from '@/queries'
+import { supabase } from '@/app/lib/supabase'
 
-interface ChatSessionWithCharacter {
-  id: string
-  user_id: string
-  character_id: number
-  title?: string
-  created_at: string
-  character: {
-    id: number
-    name: string
-    avatar_url?: string
-  }
-  message_count: number
-  last_message_at?: string
+const DAY = 24 * 60 * 60 * 1000
+
+function relativeTime(iso: string | undefined, now: number): string {
+  if (!iso) return ''
+  const t = new Date(iso).getTime()
+  const diff = now - t
+  if (diff < 60_000) return '刚刚'
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
+  const d = new Date(t)
+  const startOfToday = new Date(now).setHours(0, 0, 0, 0)
+  if (t >= startOfToday) return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  if (t >= startOfToday - DAY) return '昨天'
+  if (diff < 7 * DAY) return `${Math.floor(diff / DAY)} 天前`
+  return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
-export default function ChatPage() {
+type Group = { id: 'today' | 'week' | 'older'; label: string; items: SessionWithCharacter[] }
+
+function groupByDate(sessions: SessionWithCharacter[], now: number): Group[] {
+  const startOfToday = new Date(now).setHours(0, 0, 0, 0)
+  const groups: Group[] = [
+    { id: 'today', label: '今天', items: [] },
+    { id: 'week', label: '本周', items: [] },
+    { id: 'older', label: '更早', items: [] },
+  ]
+  for (const s of sessions) {
+    const t = new Date(s.updated_at ?? s.created_at).getTime()
+    if (t >= startOfToday) groups[0].items.push(s)
+    else if (t >= startOfToday - 6 * DAY) groups[1].items.push(s)
+    else groups[2].items.push(s)
+  }
+  return groups.filter((g) => g.items.length > 0)
+}
+
+function sessionTitle(s: SessionWithCharacter) {
+  return s.title?.trim() || `与 ${s.character?.name ?? '角色'} 的对话`
+}
+
+const listVariants = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } }
+const itemVariants = { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.24, ease: [0.2, 0.8, 0.2, 1] as const } } }
+
+export default function ChatListPage() {
   const { user } = useAuth()
   const router = useRouter()
-  
-  const [sessions, setSessions] = useState<ChatSessionWithCharacter[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isSearchVisible, setIsSearchVisible] = useState(false)
+  const qc = useQueryClient()
+  const sessions = useSessions(user?.id)
+  const [query, setQuery] = useState('')
+  const [busyId, setBusyId] = useState<string | null>(null)
 
+  // one clock for grouping and labels; ticks every minute so "刚刚" ages
+  const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    if (!user) return
-    
-    fetchChatSessions()
-  }, [user, router])
+    const t = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(t)
+  }, [])
 
-  const fetchChatSessions = async () => {
-    if (!user) return
-    
-    setIsLoading(true)
-    try {
-      // 获取聊天会话和相关角色信息
-      const { data: sessionsData, error: sessionsError } = await supabase
-        .from('chat_sessions')
-        .select(`
-          *,
-          characters!inner (
-            id,
-            name,
-            avatar_url
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false })
+  const groups = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const rows = (sessions.data ?? []).filter((s) => !q || sessionTitle(s).toLowerCase().includes(q) || (s.character?.name ?? '').toLowerCase().includes(q))
+    return groupByDate(rows, now)
+  }, [sessions.data, query, now])
 
-      if (sessionsError) throw sessionsError
+  const invalidate = () => {
+    if (user) qc.invalidateQueries({ queryKey: qk.sessions(user.id) })
+  }
 
-      // 为每个会话获取消息数量和最后消息时间
-      const sessionsWithStats = await Promise.all(
-        (sessionsData || []).map(async (session) => {
-          // 使用正确的Supabase计数查询
-          const { count: messageCount, error: countError } = await supabase
-            .from('chat_messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('session_id', session.id)
-
-          // 获取最后一条消息的时间
-          const { data: lastMessageData, error: lastMessageError } = await supabase
-            .from('chat_messages')
-            .select('created_at')
-            .eq('session_id', session.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-
-          if (countError) {
-            console.error('获取消息数量失败:', countError)
-          }
-
-          if (lastMessageError) {
-            console.error('获取最后消息时间失败:', lastMessageError)
-          }
-
-          const finalMessageCount = messageCount || 0
-          const lastMessageAt = lastMessageData?.created_at || session.created_at
-
-          // console.log(`会话 ${session.id} 消息统计:`, {
-          //   messageCount: finalMessageCount,
-          //   lastMessageAt
-          // })
-
-          return {
-            ...session,
-            character: session.characters,
-            message_count: finalMessageCount,
-            last_message_at: lastMessageAt
-          }
-        })
-      )
-
-      // 按最新消息时间排序（最新的在前）
-      const sortedSessions = sessionsWithStats.sort((a, b) => {
-        const timeA = new Date(a.last_message_at || a.created_at).getTime()
-        const timeB = new Date(b.last_message_at || b.created_at).getTime()
-        return timeB - timeA // 降序排列，最新的在前
-      })
-
-      setSessions(sortedSessions)
-    } catch (error) {
-      console.error('获取聊天记录失败:', error)
-    } finally {
-      setIsLoading(false)
+  const rename = async (s: SessionWithCharacter) => {
+    const next = prompt('会话标题', sessionTitle(s))
+    if (next === null) return
+    setBusyId(s.id)
+    const { error } = await supabase.from('chat_sessions').update({ title: next.trim() || null }).eq('id', s.id)
+    setBusyId(null)
+    if (error) {
+      alert('重命名失败，请重试')
+      return
     }
+    invalidate()
   }
 
-  // 删除聊天会话
-  const deleteSession = async (sessionId: string) => {
-    if (!confirm('确定要删除这个对话吗？此操作无法撤销。')) return
-    
-    try {
-      // 先删除消息
-      await supabase
-        .from('chat_messages')
-        .delete()
-        .eq('session_id', sessionId)
-
-      // 再删除会话
-      const { error } = await supabase
-        .from('chat_sessions')
-        .delete()
-        .eq('id', sessionId)
-
-      if (error) throw error
-      
-      // 更新本地状态
-      setSessions(prev => prev.filter(session => session.id !== sessionId))
-    } catch (error) {
-      console.error('删除聊天记录失败:', error)
+  const remove = async (s: SessionWithCharacter) => {
+    if (!confirm(`删除「${sessionTitle(s)}」？消息、摘要和日记会一并删除，无法撤销。`)) return
+    setBusyId(s.id)
+    const { error } = await supabase.from('chat_sessions').delete().eq('id', s.id)
+    setBusyId(null)
+    if (error) {
+      alert('删除失败，请重试')
+      return
     }
+    invalidate()
   }
 
-  // 处理开始新对话
-  const handleStartNewChat = async () => {
-    router.push('/characters')
-  }
-
-  // 过滤和搜索会话
-  const filteredSessions = sessions.filter(session => {
-    if (!searchQuery) return true
-    
-    const matchesSearch = 
-      session.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      session.character.name.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    return matchesSearch
-  })
-
-  // 格式化时间 - 微信风格
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
-    const diffInHours = Math.floor(diffInMinutes / 60)
-    const diffInDays = Math.floor(diffInHours / 24)
-    
-    if (diffInMinutes < 1) return '刚刚'
-    if (diffInMinutes < 60) return `${diffInMinutes}分钟前`
-    if (diffInHours < 24) {
-      if (diffInHours < 1) return '刚刚'
-      return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-    }
-    if (diffInDays === 1) return '昨天'
-    if (diffInDays < 7) return `${diffInDays}天前`
-    
-    return date.toLocaleDateString('zh-CN', { 
-      month: 'short', 
-      day: 'numeric' 
-    })
-  }
-
-  // 获取最后一条消息预览
-  const getLastMessagePreview = (session: ChatSessionWithCharacter) => {
-    if (session.message_count === 0) {
-      return '开始新对话'
-    }
-    return `${session.message_count}条消息`
-  }
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-        duration: 0.3
-      }
-    }
-  }
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.4 }
-    }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center space-y-4">
-          <div className="w-8 h-8 mx-auto animate-spin rounded-full border-2 border-slate-900 border-t-transparent" />
-          <p className="text-slate-600">加载聊天记录中...</p>
-        </div>
-      </div>
-    )
-  }
+  const total = sessions.data?.length ?? 0
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 -mx-4 -my-6 sm:-mx-6 sm:-my-8">
-      {/* 顶部标题栏 - 微信风格 */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-b border-slate-200/60 dark:border-slate-700/60 px-4 py-3 z-10"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <h1 className="text-xl font-semibold text-slate-900 dark:text-white">聊天</h1>
-            {sessions.length > 0 && (
-              <span className="text-sm text-slate-500 dark:text-slate-400">({sessions.length})</span>
-            )}
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsSearchVisible(!isSearchVisible)}
-              className="h-9 w-9 p-0 rounded-full"
-            >
-              <Search className="w-5 h-5" />
-            </Button>
-            <Link href="/characters">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 w-9 p-0 rounded-full"
-              >
-                <Plus className="w-5 h-5" />
-              </Button>
-            </Link>
-          </div>
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-3xl font-semibold">对话</h1>
+          <p className="mt-1 text-sm text-cv-fg-muted">{total > 0 ? `${total} 段对话，按最近活动排序` : '从一个角色开始新的对话。'}</p>
         </div>
-        
-        {/* 搜索栏 */}
-        <AnimatePresence>
-          {isSearchVisible && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="mt-3"
-            >
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <Input
-                  placeholder="搜索对话..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-slate-100 dark:bg-slate-800 dark:text-white border-none rounded-full h-9"
-                  autoFocus
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+        <Button asChild variant="accent"><Link href="/characters"><Users />选择角色</Link></Button>
+      </header>
 
-      {/* 聊天列表 */}
-      <div className="pb-4">
-        {filteredSessions.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
-            className="flex flex-col items-center justify-center py-20 px-4"
-          >
-            <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center mb-4">
-              <MessageCircle className="w-10 h-10 text-slate-400" />
-            </div>
-            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
-              {searchQuery ? '没有找到匹配的对话' : '还没有聊天记录'}
-            </h3>
-            <p className="text-slate-500 dark:text-slate-400 text-center mb-6">
-              {searchQuery 
-                ? '试试其他关键词'
-                : '选择一个角色开始你的第一次对话'
-              }
-            </p>
-            {!searchQuery && (
-              <Button 
-                className="bg-blue-500 hover:bg-blue-600 rounded-full px-6"
-                onClick={handleStartNewChat}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                开始新对话
-              </Button>
-            )}
-          </motion.div>
-        ) : (
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="divide-y divide-slate-100"
-          >
-            {filteredSessions.map((session, index) => (
-              <motion.div
-                key={session.id}
-                variants={itemVariants}
-                custom={index}
-              >
-                <motion.div
-                  whileHover={{ backgroundColor: 'rgb(248 250 252)' }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ duration: 0.1 }}
-                  className="group"
-                >
-                  <Link href={`/chat/${session.id}`}>
-                    <div className="flex items-center px-4 py-4 active:bg-slate-100 transition-colors">
-                      {/* 头像 */}
-                      <Avatar className="w-12 h-12 mr-3 flex-shrink-0 ring-2 ring-transparent group-hover:ring-slate-200 transition-all">
-                        <AvatarImage src={session.character.avatar_url} />
-                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-medium">
-                          {session.character.name[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                      
-                      {/* 内容区域 */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <h3 className="font-medium text-slate-900 dark:text-white truncate">
-                            {session.title || session.character.name}
-                          </h3>
-                          <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 flex-shrink-0">
-                            {formatTime(session.last_message_at || session.created_at)}
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
-                            {getLastMessagePreview(session)}
-                          </p>
-                          
-                          {/* 未读消息指示器 */}
-                          {session.message_count > 0 && (
-                            <motion.div 
-                              className="ml-2 flex items-center"
-                              whileHover={{ x: 2 }}
-                              transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                            >
-                              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
-                            </motion.div>
-                          )}
-                        </div>
+      {total > 3 && (
+        <div className="relative mb-5">
+          <Search className="pointer-events-none absolute inset-y-0 left-4 my-auto size-4 text-cv-fg-subtle" />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索标题或角色…" className="pl-11" aria-label="搜索对话" />
+        </div>
+      )}
+
+      {sessions.isLoading && (
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => <CardSkeleton key={i} variant="row" />)}
+        </div>
+      )}
+
+      {sessions.isError && (
+        <PosterCard tone="ink" className="text-center">
+          <PosterTitle>加载失败</PosterTitle>
+          <p className="mt-2 text-sm opacity-80">网络或权限问题，稍后再试。</p>
+          <Button variant="glass" size="sm" className="mt-4" onClick={() => sessions.refetch()}>重试</Button>
+        </PosterCard>
+      )}
+
+      {sessions.isSuccess && total === 0 && (
+        <PosterCard tone="primary" className="flex min-h-64 flex-col items-start justify-between p-6 sm:p-8">
+          <span className="flex size-10 items-center justify-center rounded-cv-sm bg-cv-accent text-white shadow-[0_10px_24px_-10px_var(--cv-accent)]"><MessageSquare className="size-5" /></span>
+          <div className="mt-8">
+            <PosterTitle className="text-3xl sm:text-4xl">还没有对话。</PosterTitle>
+            <p className="mt-2 max-w-sm text-sm opacity-80">去「角色」页挑一个角色，点「聊天」就会在这里出现。</p>
+            <Button asChild variant="glass" className="mt-5"><Link href="/characters"><Users />去角色页</Link></Button>
+          </div>
+        </PosterCard>
+      )}
+
+      {sessions.isSuccess && total > 0 && groups.length === 0 && (
+        <div className="glass rounded-cv-lg p-8 text-center text-sm text-cv-fg-muted">没有匹配的对话。</div>
+      )}
+
+      {groups.map((g) => (
+        <section key={g.id} className="mb-7">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-cv-fg-subtle">{g.label}</h2>
+          <motion.ul variants={listVariants} initial="hidden" animate="visible" className="space-y-3">
+            {g.items.map((s) => {
+              const name = s.character?.name ?? '已删除的角色'
+              const busy = busyId === s.id
+              return (
+                <motion.li key={s.id} variants={itemVariants} layout>
+                  <div className={`glass relative flex items-center gap-3 rounded-cv-lg p-3 transition-shadow hover:shadow-glass ${busy ? 'opacity-60' : ''}`}>
+                    <Link href={`/chat/${s.id}`} aria-label={sessionTitle(s)} className="absolute inset-0 z-0 rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-cv-ring" />
+                    <Avatar className="size-12 shrink-0 rounded-cv-sm">
+                      <AvatarImage src={s.character?.avatar_url ?? undefined} alt="" className="object-cover" />
+                      <AvatarFallback className="rounded-cv-sm bg-cv-secondary font-display text-lg font-semibold text-cv-secondary-fg">{name.slice(0, 1)}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="truncate font-semibold leading-tight">{sessionTitle(s)}</h3>
+                        {s.parent_session_id && <GitBranch className="size-3.5 shrink-0 text-cv-fg-subtle" aria-label="分支会话" />}
                       </div>
-                      
-                      {/* 更多操作 */}
+                      <p className="truncate text-sm text-cv-fg-muted">
+                        {name}
+                        <span className="mx-1.5 text-cv-fg-subtle">·</span>
+                        <time dateTime={s.updated_at ?? s.created_at}>{relativeTime(s.updated_at ?? s.created_at, now)}</time>
+                      </p>
+                    </div>
+                    <div className="relative z-10 flex shrink-0 items-center gap-1">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="opacity-0 group-hover:opacity-100 ml-2 h-8 w-8 p-0 rounded-full hover:bg-slate-200 transition-all"
-                            onClick={(e) => e.preventDefault()}
-                          >
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
+                          <IconButton label="会话操作" variant="ghost" size="sm" disabled={busy}><MoreHorizontal /></IconButton>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl shadow-lg border-slate-200/60">
-                          <DropdownMenuItem 
-                            onClick={(e) => {
-                              e.preventDefault()
-                              deleteSession(session.id)
-                            }}
-                            className="text-red-600 focus:text-red-700 focus:bg-red-50 rounded-lg"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            删除对话
-                          </DropdownMenuItem>
+                        <DropdownMenuContent align="end" className="min-w-40">
+                          <DropdownMenuItem onClick={() => router.push(`/chat/${s.id}`)}><MessageSquare />打开</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => void rename(s)}><Pencil />重命名</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem variant="destructive" onClick={() => void remove(s)}><Trash2 />删除会话</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      <ChevronRight className="hidden size-4 text-cv-fg-subtle sm:block" aria-hidden />
                     </div>
-                  </Link>
-                </motion.div>
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
-      </div>
+                  </div>
+                </motion.li>
+              )
+            })}
+          </motion.ul>
+        </section>
+      ))}
     </div>
   )
-} 
+}

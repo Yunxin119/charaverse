@@ -1,456 +1,291 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Search, 
-  Plus, 
-  Edit3, 
-  Trash2, 
-  User, 
-  Clock,
-  Tag,
-  Save
-} from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
+import { Plus, Search, Pencil, Trash2, Copy, Check, MoreHorizontal, BookTemplate, Globe, Lock, Loader2, User, AlertTriangle, Clapperboard, Wand2, Puzzle } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { 
-  getUserTemplates, 
-  savePromptTemplate, 
-  updatePromptTemplate,
-  deletePromptTemplate
-} from '../lib/promptTemplates'
-import { type PromptTemplate } from '../lib/supabase'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Chip, IconButton, PosterCard, PosterTitle, CardSkeleton } from '@/components/glass'
+import { useAuth } from '@/providers/AuthProvider'
+import { useTemplates, useSaveTemplate, useDeleteTemplate, templateContentText, TEMPLATE_TYPES, type TemplateScope } from '@/queries'
+import type { PromptTemplate } from '@/app/lib/supabase'
+import { cn } from '@/lib/utils'
 
-const templateTypes = [
-  { value: '用户角色设定', label: '用户角色设定', icon: User },
-  { value: '注意事项', label: '注意事项', icon: Tag },
-  { value: '初始情景', label: '初始情景', icon: Clock },
-  { value: '特殊要求', label: '特殊要求', icon: Edit3 },
-  { value: '自定义模块', label: '自定义模块', icon: Plus }
+type TemplateType = PromptTemplate['template_type']
+
+// static class strings so Tailwind can see them
+const TYPE_META: Record<TemplateType, { icon: LucideIcon; tone: 'info' | 'warning' | 'accent' | 'success' | 'flat'; badge: string }> = {
+  用户角色设定: { icon: User, tone: 'info', badge: 'text-cv-info bg-[color-mix(in_oklab,var(--cv-info)_16%,transparent)]' },
+  注意事项: { icon: AlertTriangle, tone: 'warning', badge: 'text-cv-warning bg-[color-mix(in_oklab,var(--cv-warning)_18%,transparent)]' },
+  初始情景: { icon: Clapperboard, tone: 'accent', badge: 'bg-cv-accent text-cv-accent-fg' },
+  特殊要求: { icon: Wand2, tone: 'success', badge: 'text-cv-success bg-[color-mix(in_oklab,var(--cv-success)_18%,transparent)]' },
+  自定义模块: { icon: Puzzle, tone: 'flat', badge: 'bg-cv-secondary text-cv-secondary-fg' },
+}
+
+const SCOPES: { id: TemplateScope; label: string }[] = [
+  { id: 'mine', label: '我的' },
+  { id: 'public', label: '公开' },
+  { id: 'system', label: '系统' },
 ]
 
+type FormState = { name: string; template_type: TemplateType; description: string; content: string; is_public: boolean }
+const EMPTY_FORM: FormState = { name: '', template_type: '用户角色设定', description: '', content: '', is_public: false }
+
+const listVariants = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } }
+const itemVariants = { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.24, ease: [0.2, 0.8, 0.2, 1] as const } } }
+
 export default function TemplatesPage() {
-  const [templates, setTemplates] = useState<PromptTemplate[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedType, setSelectedType] = useState<string>('all')
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [editingTemplate, setEditingTemplate] = useState<PromptTemplate | null>(null)
-  
-  // 创建/编辑模板的表单状态
-  const [templateForm, setTemplateForm] = useState({
-    name: '',
-    template_type: '用户角色设定',
-    description: '',
-    content: ''
-  })
+  const { user } = useAuth()
+  const [scope, setScope] = useState<TemplateScope>('mine')
+  const [query, setQuery] = useState('')
+  const [typeFilter, setTypeFilter] = useState<'all' | TemplateType>('all')
+  const templates = useTemplates(scope, user?.id)
+  const save = useSaveTemplate()
+  const del = useDeleteTemplate()
 
-  // 加载个人模板列表
-  const loadTemplates = useCallback(async () => {
-    try {
-      setIsLoading(true)
-      const data = await getUserTemplates(selectedType === 'all' ? undefined : selectedType)
-      setTemplates(data)
-    } catch (error) {
-      console.error('加载模板失败:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [selectedType])
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editing, setEditing] = useState<PromptTemplate | null>(null)
+  const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<number | null>(null)
 
-  useEffect(() => {
-    loadTemplates()
-  }, [loadTemplates])
-
-  // 重置表单
-  const resetForm = () => {
-    setTemplateForm({
-      name: '',
-      template_type: '用户角色设定',
-      description: '',
-      content: ''
+  const list = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return (templates.data ?? []).filter((t) => {
+      if (typeFilter !== 'all' && t.template_type !== typeFilter) return false
+      if (!q) return true
+      return t.name.toLowerCase().includes(q) || (t.description ?? '').toLowerCase().includes(q) || templateContentText(t.content).toLowerCase().includes(q)
     })
+  }, [templates.data, query, typeFilter])
+
+  const openCreate = () => {
+    setEditing(null)
+    setForm(EMPTY_FORM)
+    setFormError(null)
+    setDialogOpen(true)
   }
 
-  // 打开创建对话框
-  const handleCreateTemplate = () => {
-    resetForm()
-    setEditingTemplate(null)
-    setShowCreateDialog(true)
+  const openEdit = (t: PromptTemplate) => {
+    setEditing(t)
+    setForm({ name: t.name, template_type: t.template_type, description: t.description ?? '', content: templateContentText(t.content), is_public: !!t.is_public })
+    setFormError(null)
+    setDialogOpen(true)
   }
 
-  // 打开编辑对话框
-  const handleEditTemplate = (template: PromptTemplate) => {
-    // 将复杂的content对象转换为简单的字符串
-    let contentStr = ''
-    if (typeof template.content === 'string') {
-      contentStr = template.content
-    } else if (typeof template.content === 'object' && template.content !== null) {
-      // 如果是对象，尝试提取主要内容
-      if (template.content.content) {
-        contentStr = template.content.content
-      } else {
-        contentStr = JSON.stringify(template.content, null, 2)
-      }
-    }
-
-    setTemplateForm({
-      name: template.name,
-      template_type: template.template_type,
-      description: template.description || '',
-      content: contentStr
-    })
-    setEditingTemplate(template)
-    setShowCreateDialog(true)
-  }
-
-  // 保存模板
-  const handleSaveTemplate = async () => {
-    if (!templateForm.name.trim()) {
-      alert('请输入模板名称')
-      return
-    }
-
-    if (!templateForm.content.trim()) {
-      alert('请输入模板内容')
-      return
-    }
-
+  const submit = async () => {
+    if (!form.name.trim()) return setFormError('请输入模板名称')
+    if (!form.content.trim()) return setFormError('请输入模板内容')
+    setFormError(null)
     try {
-      const templateData = {
-        name: templateForm.name,
-        template_type: templateForm.template_type,
-        description: templateForm.description,
-        content: { content: templateForm.content }, // 统一使用这种格式
-        is_public: false // 固定为私人模板
-      }
-
-      if (editingTemplate) {
-        // 更新模板
-        await updatePromptTemplate(editingTemplate.id, templateData)
-      } else {
-        // 创建新模板
-        await savePromptTemplate(templateData)
-      }
-      
-      setShowCreateDialog(false)
-      resetForm()
-      setEditingTemplate(null)
-      loadTemplates()
-      
-      alert(editingTemplate ? '模板更新成功！' : '模板创建成功！')
-    } catch (error) {
-      console.error('保存模板失败:', error)
-      alert('保存模板失败，请重试')
+      await save.mutateAsync({
+        id: editing?.id,
+        name: form.name.trim(),
+        template_type: form.template_type,
+        description: form.description.trim() || undefined,
+        // same shape the old page wrote, so the character form keeps reading it
+        content: { content: form.content },
+        is_public: form.is_public,
+      })
+      setDialogOpen(false)
+    } catch {
+      setFormError('保存失败，请重试')
     }
   }
 
-  // 删除模板
-  const handleDeleteTemplate = async (templateId: number) => {
-    if (!confirm('确定要删除这个模板吗？')) return
-    
+  const remove = async (t: PromptTemplate) => {
+    if (!confirm(`删除模板「${t.name}」？此操作无法撤销。`)) return
     try {
-      await deletePromptTemplate(templateId)
-      loadTemplates()
-      alert('模板删除成功！')
-    } catch (error) {
-      console.error('删除模板失败:', error)
-      alert('删除模板失败，请重试')
+      await del.mutateAsync(t.id)
+    } catch {
+      alert('删除失败，请重试')
     }
   }
 
-  // 过滤模板
-  const filteredTemplates = templates.filter(template =>
-    template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    template.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
+  const copy = async (t: PromptTemplate) => {
+    try {
+      await navigator.clipboard.writeText(templateContentText(t.content))
+      setCopiedId(t.id)
+      setTimeout(() => setCopiedId((id) => (id === t.id ? null : id)), 1500)
+    } catch {
+      alert('复制失败，请手动选择文本')
     }
   }
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 }
-  }
+  const total = templates.data?.length ?? 0
+  const canEdit = (t: PromptTemplate) => scope === 'mine' && !!user && t.user_id === user.id
 
   return (
-    <motion.div
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-      className="max-w-6xl mx-auto space-y-6"
-    >
-      {/* Header */}
-      <motion.div variants={itemVariants}>
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl">我的模板库</CardTitle>
-                <p className="text-slate-600 mt-1">管理和复用你的角色设定模板</p>
-              </div>
-              <Button onClick={handleCreateTemplate}>
-                <Plus className="w-4 h-4 mr-2" />
-                创建模板
-              </Button>
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-3xl font-semibold">模板</h1>
+          <p className="mt-1 text-sm text-cv-fg-muted">把常用的人设、情景和要求存成模板，在角色表单里一键套用。</p>
+        </div>
+        <Button variant="accent" onClick={openCreate}><Plus />新建模板</Button>
+      </header>
+
+      <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center">
+        <Tabs value={scope} onValueChange={(v) => setScope(v as TemplateScope)}>
+          <TabsList className="w-full sm:w-fit">
+            {SCOPES.map((s) => <TabsTrigger key={s.id} value={s.id}>{s.label}</TabsTrigger>)}
+          </TabsList>
+        </Tabs>
+        <div className="flex flex-1 flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute inset-y-0 left-4 my-auto size-4 text-cv-fg-subtle" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索名称、描述或内容…" className="pl-11" aria-label="搜索模板" />
+          </div>
+          <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as 'all' | TemplateType)}>
+            <SelectTrigger className="w-full sm:w-40" aria-label="模板类型"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">所有类型</SelectItem>
+              {TEMPLATE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {templates.isLoading && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} className="min-h-44" />)}
+        </div>
+      )}
+
+      {templates.isError && (
+        <PosterCard tone="ink" className="text-center">
+          <PosterTitle>加载失败</PosterTitle>
+          <p className="mt-2 text-sm opacity-80">网络或权限问题，稍后再试。</p>
+          <Button variant="glass" size="sm" className="mt-4" onClick={() => templates.refetch()}>重试</Button>
+        </PosterCard>
+      )}
+
+      {templates.isSuccess && total === 0 && (
+        <PosterCard tone={scope === 'mine' ? 'ink' : 'secondary'} className="flex min-h-56 flex-col items-start justify-between p-6 sm:p-8">
+          <BookTemplate className="size-8 opacity-80" />
+          <div className="mt-6">
+            <PosterTitle className="text-3xl">{scope === 'mine' ? '还没有模板。' : scope === 'public' ? '还没有人公开模板。' : '暂无系统模板。'}</PosterTitle>
+            <p className="mt-2 max-w-sm text-sm opacity-80">{scope === 'mine' ? '把你写过最好的一段人设存下来，下次建角色直接套用。' : '把自己的模板设为公开，就会出现在这里。'}</p>
+            {scope === 'mine' && <Button variant="glass" className="mt-5" onClick={openCreate}><Plus />新建模板</Button>}
+          </div>
+        </PosterCard>
+      )}
+
+      {templates.isSuccess && total > 0 && list.length === 0 && (
+        <div className="glass rounded-cv-lg p-8 text-center text-sm text-cv-fg-muted">没有匹配的模板。</div>
+      )}
+
+      {templates.isSuccess && list.length > 0 && (
+        <motion.div key={scope} variants={listVariants} initial="hidden" animate="visible" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {list.map((t) => {
+            const meta = TYPE_META[t.template_type] ?? TYPE_META.自定义模块
+            const Icon = meta.icon
+            const editable = canEdit(t)
+            const copied = copiedId === t.id
+            return (
+              <motion.div key={t.id} variants={itemVariants} layout>
+                <article className="glass flex h-full flex-col rounded-cv-lg p-5 transition-shadow hover:shadow-glass">
+                  <div className="flex items-start gap-3">
+                    <span className={cn('flex size-10 shrink-0 items-center justify-center rounded-cv-sm', meta.badge)}>
+                      <Icon className="size-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate font-semibold leading-tight">{t.name}</h3>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        <Chip tone={meta.tone} className="px-2 py-0.5 text-[11px]">{t.template_type}</Chip>
+                        {scope === 'mine' && (t.is_public ? <Chip tone="success" className="px-2 py-0.5 text-[11px]"><Globe className="size-3" />公开</Chip> : <Chip tone="outline" className="px-2 py-0.5 text-[11px]"><Lock className="size-3" />私人</Chip>)}
+                      </div>
+                    </div>
+                    {editable && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <IconButton label="模板操作" variant="ghost" size="sm" className="-mr-2 -mt-1"><MoreHorizontal /></IconButton>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="min-w-36">
+                          <DropdownMenuItem onClick={() => openEdit(t)}><Pencil />编辑</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => void copy(t)}><Copy />复制内容</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem variant="destructive" onClick={() => void remove(t)}><Trash2 />删除</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
+
+                  <p className="mt-3 line-clamp-3 flex-1 text-sm text-cv-fg-muted">{t.description?.trim() || templateContentText(t.content) || '没有描述'}</p>
+
+                  <div className="mt-4 flex items-center justify-between gap-2 border-t border-cv-border pt-3 text-xs text-cv-fg-subtle">
+                    <span>{t.usage_count > 0 ? `使用 ${t.usage_count} 次` : '尚未使用'}<span className="mx-1.5">·</span>{new Date(t.created_at).toLocaleDateString('zh-CN')}</span>
+                    <Button size="sm" variant={copied ? 'secondary' : 'neu'} onClick={() => void copy(t)} aria-live="polite">
+                      {copied ? <><Check />已复制</> : <><Copy />复制内容</>}
+                    </Button>
+                  </div>
+                </article>
+              </motion.div>
+            )
+          })}
+        </motion.div>
+      )}
+
+      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!save.isPending) setDialogOpen(o) }}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">{editing ? '编辑模板' : '新建模板'}</DialogTitle>
+            <DialogDescription>{editing ? '类型在创建后不能更改。' : '模板会出现在角色表单对应的模块里。'}</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="tpl-name">名称 *</Label>
+              <Input id="tpl-name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="例如：冷静的侦探搭档" maxLength={80} />
             </div>
-          </CardHeader>
-        </Card>
-      </motion.div>
-
-      {/* Filters */}
-      <motion.div variants={itemVariants}>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              {/* Search */}
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input
-                  placeholder="搜索模板..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* Type Filter */}
-              <Select value={selectedType} onValueChange={setSelectedType}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="选择类型" />
-                </SelectTrigger>
+            <div className="space-y-1.5">
+              <Label htmlFor="tpl-type">类型 *</Label>
+              <Select value={form.template_type} onValueChange={(v) => setForm((f) => ({ ...f, template_type: v as TemplateType }))} disabled={!!editing}>
+                <SelectTrigger id="tpl-type" className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">所有类型</SelectItem>
-                  {templateTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
+                  {TEMPLATE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Templates Grid */}
-      <motion.div variants={itemVariants}>
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-slate-500">加载中...</div>
           </div>
-        ) : filteredTemplates.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Tag className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">
-                {searchQuery ? '没有找到匹配的模板' : '还没有模板'}
-              </h3>
-              <p className="text-slate-500 mb-6">
-                {searchQuery ? '试试调整搜索条件' : '创建你的第一个模板，提高角色创建效率'}
-              </p>
-              {!searchQuery && (
-                <Button onClick={handleCreateTemplate}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  创建模板
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <AnimatePresence>
-              {filteredTemplates.map((template, index) => {
-                const TypeIcon = templateTypes.find(t => t.value === template.template_type)?.icon || Tag
-                
-                return (
-                  <motion.div
-                    key={template.id}
-                    variants={itemVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="hidden"
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <Card className="hover:shadow-lg transition-all duration-200 group">
-                      <CardContent className="p-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex items-center space-x-3 flex-1 min-w-0">
-                            <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
-                              <TypeIcon className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-slate-900 truncate">
-                                {template.name}
-                              </h4>
-                              <p className="text-sm text-slate-500">
-                                {template.template_type}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          {/* Actions */}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Edit3 className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem onClick={() => handleEditTemplate(template)}>
-                                <Edit3 className="w-4 h-4 mr-2" />
-                                编辑
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleDeleteTemplate(template.id)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                删除
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
 
-                        {template.description && (
-                          <p className="text-sm text-slate-600 line-clamp-2 mb-4">
-                            {template.description}
-                          </p>
-                        )}
-
-                        <div className="flex items-center justify-between text-xs text-slate-500">
-                          <div className="flex items-center space-x-3">
-                            <span className="flex items-center">
-                              <User className="w-3 h-3 mr-1" />
-                              个人模板
-                            </span>
-                            {template.usage_count > 0 && (
-                              <span className="flex items-center">
-                                <Clock className="w-3 h-3 mr-1" />
-                                使用 {template.usage_count} 次
-                              </span>
-                            )}
-                          </div>
-                          <span>
-                            {new Date(template.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )
-              })}
-            </AnimatePresence>
+          <div className="space-y-1.5">
+            <Label htmlFor="tpl-desc">描述（可选）</Label>
+            <Input id="tpl-desc" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="一句话说明这个模板适合什么场景" maxLength={200} />
           </div>
-        )}
-      </motion.div>
 
-      {/* Create/Edit Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editingTemplate ? '编辑模板' : '创建新模板'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-6 py-4">
-            {/* Basic Info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="template-name">模板名称 *</Label>
-                <Input
-                  id="template-name"
-                  placeholder="输入模板名称..."
-                  value={templateForm.name}
-                  onChange={(e) => setTemplateForm(prev => ({ ...prev, name: e.target.value }))}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="template-type">模板类型 *</Label>
-                <Select 
-                  value={templateForm.template_type} 
-                  onValueChange={(value) => setTemplateForm(prev => ({ ...prev, template_type: value }))}
-                  disabled={!!editingTemplate} // 编辑时不允许修改类型
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templateTypes.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="template-description">描述（可选）</Label>
-              <Textarea
-                id="template-description"
-                placeholder="描述这个模板的用途..."
-                value={templateForm.description}
-                onChange={(e) => setTemplateForm(prev => ({ ...prev, description: e.target.value }))}
-                className="min-h-[80px] resize-none"
-              />
-            </div>
-
-            {/* Simplified Content Editor */}
-            <div className="space-y-2">
-              <Label htmlFor="template-content">模板内容 *</Label>
-              <Textarea
-                id="template-content"
-                placeholder="输入模板内容..."
-                value={templateForm.content}
-                onChange={(e) => setTemplateForm(prev => ({ ...prev, content: e.target.value }))}
-                className="min-h-[200px] resize-none"
-              />
-              <p className="text-xs text-slate-500">
-                输入你的角色设定模板内容，支持多行文本
-              </p>
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-                取消
-              </Button>
-              <Button onClick={handleSaveTemplate}>
-                <Save className="w-4 h-4 mr-2" />
-                {editingTemplate ? '更新' : '创建'}
-              </Button>
-            </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="tpl-content">内容 *</Label>
+            <Textarea id="tpl-content" value={form.content} onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))} placeholder="输入模板正文，支持多行…" className="min-h-48 max-h-[45dvh]" />
+            <p className="text-xs text-cv-fg-subtle">{form.content.length} 字</p>
           </div>
+
+          <div className="neu flex items-center justify-between gap-3 rounded-cv-md px-4 py-3">
+            <div>
+              <Label htmlFor="tpl-public" className="text-sm font-semibold">公开模板</Label>
+              <p className="text-xs text-cv-fg-muted">公开后其他用户可以在「公开」标签里看到并复制。</p>
+            </div>
+            <Switch id="tpl-public" checked={form.is_public} onCheckedChange={(v) => setForm((f) => ({ ...f, is_public: v }))} />
+          </div>
+
+          {formError && <p role="alert" className="text-sm text-cv-danger">{formError}</p>}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={save.isPending}>取消</Button>
+            <Button variant="accent" onClick={() => void submit()} disabled={save.isPending}>
+              {save.isPending ? <Loader2 className="animate-spin" /> : null}
+              {editing ? '保存' : '创建'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-    </motion.div>
+    </div>
   )
 }

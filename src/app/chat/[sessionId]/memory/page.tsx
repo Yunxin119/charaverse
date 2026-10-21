@@ -44,7 +44,7 @@ import { useAuth } from '@/providers/AuthProvider'
 import { supabase } from '../../../lib/supabase'
 import { fetchSummaries, useCharacter, useSession } from '@/queries'
 import { parseSessionSettings } from '@/lib/chat/settings'
-import { useApiConfig } from '../../../lib/useApiConfig'
+import { useConnection } from '@/lib/llm/useConnection'
 
 // 基础记忆表格接口定义
 interface BaseMemoryEntry {
@@ -207,7 +207,8 @@ export default function MemoryManagePage() {
   const { data: session } = useSession(sessionId)
   const { data: currentCharacter } = useCharacter(session?.character_id)
   const selectedModel = parseSessionSettings(session?.settings).model ?? null
-  const { getModelConfig, availableModels } = useApiConfig()
+  const conn = useConnection()
+  const availableModels = conn.availableModels
 
   const [summaries, setSummaries] = useState<ChatSummary[]>([])
   const [memories, setMemories] = useState<MemoryEntry[]>([])
@@ -380,18 +381,9 @@ export default function MemoryManagePage() {
     const currentModel = getCurrentModel()
     console.log('🔧 当前模型:', currentModel)
 
-    let modelConfig
-    try {
-      modelConfig = getModelConfig(currentModel)
-      console.log('✅ 获取到模型配置:', { hasApiKey: !!modelConfig.apiKey, isRelay: modelConfig.isRelay })
-    } catch (error) {
-      console.error('❌ 获取模型配置失败:', error)
-      alert(error instanceof Error ? error.message : '模型配置错误')
-      return
-    }
-
-    if (!modelConfig.apiKey) {
-      alert('没有可用的API密钥，请检查配置')
+    const connHeaders = conn.headersFor(currentModel)
+    if (!connHeaders) {
+      alert('没有可用的 API 连接，请在「我的 → API 连接」添加')
       return
     }
 
@@ -428,21 +420,8 @@ export default function MemoryManagePage() {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
-        'x-api-key': modelConfig.apiKey,
-        'x-model': currentModel,
+        ...connHeaders,
         'x-regenerate': 'true' // 标记为重新生成
-      }
-
-      // 如果是中转API，添加额外的headers
-      if (modelConfig.isRelay) {
-        headers['x-base-url'] = modelConfig.baseUrl || ''
-        headers['x-actual-model'] = modelConfig.modelName || ''
-      }
-
-      // 添加thinking budget参数（如果支持）
-      if (currentModel.includes('gemini-2.5')) {
-        // 对于Gemini 2.5系列，添加thinking budget
-        headers['x-thinking-budget'] = '0' // 使用auto模式
       }
 
       const requestBody = {
@@ -1144,17 +1123,8 @@ export default function MemoryManagePage() {
 
   // 获取当前选择的模型
   const getCurrentModel = () => {
-    // 优先使用保存在localStorage中的模型选择
-    const savedModel = localStorage.getItem(`chat_model_${sessionId}`)
-    if (savedModel && availableModels.includes(savedModel)) {
-      return savedModel
-    }
-    // 其次使用会话设置中的选择
-    if (selectedModel && availableModels.includes(selectedModel)) {
-      return selectedModel
-    }
-    // 最后使用第一个可用模型
-    return availableModels[0] || 'gemini-2.5-flash'
+    if (selectedModel && conn.resolve(selectedModel)) return selectedModel
+    return conn.defaultModel ?? ''
   }
 
   // 手动范围输入变化处理
@@ -1207,17 +1177,9 @@ export default function MemoryManagePage() {
 
     const currentModel = getCurrentModel()
 
-    let modelConfig
-    try {
-      modelConfig = getModelConfig(currentModel)
-    } catch (error) {
-      console.error('❌ 获取模型配置失败:', error)
-      alert(error instanceof Error ? error.message : '模型配置错误')
-      return
-    }
-
-    if (!modelConfig.apiKey) {
-      alert('没有可用的API密钥，请检查配置')
+    const connHeaders = conn.headersFor(currentModel)
+    if (!connHeaders) {
+      alert('没有可用的 API 连接，请在「我的 → API 连接」添加')
       return
     }
 
@@ -1233,20 +1195,7 @@ export default function MemoryManagePage() {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
-        'x-api-key': modelConfig.apiKey,
-        'x-model': currentModel,
-      }
-
-      // 如果是中转API，添加额外的headers
-      if (modelConfig.isRelay) {
-        headers['x-base-url'] = modelConfig.baseUrl || ''
-        headers['x-actual-model'] = modelConfig.modelName || ''
-      }
-
-      // 添加thinking budget参数（如果支持）
-      if (currentModel.includes('gemini-2.5')) {
-        // 对于Gemini 2.5系列，添加thinking budget
-        headers['x-thinking-budget'] = '0' // 使用auto模式
+        ...connHeaders,
       }
 
       const response = await fetch('/api/chat/summary', {

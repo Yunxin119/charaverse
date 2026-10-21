@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 /** `chat_sessions.settings` — everything per-session that used to live in localStorage. */
 export const sessionSettingsSchema = z.object({
-  /** legacy model id resolved client-side by useApiConfig (e.g. 'gemini-2.5-flash', 'named-relay-<id>') */
+  /** model ref `<connectionId>/<model>` (legacy ids like 'gemini-2.5-flash' / 'named-relay-<id>' still resolve) */
   model: z.string().max(128).optional(),
   /** user_presets.id, null = user default / builtin */
   presetId: z.string().uuid().nullable().optional(),

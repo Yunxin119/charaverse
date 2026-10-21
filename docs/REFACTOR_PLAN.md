@@ -8,9 +8,9 @@
 |---|---|---|---|
 | P0 | 止血：删死代码、堵安全洞、升级依赖 | 0.5 天 | ✅ 2026-10-20（hotfix SQL 待在 dashboard 执行） |
 | P1 | 地基：设计 token、App 壳、鉴权中间件、数据层 | 1 天 | 🟡 2026-10-20 基本完成（baseline 迁移 + gen types 待你跑 CLI） |
-| P2 | 聊天核心重写：流式、预设驱动的 prompt 组装、消息组件 | 1.5 天 | 🟡 2026-10-20 代码完成，待你跑 0002 迁移 + 登录实测 |
-| P3 | 可定制化：预设导入/管理、主题导入、作者皮肤、HTML 块沙箱 | 1.5 天 | 🟡 2026-10-20 代码完成，待你跑 0003 迁移 + 登录实测 |
-| P4 | 其余页面换皮 + API 连接管理合并 | 1 天 | ⬜ |
+| P2 | 聊天核心重写：流式、预设驱动的 prompt 组装、消息组件 | 1.5 天 | ✅ 2026-10-20（已实测） |
+| P3 | 可定制化：预设导入/管理、主题导入、作者皮肤、HTML 块沙箱 | 1.5 天 | ✅ 2026-10-20（已实测） |
+| P4 | 其余页面换皮 + API 连接管理合并 | 1 天 | 🟡 2026-10-21 代码完成，待你跑 0004 迁移 + 实测 |
 | P5 | 记忆 / 摘要 / 日记：schema 驱动重建 | 1 天 | ⬜ |
 | P6 | 加固：限流、日志、CSP、测试、性能 | 0.5 天 | ⬜ |
 
@@ -289,14 +289,15 @@ docs/                       # 本文件 + design/
 - 验收：`tsc` / `eslint` / `next build` 全绿 ✅；91 个测试通过 ✅；导入主题 JSON 全站变色、作者 CSS 不越界、iframe 里 `<script>` 拿不到主站 cookie —— **待你登录实测**（入口：我的 → 外观 / 预设；聊天 → 更多 → 角色皮肤）
 
 ### P4 · 页面换皮 + 连接管理（1 天）
-- [ ] `lib/connections/`：统一模型 `{ id, name, kind: 'openai-compatible'|'google'|'deepseek'|'anthropic', baseUrl?, apiKey, models[], isDefault }`；一次性迁移 `api_pool_config` / `named_relay_configs` / `api_key_*`；删 `apiManager`、`apiMigration`、`useApiConfig`、`ApiPoolManager`、`RelayServiceManager`、`ApiManagerModal`
-- [ ] 设置页拆成 `settings/{profile,connections,appearance,account}`；「测试连接」真打一次 `/api/chat` 的 ping
-- [ ] `CharacterForm` 合并 new/edit；分区：基本信息 / 人设模块 / 开场白 / 外观皮肤 / 发布
-- [ ] **发布即快照**（A12）：迁移 + `PublishDialog`；explore / public 页 / 他人开聊只读 `published_snapshot`；fork 复制快照
-- [ ] 角色编辑器去掉多角色启动器与 `script_*` 字段（A15）
-- [ ] explore / characters / chat 列表 / user 页 / templates 换成 glass + poster 卡片；骨架屏
-- [ ] 响应式：窄屏下 rail 收成底部 tab、安全区 padding（只保证手机浏览器可用，不做更多手机特化）
-- 验收：没有页面再 import `slate-*`；旧 API 配置自动迁移且聊天正常
+- [x] `lib/connections/` + `stores/connections.ts`（zustand，localStorage 持久化）：统一模型 `{ id, name, kind: 'openai-compatible'|'google'|'deepseek'|'anthropic', baseUrl?, apiKey, models[], isDefault }`；一次性迁移 `api_pool_config` / `named_relay_configs` / `api_key_*`；删 `apiManager`、`apiMigration`、`useApiConfig`、`ApiPoolManager`、`RelayServiceManager`、`ApiManagerModal`
+- [x] 设置页拆成 hub（资料 + 账号）/ `settings/connections` / `settings/appearance` / `settings/presets`；「测试连接」走 `/api/connections/test`（8 token 的 ping，返回延迟）
+- [x] `CharacterForm` 合并 new/edit；分区：基本信息 / 人设模块 / 开场白 / 外观皮肤 / 发布
+- [x] **发布即快照**（A12）：迁移 + `PublishDialog`；explore / public 页 / 他人开聊只读 `published_snapshot`；fork 复制快照
+- [x] 角色编辑器去掉多角色启动器与 `script_*` 字段（A15）
+- [x] explore / characters / chat 列表 / user 页 / templates 换成 glass + poster 卡片；骨架屏
+- [x] 响应式：窄屏下 rail 收成底部 tab、安全区 padding（只保证手机浏览器可用，不做更多手机特化）
+- [ ] **需要你手动执行**：Supabase SQL editor 跑 `supabase/migrations/0004_publish_snapshot.sql`（`published_snapshot` / `published_at` 列并回填已公开角色）。不跑的话探索页会是空的
+- 验收：`tsc` / `eslint` / `next build` / 91 测试全绿 ✅；新页面无 `slate-*` ✅（剩余只在 P5 要重写的 memory / history / diary 页和几个旧组件里）；旧 API 配置首次打开时自动迁移成「连接」（旧 key 备份在 `cv.connections.legacyBackup`）—— **待你实测**：我的 → API 连接 应能看到迁移出来的连接并测试通过；聊天里换模型；探索页看到快照
 
 ### P5 · 记忆 / 摘要 / 日记（1 天）
 - [ ] `lib/memory/types.ts`：8 种记忆类型的 **字段 schema**（label、type、options），`MemoryForm` 根据 schema 渲染 → 替换 memory 页 3 份手写表单

@@ -17,6 +17,10 @@ export type Character = {
   prompt_template: any
   /** author skin: css / regexScripts / renderHtml (lib/skins/schema.ts) */
   skin?: Record<string, unknown>
+  /** what the public sees (plan A12); the live row is the author's private draft */
+  published_snapshot?: Record<string, unknown> | null
+  published_at?: string | null
+  likes_count?: number
   is_public: boolean
   created_at: string
 }
