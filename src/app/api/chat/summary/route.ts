@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { completeText } from '@/lib/llm/complete'
 import { connectionFromRequest } from '@/lib/llm/legacyHeaders'
-import { createClient } from '@supabase/supabase-js'
+import { z } from 'zod'
+import { requireUser } from '@/lib/server/auth'
 
 interface SummaryGenerateRequest {
   sessionId: string
@@ -14,12 +15,32 @@ interface SummaryGenerateRequest {
   summaryId?: number         // 重新生成时的摘要ID
 }
 
-interface MemoryEntry {
-  type: 'character' | 'event' | 'setting' | 'emotion'
-  title: string
-  content: string
-  importance: number
-  metadata?: any
+const MEMORY_TYPES = ['character', 'event', 'setting', 'emotion', 'spacetime', 'relationship', 'task', 'item'] as const
+const memoryEntrySchema = z.object({
+  action: z.enum(['create', 'update']).default('create'),
+  existing_id: z.string().max(120).optional(),
+  type: z.enum(MEMORY_TYPES),
+  title: z.string().min(1).max(120),
+  content: z.string().min(1).max(4000),
+  importance: z.coerce.number().int().min(1).max(10).catch(5),
+  metadata: z.record(z.string(), z.unknown()).catch({}),
+})
+type MemoryEntry = z.infer<typeof memoryEntrySchema>
+const MAX_MEMORIES_PER_SUMMARY = 40
+const MAX_SUMMARY_CHARS = 20_000
+const MAX_METADATA_CHARS = 2_000
+
+/** Keep only well-formed memory entries; the model's output is untrusted. */
+function validateMemories(raw: unknown): MemoryEntry[] {
+  if (!Array.isArray(raw)) return []
+  const out: MemoryEntry[] = []
+  for (const item of raw.slice(0, MAX_MEMORIES_PER_SUMMARY)) {
+    const r = memoryEntrySchema.safeParse(item)
+    if (!r.success) continue
+    if (JSON.stringify(r.data.metadata).length > MAX_METADATA_CHARS) r.data.metadata = {}
+    out.push(r.data)
+  }
+  return out
 }
 
 // 定义风格示例（One-Shot Example），这是让AI学会你想要风格的关键
@@ -41,34 +62,14 @@ const STYLE_EXAMPLE = `
 
 export async function POST(request: NextRequest) {
   try {
-    // 创建Supabase客户端
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    
-    // 获取用户的access token
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: '缺少认证token' }, { status: 401 })
-    }
-    
-    const accessToken = authHeader.replace('Bearer ', '')
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      },
-    })
+    const auth = await requireUser(request)
+    if (!auth) return NextResponse.json({ error: '请先登录' }, { status: 401 })
+    const { user, supabase } = auth
 
     if (!connectionFromRequest(request.headers)) {
       return NextResponse.json({ error: '缺少模型连接信息（API Key）' }, { status: 400 })
     }
 
-    // 验证用户身份
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: '用户身份验证失败' }, { status: 401 })
-    }
 
     // 解析请求体
     const {
@@ -146,7 +147,7 @@ export async function POST(request: NextRequest) {
     if (character) {
       const prompt = character.prompt_template
       if (prompt) {
-        characterContext += '\n【角色设定信息】\n'
+        characterContext += '\n<character_card>\n'
 
         if (prompt.basic_info) {
           characterContext += `角色名称: ${prompt.basic_info.name || characterName}\n`
@@ -183,7 +184,7 @@ export async function POST(request: NextRequest) {
         if (prompt.modules && Array.isArray(prompt.modules)) {
           const userPersonaModule = prompt.modules.find((m: any) => m.type === '用户角色设定')
           if (userPersonaModule) {
-            userPersonaContext += '\n【用户角色设定】\n'
+            userPersonaContext += '\n<user_persona>\n'
             if (userPersonaModule.userRoleName) {
               userPersonaContext += `用户角色姓名: ${userPersonaModule.userRoleName}\n`
             }
@@ -249,14 +250,14 @@ export async function POST(request: NextRequest) {
       }
 
       if (previousSummaries && previousSummaries.length > 0) {
-        previousContext += '\n【之前的对话摘要】\n'
+        previousContext += '\n<previous_summaries>\n'
         previousSummaries.forEach((s, i) => {
           previousContext += `摘要${i+1} (消息#${s.start_message_id}-#${s.end_message_id}): ${s.content}\n`
         })
       }
 
       if (previousMemories && previousMemories.length > 0) {
-        previousContext += '\n【现有记忆表格（供更新/合并参考）】\n'
+        previousContext += '\n<existing_memories>\n'
         previousContext += '以下是已存在的记忆条目。如果当前对话提供了新信息，请UPDATE这些条目而不是创建新条目。\n\n'
 
         // 按类型分组显示现有记忆
@@ -281,8 +282,12 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (error) {
-      console.error('获取历史上下文失败:', error)
     }
+
+    if (characterContext) characterContext += '</character_card>\n'
+    if (userPersonaContext) userPersonaContext += '</user_persona>\n'
+    if (previousContext) previousContext += '\n</previous_context>\n'
+    if (previousContext) previousContext = previousContext.replace('\n<previous_summaries>', '\n<previous_context>\n<previous_summaries>')
 
     let summaryPrompt = ''
     if (useMemoryTable) {
@@ -372,8 +377,9 @@ ${STYLE_EXAMPLE}
    - **直接输出正文**，不要有“好的，这是故事”、“基于对话...”等前言后语。
    - 自然分段，长短句结合，营造呼吸感。
 
-【待改写的对话记录】：
+<conversation>
 ${conversationText}
+</conversation>
 
 【请开始你的创作】：`
     }
@@ -428,17 +434,16 @@ ${conversationText}
 
         // 尝试解析JSON格式的响应
         const parsedResult = JSON.parse(cleanedResponse)
-        if (parsedResult.summary && parsedResult.memories) {
+        if (typeof parsedResult?.summary === 'string' && parsedResult.summary.trim()) {
           generatedSummary = parsedResult.summary
-          memoryEntries = parsedResult.memories
-          memoryTableData = parsedResult
-          console.log('成功解析记忆表格数据:', memoryEntries.length, '个记忆条目')
+          memoryEntries = validateMemories(parsedResult.memories)
+          memoryTableData = { summary: generatedSummary, memories: memoryEntries }
         }
-      } catch (error) {
-        console.warn('解析记忆表格JSON失败，使用传统摘要:', error)
-        // 如果解析失败，就使用传统的摘要格式
+      } catch {
+        // not JSON → keep the raw text as a plain summary
       }
     }
+    generatedSummary = String(generatedSummary).slice(0, MAX_SUMMARY_CHARS)
 
     // 保存摘要到数据库
     const insertData: Record<string, unknown> = {
@@ -548,7 +553,8 @@ ${conversationText}
           .select('*')
           .eq('id', memory.id)
           .eq('user_id', userId)
-          .single()
+          .eq('session_id', sessionId)
+          .maybeSingle()
 
         if (!existingMemory) continue
 
@@ -595,7 +601,7 @@ ${conversationText}
                 end_message_id: existingMemory.end_message_id,
                 created_at: new Date().toISOString()
             })
-        } catch (e) { console.warn('版本保存失败', e) }
+        } catch { /* version history is best-effort */ }
 
         // 更新主记忆表
         const { error: updateError } = await supabase
@@ -644,11 +650,8 @@ ${conversationText}
     })
 
   } catch (error) {
-    console.error('生成摘要失败:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : '服务器内部错误' },
-      { status: 500 }
-    )
+    console.error('[api/chat/summary] failed:', error instanceof Error ? error.name : 'unknown')
+    return NextResponse.json({ error: error instanceof Error && /API|连接|模型|Key/i.test(error.message) ? error.message : '摘要生成失败，请稍后重试' }, { status: 500 })
   }
 }
 
@@ -662,30 +665,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '缺少sessionId参数' }, { status: 400 })
     }
 
-    // 创建Supabase客户端
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    
-    // 获取用户的access token
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: '缺少认证token' }, { status: 401 })
-    }
-    
-    const accessToken = authHeader.replace('Bearer ', '')
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      },
-    })
-
-    // 验证用户身份
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: '用户身份验证失败' }, { status: 401 })
-    }
+    const auth = await requireUser(request)
+    if (!auth) return NextResponse.json({ error: '请先登录' }, { status: 401 })
+    const { user, supabase } = auth
 
     // 获取摘要列表
     const { data: summaries, error } = await supabase

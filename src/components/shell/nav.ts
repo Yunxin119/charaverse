@@ -23,5 +23,5 @@ export function isNavActive(item: NavItem, pathname: string): boolean {
 
 /** Routes that take the whole viewport (no bottom tabs on mobile, no page padding). */
 export function isImmersiveRoute(pathname: string): boolean {
-  return /^\/chat\/[^/]+/.test(pathname) || pathname.startsWith('/character/public/')
+  return /^\/chat\/[^/]+\/?$/.test(pathname) || pathname.startsWith('/character/public/')
 }

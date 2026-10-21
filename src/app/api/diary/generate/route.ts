@@ -1,534 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { assertSafeBaseUrl } from '@/lib/server/llmGuards'
-import { createClient } from '@supabase/supabase-js'
-import { Character, ChatMessage } from '@/app/types/character'
+import { requireUser } from '@/lib/server/auth'
+import { connectionFromRequest } from '@/lib/llm/legacyHeaders'
+import { conversationTurns, diaryErrorResponse, writeDiary, type SourceMessage } from '../_lib/diary'
 
-interface DiaryGenerateRequest {
-  sessionId: string
-  userId: string
-}
+const MIN_NEW_MESSAGES = 3
 
-// 调用AI API生成日记内容
-async function generateDiaryContent(
-  character: Character,
-  conversationMessages: ChatMessage[],
-  apiKey: string,
-  model: string,
-  baseUrl?: string,
-  actualModel?: string
-): Promise<string> {
-  console.log('📝 Generating diary content with:', {
-    characterName: character.name,
-    messageCount: conversationMessages.length,
-    model,
-    actualModel,
-    baseUrl: baseUrl ? baseUrl.substring(0, 30) + '...' : 'none'
-  })
-  // 构建角色信息
-  const characterInfo = character.prompt_template?.basic_info
-  const characterName = character.name
-  const characterDescription = characterInfo?.description || ''
-  const characterPersonality = characterInfo?.personality || ''
-  
-  // 将对话转换为文本
-  const conversationText = conversationMessages
-    .map(m => `${m.role === 'user' ? '用户' : characterName}: ${m.content}`)
-    .join('\n')
-
-  // 构建专属的日记生成prompt
-  const diaryPrompt = `[角色设定]
-你是${characterName}，${characterDescription}
-${characterPersonality ? `性格特征：${characterPersonality}` : ''}
-
-[任务指令]
-请以${characterName}的第一人称视角，根据下面的对话内容写一篇日记，注意感情细腻，贴合人物。
-要求：
-1. 以第一人称视角（"我"）来写
-2. 不要只是复述对话，要展现内心的情感和思考
-3. 体现你的性格特征和感受
-4. 日记风格要自然，像真正的个人日记
-5. 字数控制在1000-2000字之间，根据对话内容多少、剧情多少和人物性格决定。
-6. 不要在开头写"日记"或日期等标题
-
-[最近的对话内容]
-${conversationText}
-
-[请开始写你的日记]`
-
-  // 根据模型调用相应的API
-  if (model.startsWith('named-relay-')) {
-    if (!baseUrl || !actualModel) {
-      throw new Error('中转API需要baseUrl和actualModel参数')
-    }
-    return await callRelayAPI(diaryPrompt, apiKey, actualModel, baseUrl)
-  } else if (model.startsWith('deepseek')) {
-    return await callDeepSeek(diaryPrompt, apiKey, model)
-  } else if (model.startsWith('gemini')) {
-    return await callGemini(diaryPrompt, apiKey, model)
-  } else if (model.startsWith('gpt')) {
-    return await callOpenAI(diaryPrompt, apiKey, model)
-  } else {
-    throw new Error('不支持的模型类型')
-  }
-}
-
-// DeepSeek API 调用
-async function callDeepSeek(prompt: string, apiKey: string, model: string): Promise<string> {
-  const maxTokens = 6000
-  
-  console.log('📊 DeepSeek API Call Settings:', {
-    model,
-    inputLength: prompt.length,
-    maxTokensSet: maxTokens,
-    temperature: 0.8
-  })
-  
-  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.8,
-      max_tokens: maxTokens,
-    }),
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`DeepSeek API error: ${response.statusText} - ${errorText}`)
-  }
-
-  const data = await response.json()
-  const content = data.choices[0].message.content
-  
-  // 详细的token使用日志
-  console.log('📊 DeepSeek API Response Usage:', {
-    promptTokens: data.usage?.prompt_tokens || 'N/A',
-    completionTokens: data.usage?.completion_tokens || 'N/A',
-    totalTokens: data.usage?.total_tokens || 'N/A',
-    finishReason: data.choices[0].finish_reason,
-    contentLength: content?.length || 0,
-    maxTokensSet: maxTokens,
-    wasTokenLimited: data.choices[0].finish_reason === 'length'
-  })
-  
-  // 检测是否被截断
-  if (data.choices[0].finish_reason === 'length') {
-    console.warn('⚠️ DeepSeek response was truncated due to length limit!')
-    console.warn(`   Set max_tokens: ${maxTokens}, Used tokens: ${data.usage?.completion_tokens || 'N/A'}`)
-  }
-  
-  return content
-}
-
-// Gemini API 调用
-async function callGemini(prompt: string, apiKey: string, model: string): Promise<string> {
-  const maxTokens = 10000
-  
-  console.log('📊 Gemini API Call Settings:', {
-    model,
-    inputLength: prompt.length,
-    maxTokensSet: maxTokens,
-    temperature: 1.2
-  })
-  
-  const requestBody = {
-    contents: [{
-      role: 'user',
-      parts: [{ text: prompt }]
-    }],
-    generationConfig: {
-      temperature: 1.2,
-      maxOutputTokens: maxTokens,
-    }
-  }
-
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey,
-    },
-    body: JSON.stringify(requestBody),
-  })
-
-  if (!response.ok) {
-    const errorData = await response.text()
-    throw new Error(`Gemini API error: ${response.statusText} - ${errorData}`)
-  }
-
-  const data = await response.json()
-  
-  // 添加详细日志
-  
-  if (data.error) {
-    throw new Error(`Gemini API Error: ${data.error.message}`)
-  }
-  
-  if (!data.candidates || data.candidates.length === 0) {
-    throw new Error('Gemini API没有返回有效内容')
-  }
-  
-  const candidate = data.candidates[0]
-  console.log('First candidate:', JSON.stringify(candidate, null, 2))
-  
-  if (candidate.finishReason === 'SAFETY' || candidate.finishReason === 'BLOCKED_REASON_UNSPECIFIED') {
-    throw new Error('响应被Gemini安全过滤器阻止')
-  }
-  
-  if (!candidate.content) {
-    console.error('No content in candidate:', candidate)
-    throw new Error('Gemini API响应中没有content字段')
-  }
-  
-  if (!candidate.content.parts) {
-    console.error('No parts in content:', candidate.content)
-    throw new Error('Gemini API响应中content没有parts字段')
-  }
-  
-  if (candidate.content.parts.length === 0) {
-    console.error('Empty parts array:', candidate.content.parts)
-    throw new Error('Gemini API响应中parts数组为空')
-  }
-
-  // 提取文本内容
-  let responseText = ''
-  for (const part of candidate.content.parts) {
-    if (part.text) {
-      responseText += part.text
-    } else {
-      console.warn('Part without text:', part)
-    }
-  }
-  
-  if (!responseText.trim()) {
-    console.error('No text content found in parts:', candidate.content.parts)
-    throw new Error('Gemini API响应中没有文本内容')
-  }
-
-  // 详细的token使用日志（Gemini格式）
-  console.log('📊 Gemini API Response Usage:', {
-    promptTokens: data.usageMetadata?.promptTokenCount || 'N/A',
-    completionTokens: data.usageMetadata?.candidatesTokenCount || 'N/A', 
-    totalTokens: data.usageMetadata?.totalTokenCount || 'N/A',
-    finishReason: candidate.finishReason,
-    contentLength: responseText.length,
-    maxTokensSet: maxTokens,
-    wasTokenLimited: candidate.finishReason === 'MAX_TOKENS'
-  })
-  
-  // 检测是否被截断
-  if (candidate.finishReason === 'MAX_TOKENS') {
-    console.warn('⚠️ Gemini response was truncated due to token limit!')
-    console.warn(`   Set max_tokens: ${maxTokens}, Used tokens: ${data.usageMetadata?.candidatesTokenCount || 'N/A'}`)
-  }
-
-  return responseText
-}
-
-// OpenAI API 调用
-async function callOpenAI(prompt: string, apiKey: string, model: string): Promise<string> {
-  const maxTokens = 10000
-  
-  console.log('📊 OpenAI API Call Settings:', {
-    model,
-    inputLength: prompt.length,
-    maxTokensSet: maxTokens,
-    temperature: 0.8
-  })
-  
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.8,
-      max_tokens: maxTokens,
-    }),
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`OpenAI API error: ${response.statusText} - ${errorText}`)
-  }
-
-  const data = await response.json()
-  const content = data.choices[0].message.content
-  
-  // 详细的token使用日志
-  console.log('📊 OpenAI API Response Usage:', {
-    promptTokens: data.usage?.prompt_tokens || 'N/A',
-    completionTokens: data.usage?.completion_tokens || 'N/A',
-    totalTokens: data.usage?.total_tokens || 'N/A',
-    finishReason: data.choices[0].finish_reason,
-    contentLength: content?.length || 0,
-    maxTokensSet: maxTokens,
-    wasTokenLimited: data.choices[0].finish_reason === 'length'
-  })
-  
-  // 检测是否被截断
-  if (data.choices[0].finish_reason === 'length') {
-    console.warn('⚠️ OpenAI response was truncated due to length limit!')
-    console.warn(`   Set max_tokens: ${maxTokens}, Used tokens: ${data.usage?.completion_tokens || 'N/A'}`)
-  }
-  
-  return content
-}
-
-// 中转API调用（支持OpenAI格式的中转服务）
-async function callRelayAPI(prompt: string, apiKey: string, actualModel: string, baseUrl: string): Promise<string> {
-  // 确保baseUrl以/v1结尾
-  const safeBase = assertSafeBaseUrl(baseUrl)
-  const apiUrl = safeBase.endsWith('/v1') ? safeBase : `${safeBase}/v1`
-  const maxTokens = 10000
-  
-  console.log('📊 Relay API Call Settings:', {
-    apiUrl: `${apiUrl}/chat/completions`,
-    actualModel,
-    inputLength: prompt.length,
-    maxTokensSet: maxTokens,
-    temperature: 1.2
-  })
-  
-  const requestBody: Record<string, unknown> = {
-    model: actualModel,
-    messages: [
-      { role: 'user', content: prompt }
-    ],
-    temperature: 1.2,
-    max_tokens: maxTokens,
-  }
-
-  // 如果actualModel是Gemini 2.5系列，添加thinking配置
-  if (actualModel.includes('gemini-2.5')) {
-    console.log('📝 Adding thinking config for Gemini 2.5 model:', actualModel)
-    if (actualModel === 'gemini-3-pro-preview') {
-      // Pro版本使用auto模式
-      requestBody.thinkingConfig = {}
-      console.log('📝 Using auto thinking mode for Pro')
-    } else if (actualModel.includes('gemini-2.5-flash')) {
-      // Flash版本也使用auto模式（日记生成不需要手动限制）
-      requestBody.thinkingConfig = {}
-      console.log('📝 Using auto thinking mode for Flash')
-    }
-  }
-  
-  const response = await fetch(`${apiUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'User-Agent': 'Charaverse/1.0.0',
-    },
-    body: JSON.stringify(requestBody),
-  })
-
-  console.log('📝 Diary Relay Response Status:', response.status, response.statusText)
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Relay API error: ${response.statusText} - ${errorText}`)
-  }
-
-  const data = await response.json()
-  
-  if (!data.choices || data.choices.length === 0) {
-    console.error('📝 Diary Relay API returned no choices:', data)
-    throw new Error('Relay API returned no choices')
-  }
-  
-  const content = data.choices[0].message.content
-  
-  // 详细的token使用日志
-  console.log('📊 Relay API Response Usage:', {
-    promptTokens: data.usage?.prompt_tokens || 'N/A',
-    completionTokens: data.usage?.completion_tokens || 'N/A',
-    totalTokens: data.usage?.total_tokens || 'N/A',
-    finishReason: data.choices[0].finish_reason,
-    contentLength: content?.length || 0,
-    maxTokensSet: maxTokens,
-    wasTokenLimited: data.choices[0].finish_reason === 'length',
-    actualModel,
-    contentPreview: content?.substring(0, 200) + '...'
-  })
-  
-  // 检测是否被截断
-  if (data.choices[0].finish_reason === 'length') {
-    console.warn('⚠️ Relay API response was truncated due to length limit!')
-    console.warn(`   Model: ${actualModel}, Set max_tokens: ${maxTokens}, Used tokens: ${data.usage?.completion_tokens || 'N/A'}`)
-  }
-  
-  return content
-}
-
+/**
+ * POST /api/diary/generate  { sessionId }
+ * Writes a diary entry for everything after the last diary's `source_message_id_end`.
+ * Returns { diary, message }.
+ */
 export async function POST(request: NextRequest) {
+  const auth = await requireUser(request)
+  if (!auth) return NextResponse.json({ error: '请先登录' }, { status: 401 })
+  const { user, supabase } = auth
+
+  const connection = connectionFromRequest(request.headers)
+  if (!connection) return NextResponse.json({ error: '没有可用的模型连接，请先在设置里配置 API' }, { status: 400 })
+
+  let sessionId: string | undefined
   try {
-    // 创建Supabase客户端
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    
-    // 获取用户的access token
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: '缺少认证token' }, { status: 401 })
-    }
-    
-    const accessToken = authHeader.replace('Bearer ', '')
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      },
-    })
+    const body = (await request.json()) as { sessionId?: unknown }
+    sessionId = typeof body.sessionId === 'string' ? body.sessionId : undefined
+  } catch {
+    return NextResponse.json({ error: '请求参数不合法' }, { status: 400 })
+  }
+  if (!sessionId) return NextResponse.json({ error: '缺少必需参数' }, { status: 400 })
 
-    // 获取API密钥和模型（从header中）
-    const apiKey = request.headers.get('x-api-key')
-    const model = request.headers.get('x-model') || 'deepseek-chat'
-    const baseUrl = request.headers.get('x-base-url')
-    const actualModel = request.headers.get('x-actual-model')
-    
-    if (!apiKey) {
-      return NextResponse.json({ error: '缺少API密钥' }, { status: 400 })
-    }
-
-    // 解析请求体
-    const { sessionId, userId } = await request.json() as DiaryGenerateRequest
-    
-    if (!sessionId || !userId) {
-      return NextResponse.json({ error: '缺少必需参数' }, { status: 400 })
-    }
-
-    // 验证用户身份
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user || user.id !== userId) {
-      return NextResponse.json({ error: '用户身份验证失败' }, { status: 401 })
-    }
-
-    // 1. 验证会话存在且属于当前用户
-    const { data: session, error: sessionError } = await supabase
+  try {
+    const { data: session } = await supabase
       .from('chat_sessions')
-      .select('*')
+      .select('id, character_id')
       .eq('id', sessionId)
-      .eq('user_id', userId)
-      .single()
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (!session) return NextResponse.json({ error: '会话不存在或无权限访问' }, { status: 404 })
 
-    if (sessionError) {
-      console.error('Session query error:', sessionError)
-      return NextResponse.json({ error: '会话不存在或无权限访问' }, { status: 404 })
-    }
-
-    if (!session) {
-      return NextResponse.json({ error: '会话不存在或无权限访问' }, { status: 404 })
-    }
-
-    // 2. 获取角色信息
-    const { data: character, error: characterError } = await supabase
+    const { data: character } = await supabase
       .from('characters')
-      .select('*')
+      .select('name, prompt_template')
       .eq('id', session.character_id)
-      .single()
+      .maybeSingle()
+    if (!character) return NextResponse.json({ error: '角色信息获取失败' }, { status: 404 })
 
-    if (characterError || !character) {
-      return NextResponse.json({ error: '角色信息获取失败' }, { status: 404 })
-    }
-
-    // 3. 查找最后一篇日记，确定起始消息ID
+    // incremental range: continue after the most recent diary's last source message
     const { data: lastDiary } = await supabase
       .from('diaries')
       .select('source_message_id_end')
       .eq('session_id', sessionId)
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
+    const startAfter = lastDiary?.source_message_id_end ?? 0
 
-    const startFromMessageId = lastDiary?.source_message_id_end || 0
-
-    // 4. 获取新的聊天消息
-    const { data: newMessages, error: messagesError } = await supabase
+    const { data: rows, error: messagesError } = await supabase
       .from('chat_messages')
-      .select('*')
+      .select('id, role, content')
       .eq('session_id', sessionId)
-      .gt('id', startFromMessageId)
-      .order('created_at', { ascending: true })
+      .gt('id', startAfter)
+      .order('id', { ascending: true })
+    if (messagesError) return NextResponse.json({ error: '获取聊天消息失败' }, { status: 500 })
 
-    if (messagesError) {
-      return NextResponse.json({ error: '获取聊天消息失败' }, { status: 500 })
+    const messages = conversationTurns((rows ?? []) as SourceMessage[])
+    if (messages.length < MIN_NEW_MESSAGES) {
+      return NextResponse.json({ error: `对话内容不足，至少需要${MIN_NEW_MESSAGES}条新消息才能生成日记` }, { status: 400 })
     }
 
-    // 5. 检查是否有足够的新消息来生成日记
-    if (!newMessages || newMessages.length < 3) {
-      return NextResponse.json({ 
-        error: '对话内容不足，至少需要3条新消息才能生成日记' 
-      }, { status: 400 })
-    }
+    const content = await writeDiary(connection, character, messages)
 
-    // 6. 调用AI生成日记内容
-    console.log('📝 About to generate diary with params:', {
-      model,
-      baseUrl,
-      actualModel,
-      messageCount: newMessages.length
-    })
-    
-    const diaryContent = await generateDiaryContent(
-      character,
-      newMessages,
-      apiKey,
-      model,
-      baseUrl || undefined,
-      actualModel || undefined
-    )
-
-    console.log('📝 Generated diary content:', {
-      length: diaryContent?.length || 0,
-      preview: diaryContent?.substring(0, 100) + '...',
-      lastChars: diaryContent?.slice(-50) || ''
-    })
-
-    // 7. 保存日记到数据库
-    const { data: newDiary, error: insertError } = await supabase
+    const { data: diary, error: insertError } = await supabase
       .from('diaries')
       .insert({
         session_id: sessionId,
-        user_id: userId,
-        content: diaryContent,
-        source_message_id_start: newMessages[0].id,
-        source_message_id_end: newMessages[newMessages.length - 1].id
+        user_id: user.id,
+        content,
+        source_message_id_start: messages[0].id,
+        source_message_id_end: messages[messages.length - 1].id,
       })
       .select()
       .single()
+    if (insertError || !diary) return NextResponse.json({ error: '保存日记失败' }, { status: 500 })
 
-    if (insertError) {
-      console.error('保存日记失败:', insertError)
-      return NextResponse.json({ error: '保存日记失败' }, { status: 500 })
-    }
-
-    return NextResponse.json({ 
-      diary: newDiary,
-      message: '日记生成成功'
-    })
-
+    return NextResponse.json({ diary, message: '日记生成成功' })
   } catch (error) {
-    console.error('生成日记失败:', error)
-    return NextResponse.json(
-      { 
-        error: error instanceof Error ? error.message : '服务器内部错误'
-      },
-      { status: 500 }
-    )
+    return diaryErrorResponse(error)
   }
 }

@@ -10,8 +10,8 @@
 | P1 | 地基：设计 token、App 壳、鉴权中间件、数据层 | 1 天 | 🟡 2026-10-20 基本完成（baseline 迁移 + gen types 待你跑 CLI） |
 | P2 | 聊天核心重写：流式、预设驱动的 prompt 组装、消息组件 | 1.5 天 | ✅ 2026-10-20（已实测） |
 | P3 | 可定制化：预设导入/管理、主题导入、作者皮肤、HTML 块沙箱 | 1.5 天 | ✅ 2026-10-20（已实测） |
-| P4 | 其余页面换皮 + API 连接管理合并 | 1 天 | 🟡 2026-10-21 代码完成，待你跑 0004 迁移 + 实测 |
-| P5 | 记忆 / 摘要 / 日记：schema 驱动重建 | 1 天 | ⬜ |
+| P4 | 其余页面换皮 + API 连接管理合并 | 1 天 | ✅ 2026-10-21（已实测） |
+| P5 | 记忆 / 摘要 / 日记：schema 驱动重建 | 1 天 | 🟡 2026-10-21 代码完成，待你跑 0005 迁移 + 实测 |
 | P6 | 加固：限流、日志、CSP、测试、性能 | 0.5 天 | ⬜ |
 
 状态图例：⬜ 未开始 · 🟡 进行中 · ✅ 完成 · ⏸ 暂缓
@@ -300,13 +300,14 @@ docs/                       # 本文件 + design/
 - 验收：`tsc` / `eslint` / `next build` / 91 测试全绿 ✅；新页面无 `slate-*` ✅（剩余只在 P5 要重写的 memory / history / diary 页和几个旧组件里）；旧 API 配置首次打开时自动迁移成「连接」（旧 key 备份在 `cv.connections.legacyBackup`）—— **待你实测**：我的 → API 连接 应能看到迁移出来的连接并测试通过；聊天里换模型；探索页看到快照
 
 ### P5 · 记忆 / 摘要 / 日记（1 天）
-- [ ] `lib/memory/types.ts`：8 种记忆类型的 **字段 schema**（label、type、options），`MemoryForm` 根据 schema 渲染 → 替换 memory 页 3 份手写表单
-- [ ] memory 页拆成 `SummaryTimeline` / `MemoryGrid` / `ContextCoverage` 三个组件 + `useMemories`/`useSummaries` queries
-- [ ] `/api/chat/summary` 不再 HTTP 回调自己：直接调 `lib/llm`；prompt 用分隔符；记忆写回前做字段校验 + 长度上限（防投毒/膨胀）
-- [ ] 记忆版本/软删除逻辑移到 Postgres function（一个事务），前端不再手动回滚
-- [ ] 日记：入口恢复（header 菜单），复用 `lib/llm`，删 2 份复制的 provider 代码
-- [ ] 修 schema 不一致：`chat_memories.session_id` text→uuid，`summary_id`/message id int→bigint
-- 验收：memory 页 < 1200 行；自动摘要 + 记忆深化在聊天里闭环
+- [x] `lib/memory/types.ts`：8 种记忆类型的 **字段 schema**（label、type、options），`MemoryForm` 根据 schema 渲染 → 替换 memory 页 3 份手写表单
+- [x] memory 页拆成 `SummaryTimeline` / `MemoryGrid` / `ContextCoverage` 三个组件 + `useMemories`/`useSummaries` queries
+- [x] `/api/chat/summary` 不再 HTTP 回调自己：直接调 `lib/llm`；prompt 用分隔符；记忆写回前做字段校验 + 长度上限（防投毒/膨胀）
+- [x] 记忆版本/软删除逻辑移到 Postgres function `delete_summary_with_rollback`（一个事务），前端不再手动回滚；历史页也重做（load-more、搜索、跳转 #id、编辑 swipe）
+- [x] 日记：入口恢复（header 菜单），复用 `lib/llm`，删 2 份复制的 provider 代码
+- [x] 修 schema 不一致：`chat_memories.session_id` text→uuid，`summary_id`/message id int→bigint
+- [ ] **需要你手动执行**：Supabase SQL editor 跑 `supabase/migrations/0005_memory_fixes.sql`（列类型修正 + `delete_summary_with_rollback` 函数）。不跑的话删除摘要会报错
+- 验收：memory 页 193 行（组件化）✅；`tsc` / `eslint` / `next build` / 91 测试全绿 ✅；自动摘要 + 记忆深化闭环 —— **待你实测**（聊到阈值后看记忆页是否出现新摘要和记忆）
 
 ### P6 · 加固 & 收尾（0.5 天）
 - [ ] 限流：Upstash Ratelimit（或 Supabase 表计数）按 user 每分钟 N 次 `/api/chat`；body 大小、`max_tokens` 上限可配

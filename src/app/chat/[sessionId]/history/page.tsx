@@ -1,388 +1,187 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ChevronLeft, ChevronRight, Calendar, User, Bot, Edit3, Save, X } from 'lucide-react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
+import type { ChatMessage } from '@/app/lib/supabase'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Textarea } from '@/components/ui/textarea'
-import { supabase } from '../../../lib/supabase'
-import { useCharacter, useSession } from '@/queries'
-import { useAuth } from '@/providers/AuthProvider'
-import { format } from 'date-fns'
-import { zhCN } from 'date-fns/locale'
+import { CardSkeleton, IconButton, PosterCard, PosterTitle } from '@/components/glass'
+import { InlineNotice } from '@/components/diary'
+import { EditMessageDialog, HistoryMessageRow, HistoryToolbar, useMessageCount, type RoleFilter } from '@/components/history'
+import { useCharacter, useSession, useMessages, useEditMessage, useDeleteMessages } from '@/queries'
+import { parseSessionSettings } from '@/lib/chat/settings'
+import { parseCharacterCard } from '@/lib/chat/characterCard'
 
-interface Message {
-  id: number
-  role: 'user' | 'assistant'
-  content: string
-  created_at: string
-}
-
-const MESSAGES_PER_PAGE = 50
+const MAX_JUMP_PAGES = 60
 
 export default function ChatHistoryPage() {
   const router = useRouter()
-  const params = useParams()
-  const sessionId = params.sessionId as string
+  const sessionId = useParams().sessionId as string
 
-  const { data: session } = useSession(sessionId)
-  const { data: currentCharacter } = useCharacter(session?.character_id)
-  const { user } = useAuth()
+  const session = useSession(sessionId)
+  const character = useCharacter(session.data?.character_id)
+  const messages = useMessages(sessionId)
+  const count = useMessageCount(sessionId)
+  const edit = useEditMessage(sessionId)
+  const del = useDeleteMessages(sessionId)
 
-  const [messages, setMessages] = useState<Message[]>([])
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalMessages, setTotalMessages] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
-  const [sessionTitle, setSessionTitle] = useState('')
-  const [selectedMessageId, setSelectedMessageId] = useState<number | null>(null)
-  const [editingMessage, setEditingMessage] = useState<Message | null>(null)
-  const [showEditDialog, setShowEditDialog] = useState(false)
-  const [editContent, setEditContent] = useState('')
+  const [query, setQuery] = useState('')
+  const [role, setRole] = useState<RoleFilter>('all')
+  const [editing, setEditing] = useState<ChatMessage | null>(null)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [highlight, setHighlight] = useState<number | null>(null)
+  const [jumping, setJumping] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
 
-  const totalPages = Math.ceil(totalMessages / MESSAGES_PER_PAGE)
+  const characterLabel = character.data?.name ?? '角色'
+  const userLabel = useMemo(
+    () => parseSessionSettings(session.data?.settings).userName ?? (character.data ? parseCharacterCard(character.data).userName : '用户'),
+    [session.data?.settings, character.data]
+  )
 
-  // 加载会话标题
+  // newest first, as the pages arrive
+  const loaded = useMemo(() => (messages.data?.pages ?? []).flat(), [messages.data])
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return loaded.filter((m) => (role === 'all' || m.role === role) && (!q || m.content.toLowerCase().includes(q)))
+  }, [loaded, query, role])
+
   useEffect(() => {
-    const loadSessionTitle = async () => {
-      const { data, error } = await supabase
-        .from('chat_sessions')
-        .select('title')
-        .eq('id', sessionId)
-        .single()
+    if (highlight === null) return
+    const el = document.getElementById(`msg-${highlight}`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const t = setTimeout(() => setHighlight(null), 2400)
+    return () => clearTimeout(t)
+  }, [highlight])
 
-      if (data) {
-        setSessionTitle(data.title || '聊天记录')
-      }
-    }
-    loadSessionTitle()
-  }, [sessionId])
-
-  // 加载消息总数
-  useEffect(() => {
-    const loadTotalCount = async () => {
-      const { count, error } = await supabase
-        .from('chat_messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('session_id', sessionId)
-
-      if (count !== null) {
-        setTotalMessages(count)
-      }
-    }
-    loadTotalCount()
-  }, [sessionId])
-
-  // 加载当前页的消息
-  useEffect(() => {
-    const loadMessages = async () => {
-      setIsLoading(true)
-
-      const start = (currentPage - 1) * MESSAGES_PER_PAGE
-      const end = start + MESSAGES_PER_PAGE - 1
-
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('id, role, content, created_at')
-        .eq('session_id', sessionId)
-        .order('id', { ascending: true })
-        .range(start, end)
-
-      if (data) {
-        setMessages(data)
-      }
-
-      setIsLoading(false)
-    }
-
-    loadMessages()
-  }, [sessionId, currentPage])
-
-  const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    }
-  }
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    }
-  }
-
-  const formatMessageTime = (timestamp: string) => {
+  const jumpTo = async (id: number) => {
+    setJumping(true)
+    setNotice(null)
     try {
-      return format(new Date(timestamp), 'MM月dd日 HH:mm', { locale: zhCN })
-    } catch {
-      return ''
+      let found = loaded.some((m) => m.id === id)
+      let r = messages
+      let guard = 0
+      while (!found && r.hasNextPage && guard++ < MAX_JUMP_PAGES) {
+        r = await messages.fetchNextPage()
+        found = (r.data?.pages ?? []).flat().some((m) => m.id === id)
+      }
+      if (!found) {
+        setNotice(`没有找到消息 #${id}，它可能已被删除或不属于这个会话。`)
+        return
+      }
+      setQuery('')
+      setRole('all')
+      setHighlight(id)
+    } finally {
+      setJumping(false)
     }
   }
 
-  // 处理消息点击
-  const handleMessageClick = (message: Message) => {
-    setSelectedMessageId(message.id === selectedMessageId ? null : message.id)
+  const save = (content: string) => {
+    if (!editing) return
+    setEditError(null)
+    edit.mutate({ message: editing, content }, {
+      onSuccess: () => setEditing(null),
+      onError: (e) => setEditError(e instanceof Error ? e.message : '保存失败，请重试'),
+    })
   }
 
-  // 开始编辑消息
-  const handleEditMessage = (message: Message) => {
-    setEditingMessage(message)
-    setEditContent(message.content)
-    setShowEditDialog(true)
-    setSelectedMessageId(null)
-  }
-
-  // 保存编辑的消息
-  const handleSaveEdit = async () => {
-    if (!editingMessage || !editContent.trim()) {
-      alert('消息内容不能为空')
-      return
-    }
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user) throw new Error('用户未登录')
-
-      const { error } = await supabase
-        .from('chat_messages')
-        .update({ content: editContent })
-        .eq('id', editingMessage.id)
-        .eq('session_id', sessionId)
-
-      if (error) throw error
-
-      // 更新本地消息列表
-      setMessages(prev => prev.map(msg =>
-        msg.id === editingMessage.id
-          ? { ...msg, content: editContent }
-          : msg
-      ))
-
-      setShowEditDialog(false)
-      setEditingMessage(null)
-      setEditContent('')
-    } catch (error) {
-      console.error('保存消息失败:', error)
-      alert('保存失败，请重试')
-    }
-  }
-
-  const pageVariants = {
-    initial: { opacity: 0, x: 20 },
-    in: { opacity: 1, x: 0 },
-    out: { opacity: 0, x: -20 }
-  }
+  const total = count.data
+  const back = () => router.push(`/chat/${sessionId}`)
 
   return (
-    <motion.div
-      initial="initial"
-      animate="in"
-      exit="out"
-      variants={pageVariants}
-      transition={{ duration: 0.3 }}
-      className="absolute top-0 left-0 w-full h-full bg-slate-50 dark:bg-slate-900 z-10 flex flex-col"
-    >
-      {/* Header */}
-      <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.back()}
-              className="p-2 h-8 w-8"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <h2 className="text-lg font-semibold dark:text-white">聊天记录</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {sessionTitle}
-              </p>
-            </div>
-          </div>
-
-          {/* Page Info */}
-          <div className="text-sm text-slate-600 dark:text-slate-400">
-            共 {totalMessages} 条消息
-          </div>
+    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
+      <header className="mb-5 flex items-center gap-3">
+        <IconButton label="返回对话" variant="glass" onClick={back}><ArrowLeft /></IconButton>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate font-display text-2xl font-semibold leading-tight sm:text-3xl">完整历史</h1>
+          <p className="mt-0.5 truncate text-xs text-cv-fg-muted sm:text-sm">
+            {session.data?.title?.trim() || `与 ${characterLabel} 的对话`}
+            {typeof total === 'number' && ` · 共 ${total} 条`}
+            {loaded.length > 0 && ` · 已加载 ${loaded.length} 条`}
+          </p>
         </div>
-      </div>
+      </header>
 
-      {/* Messages Content */}
-      <div className="flex-1 overflow-y-auto">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-slate-500 dark:text-slate-400">加载中...</div>
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center text-slate-500 dark:text-slate-400">
-              <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p>暂无聊天记录</p>
-            </div>
-          </div>
-        ) : (
-          <div className="p-4 space-y-4">
-            <AnimatePresence mode="wait">
-              {messages.map((message, index) => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.02 }}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} group`}
-                >
-                  <div className={`flex max-w-[85%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'} gap-2 relative`}>
-                    {/* Avatar */}
-                    <Avatar className="w-8 h-8 flex-shrink-0">
-                      {message.role === 'user' ? (
-                        <>
-                          <AvatarImage src={user?.user_metadata?.avatar_url} />
-                          <AvatarFallback>
-                            <User className="w-4 h-4" />
-                          </AvatarFallback>
-                        </>
-                      ) : (
-                        <>
-                          <AvatarImage src={currentCharacter?.avatar_url} />
-                          <AvatarFallback>
-                            <Bot className="w-4 h-4" />
-                          </AvatarFallback>
-                        </>
-                      )}
-                    </Avatar>
+      <HistoryToolbar
+        query={query}
+        onQueryChange={setQuery}
+        role={role}
+        onRoleChange={setRole}
+        userLabel={userLabel}
+        characterLabel={characterLabel}
+        onJump={(id) => void jumpTo(id)}
+        jumping={jumping}
+      />
 
-                    {/* Message Bubble */}
-                    <div className="flex flex-col">
-                      <div
-                        onClick={() => handleMessageClick(message)}
-                        className={`rounded-2xl px-4 py-2 cursor-pointer transition-all ${
-                          message.role === 'user'
-                            ? 'bg-blue-500 text-white hover:bg-blue-600'
-                            : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                        } ${selectedMessageId === message.id ? 'ring-2 ring-blue-400' : ''}`}
-                      >
-                        <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-                      </div>
+      {notice && <InlineNotice className="mb-4" onClose={() => setNotice(null)}>{notice}</InlineNotice>}
 
-                      {/* 编辑按钮 */}
-                      <AnimatePresence>
-                        {selectedMessageId === message.id && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className={`flex gap-2 mt-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                          >
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditMessage(message)}
-                              className="h-7 text-xs"
-                            >
-                              <Edit3 className="w-3 h-3 mr-1" />
-                              编辑
-                            </Button>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-
-                      <span className={`text-xs text-slate-400 dark:text-slate-500 mt-1 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
-                        {formatMessageTime(message.created_at)}
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        )}
-      </div>
-
-      {/* Pagination Footer */}
-      {totalPages > 1 && (
-        <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePreviousPage}
-              disabled={currentPage === 1}
-              className="flex items-center gap-1"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              上一页
-            </Button>
-
-            <div className="text-sm text-slate-600 dark:text-slate-400">
-              第 {currentPage} / {totalPages} 页
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNextPage}
-              disabled={currentPage === totalPages}
-              className="flex items-center gap-1"
-            >
-              下一页
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
+      {messages.isLoading && (
+        <div className="space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} variant="row" />)}
         </div>
       )}
 
-      {/* 编辑消息对话框 */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <Edit3 className="w-5 h-5" />
-              <span>编辑消息</span>
-            </DialogTitle>
-          </DialogHeader>
+      {messages.isError && (
+        <PosterCard tone="ink" className="text-center">
+          <PosterTitle>加载失败</PosterTitle>
+          <p className="mt-2 text-sm opacity-80">网络或权限问题，稍后再试。</p>
+          <Button variant="glass" size="sm" className="mt-4" onClick={() => messages.refetch()}>重试</Button>
+        </PosterCard>
+      )}
 
-          <div className="flex-1 overflow-y-auto min-h-0 py-2">
-            <div>
-              <label className="text-sm font-medium mb-2 block text-slate-700 dark:text-slate-300">
-                {editingMessage?.role === 'user' ? '用户消息' : '角色消息'}
-              </label>
-              <Textarea
-                value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                placeholder="输入消息内容..."
-                rows={6}
-                className="resize-none"
-              />
-            </div>
-          </div>
+      {messages.data && loaded.length === 0 && (
+        <PosterCard tone="secondary" className="text-center">
+          <PosterTitle>还没有消息</PosterTitle>
+          <p className="mt-2 text-sm opacity-80">回到对话里说点什么吧。</p>
+        </PosterCard>
+      )}
 
-          <div className="flex justify-end space-x-2 pt-2 flex-shrink-0">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setShowEditDialog(false)
-                setEditingMessage(null)
-                setEditContent('')
-              }}
-            >
-              <X className="w-4 h-4 mr-1" />
-              取消
-            </Button>
-            <Button
-              onClick={handleSaveEdit}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Save className="w-4 h-4 mr-1" />
-              保存
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </motion.div>
+      {loaded.length > 0 && visible.length === 0 && (
+        <p className="py-10 text-center text-sm text-cv-fg-muted">
+          已加载的 {loaded.length} 条里没有匹配的消息{messages.hasNextPage ? '，可以加载更早的消息再找找' : ''}。
+        </p>
+      )}
+
+      {visible.length > 0 && (
+        <ul className="space-y-3">
+          {visible.map((m) => (
+            <HistoryMessageRow
+              key={m.id}
+              message={m}
+              userLabel={userLabel}
+              characterLabel={characterLabel}
+              highlighted={highlight === m.id}
+              deleting={del.isPending && (del.variables?.includes(m.id) ?? false)}
+              onEdit={() => { setEditError(null); setEditing(m) }}
+              onDelete={() => del.mutate([m.id], { onError: (e) => setNotice(e instanceof Error ? e.message : '删除失败，请重试') })}
+            />
+          ))}
+        </ul>
+      )}
+
+      {messages.hasNextPage && (
+        <div className="mt-6 flex flex-col items-center gap-2">
+          <Button variant="neu" onClick={() => messages.fetchNextPage()} disabled={messages.isFetchingNextPage || jumping}>
+            {(messages.isFetchingNextPage || jumping) && <Loader2 className="animate-spin" />}
+            {jumping ? '正在定位…' : '加载更早的消息'}
+          </Button>
+          {query.trim() && <p className="text-xs text-cv-fg-subtle">搜索只覆盖已加载的消息</p>}
+        </div>
+      )}
+      {!messages.hasNextPage && loaded.length > 0 && (
+        <p className="mt-6 text-center text-xs text-cv-fg-subtle">已经是最早的消息了</p>
+      )}
+
+      <EditMessageDialog
+        message={editing}
+        userLabel={userLabel}
+        characterLabel={characterLabel}
+        saving={edit.isPending}
+        error={editError}
+        onClose={() => setEditing(null)}
+        onSave={save}
+      />
+    </div>
   )
 }
