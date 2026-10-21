@@ -7,7 +7,7 @@ import { NavRail } from './NavRail'
 import { BottomTabs } from './BottomTabs'
 import { isImmersiveRoute } from './nav'
 
-const NO_SHELL = ['/login']
+const NO_SHELL = ['/login', '/auth']
 
 /**
  * App frame: desktop glass rail on the left, floating tab bar on mobile.

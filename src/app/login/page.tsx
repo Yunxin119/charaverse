@@ -23,9 +23,11 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [pendingEmail, setPendingEmail] = useState<string | null>(null)
   const [resent, setResent] = useState(false)
+  const [forgot, setForgot] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const { user, signIn, signUp, resendConfirmation } = useAuth()
+  const { user, signIn, signUp, resendConfirmation, requestPasswordReset } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   // Only allow same-origin relative paths as the post-login destination.
@@ -114,7 +116,21 @@ function LoginForm() {
             <p className="mt-1 text-sm text-cv-fg-muted">{isSignUp ? '几秒钟就好，然后开始你的第一段对话。' : '登录以继续你的冒险。'}</p>
           </div>
 
-          {pendingEmail ? (
+          {forgot ? (
+            <form className="space-y-4" onSubmit={async (e) => { e.preventDefault(); setError(null); setLoading(true); try { await requestPasswordReset(email); setResetSent(true) } catch (err) { setError((err as Error).message || '发送失败') } finally { setLoading(false) } }}>
+              <div className="space-y-1.5">
+                <Label htmlFor="forgot-email">注册邮箱</Label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-cv-fg-subtle" />
+                  <Input id="forgot-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-11" placeholder="you@example.com" required />
+                </div>
+              </div>
+              {resetSent && <div className="rounded-cv-md neu px-4 py-3 text-sm">重置邮件已发送到 {email}。点邮件里的链接会回到这里设置新密码。没收到看看垃圾箱。</div>}
+              {error && <p className="text-sm text-cv-danger">{error}</p>}
+              <Button type="submit" size="lg" disabled={loading || !email} className="w-full">{loading ? <Loader2 className="animate-spin" /> : null}{resetSent ? '再发一次' : '发送重置邮件'}</Button>
+              <button type="button" onClick={() => { setForgot(false); setResetSent(false); setError(null) }} className="block w-full text-center text-sm text-cv-fg-muted transition-colors hover:text-cv-fg">返回登录</button>
+            </form>
+          ) : pendingEmail ? (
             <div className="space-y-4">
               <div className="rounded-cv-md neu px-4 py-4 text-sm">
                 <div className="font-semibold">验证邮件已发送到 {pendingEmail}</div>
@@ -156,6 +172,12 @@ function LoginForm() {
                 </button>
               </div>
             </div>
+
+            {!isSignUp && (
+              <div className="-mt-2 text-right">
+                <button type="button" onClick={() => { setForgot(true); setError(null) }} className="text-xs text-cv-fg-muted hover:text-cv-accent">忘记密码？</button>
+              </div>
+            )}
 
             {isSignUp && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-1.5">

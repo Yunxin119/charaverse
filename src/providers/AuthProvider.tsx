@@ -23,6 +23,10 @@ export interface AuthContextValue {
   signUp: (email: string, password: string, username: string) => Promise<{ user: User | null; needsConfirmation: boolean }>
   /** re-send the sign-up confirmation email */
   resendConfirmation: (email: string) => Promise<void>
+  /** send the password-reset email (lands on /auth/reset via /auth/callback) */
+  requestPasswordReset: (email: string) => Promise<void>
+  /** set a new password for the signed-in (recovery) session */
+  updatePassword: (password: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -90,6 +94,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error
   }, [])
 
+  const requestPasswordReset = useCallback(async (email: string) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${origin}/auth/callback?next=/auth/reset` })
+    if (error) throw error
+  }, [])
+
+  const updatePassword = useCallback(async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) throw error
+  }, [])
+
   const signOut = useCallback(async () => {
     const { error } = await supabase.auth.signOut()
     if (error) throw error
@@ -106,9 +121,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signUp,
       resendConfirmation,
+      requestPasswordReset,
+      updatePassword,
       signOut,
     }),
-    [session, loading, signIn, signUp, resendConfirmation, signOut]
+    [session, loading, signIn, signUp, resendConfirmation, requestPasswordReset, updatePassword, signOut]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
