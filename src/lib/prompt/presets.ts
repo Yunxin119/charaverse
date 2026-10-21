@@ -96,7 +96,8 @@ export const presetSchema = z.object({
   formatting: formattingSchema.prefault({}),
   source: z
     .object({
-      format: z.enum(['sillytavern', 'charaverse']),
+      // Unknown/legacy format labels collapse to 'external' so old rows keep parsing.
+      format: z.enum(['external', 'charaverse']).catch('external'),
       raw: z.unknown().optional(),
     })
     .optional(),
@@ -173,11 +174,11 @@ export const BUILTIN_DEFAULT_PRESET: PresetFile = {
 }
 
 /* ------------------------------------------------------------------ */
-/* SillyTavern import                                                  */
+/* External preset import                                            */
 /* ------------------------------------------------------------------ */
 
-/** ST marker identifiers that map 1:1 onto ours. */
-const ST_MARKER_IDS: ReadonlySet<string> = new Set([
+/** Marker identifiers in the external preset format that map 1:1 onto ours. */
+const EXTERNAL_MARKER_IDS: ReadonlySet<string> = new Set([
   'chatHistory',
   'dialogueExamples',
   'worldInfoBefore',
@@ -188,7 +189,7 @@ const ST_MARKER_IDS: ReadonlySet<string> = new Set([
   'personaDescription',
 ])
 
-/** Markers we add on import so CharaVerse data still flows into an ST preset. */
+/** Markers we add on import so CharaVerse data still flows into an imported preset. */
 const CHARAVERSE_EXTRA_MARKERS: readonly MarkerId[] = ['charModules', 'memoryTable', 'summaries']
 
 type Role = z.infer<typeof roleSchema>
@@ -218,8 +219,8 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n))
 }
 
-/** Detects the SillyTavern chat-completion preset shape (vs. our own format). */
-export function isSillyTavernPreset(raw: unknown): boolean {
+/** Detects the external (prompt-manager style) chat-completion preset shape (vs. our own format). */
+export function isExternalPresetFormat(raw: unknown): boolean {
   if (!isRecord(raw) || !Array.isArray(raw.prompts)) return false
   if (Array.isArray(raw.prompt_order)) return true
   return raw.prompts.some((p) => isRecord(p) && typeof p.identifier === 'string' && !('id' in p))
@@ -242,7 +243,7 @@ function importSampling(raw: Record<string, unknown>): PresetSampling {
   return sampling
 }
 
-interface StPromptEntry {
+interface ExternalPromptEntry {
   identifier: string
   raw: Record<string, unknown>
 }
@@ -265,13 +266,13 @@ function pickPromptOrder(raw: Record<string, unknown>): { identifier: string; en
   return order
 }
 
-export function importSillyTavernPreset(raw: unknown): ParseResult {
+export function importExternalPreset(raw: unknown): ParseResult {
   if (!isRecord(raw) || !Array.isArray(raw.prompts)) {
-    return { ok: false, error: '不是酒馆（SillyTavern）预设：缺少 prompts 数组' }
+    return { ok: false, error: '不是可识别的外部预设：缺少 prompts 数组' }
   }
 
-  // Index ST prompts by identifier (first wins on duplicates).
-  const byIdentifier = new Map<string, StPromptEntry>()
+  // Index external prompts by identifier (first wins on duplicates).
+  const byIdentifier = new Map<string, ExternalPromptEntry>()
   raw.prompts.forEach((p, i) => {
     if (!isRecord(p)) return
     const identifier = asString(p.identifier)?.trim() || `prompt_${i}`
@@ -280,7 +281,7 @@ export function importSillyTavernPreset(raw: unknown): ParseResult {
 
   // Resolve ordering: listed prompts first (with their enabled flag), then the rest disabled.
   const order = pickPromptOrder(raw)
-  const sequence: { entry: StPromptEntry; enabled: boolean }[] = []
+  const sequence: { entry: ExternalPromptEntry; enabled: boolean }[] = []
   const seen = new Set<string>()
   if (order) {
     for (const item of order) {
@@ -313,7 +314,7 @@ export function importSillyTavernPreset(raw: unknown): ParseResult {
     const name = asString(p.name)?.slice(0, 120)
     const role = asRole(p.role)
 
-    if (ST_MARKER_IDS.has(entry.identifier)) {
+    if (EXTERNAL_MARKER_IDS.has(entry.identifier)) {
       prompts.push({ id, name, enabled, marker: true, role: 'system', content: '' })
       continue
     }
@@ -365,7 +366,7 @@ export function importSillyTavernPreset(raw: unknown): ParseResult {
     prompts,
     sampling: importSampling(raw),
     formatting,
-    source: { format: 'sillytavern', raw },
+    source: { format: 'external', raw },
   }
 
   return parsePreset(candidate)
@@ -385,11 +386,11 @@ export function importPresetJson(json: string): ParseResult {
   } catch {
     return { ok: false, error: '不是合法的 JSON' }
   }
-  if (isSillyTavernPreset(raw)) return importSillyTavernPreset(raw)
+  if (isExternalPresetFormat(raw)) return importExternalPreset(raw)
   return parsePreset(raw)
 }
 
-/** Pretty JSON for download; the original ST `source.raw` blob is omitted. */
+/** Pretty JSON for download; the original imported `source.raw` blob is omitted. */
 export function exportPreset(preset: PresetFile): string {
   const { source, ...rest } = preset
   const out: PresetFile = source ? { ...rest, source: { format: source.format } } : rest

@@ -8,6 +8,7 @@ import { CONNECTION_HEADER, decodeConnection } from '@/lib/llm/connection'
 import { needsUserLast, resolveModel } from '@/lib/llm/providers'
 import { loadChatContext, ContextError } from '@/lib/chat/loadContext'
 import { assemble, trimHistory } from '@/lib/prompt/assemble'
+import { activateLorebooks } from '@/lib/lorebook/activate'
 
 /**
  * Streaming chat endpoint (AI SDK UI message stream).
@@ -97,6 +98,10 @@ export async function POST(request: NextRequest) {
     const extraUserMessage =
       body.action === 'continue' ? CONTINUE_MSG : body.action === 'inspire' ? inspireMsg(card.name, userName) : undefined
 
+    const lore = ctx.lorebooks.length
+      ? activateLorebooks({ books: ctx.lorebooks, recent: kept, extraText: body.action === 'send' ? body.text : undefined })
+      : null
+
     const assembled = assemble({
       preset,
       character: {
@@ -106,6 +111,7 @@ export async function POST(request: NextRequest) {
       user: { name: userName, persona: card.persona },
       memoryTable: ctx.memoryTable,
       summaries: ctx.summaries,
+      worldInfo: lore ? { before: lore.before, after: lore.after } : undefined,
       history: kept,
       ensureUserLast: !!extraUserMessage || needsUserLast(conn) || body.action === 'opening',
       continueUserMessage:

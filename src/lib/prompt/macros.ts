@@ -1,5 +1,5 @@
 /**
- * SillyTavern-compatible text macros.
+ * Text macros (compatible with the common {{macro}} syntax).
  *
  * Supported: {{char}}, {{user}}, {{newline}}, {{trim}}, {{date}}, {{time}},
  * {{random:a,b,c}} (also `{{random::a::b}}`). Names are case-insensitive.

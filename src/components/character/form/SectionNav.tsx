@@ -3,7 +3,7 @@
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type SectionId = 'basic' | 'modules' | 'opening' | 'skin' | 'publish'
+export type SectionId = 'basic' | 'modules' | 'opening' | 'lorebook' | 'skin' | 'publish'
 
 export interface NavSection {
   id: SectionId

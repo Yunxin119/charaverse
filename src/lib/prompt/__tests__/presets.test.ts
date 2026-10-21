@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import stFixture from './fixtures/st-preset.json'
+import externalFixture from './fixtures/external-preset.json'
 import {
   BUILTIN_DEFAULT_PRESET,
   MARKER_IDS,
@@ -7,8 +7,8 @@ import {
   PRESET_MAX_SERIALIZED_CHARS,
   exportPreset,
   importPresetJson,
-  importSillyTavernPreset,
-  isSillyTavernPreset,
+  importExternalPreset,
+  isExternalPresetFormat,
   parsePreset,
   type PresetFile,
 } from '../presets'
@@ -78,8 +78,8 @@ describe('parsePreset', () => {
   })
 })
 
-describe('importSillyTavernPreset', () => {
-  const result = importSillyTavernPreset(stFixture)
+describe('importExternalPreset', () => {
+  const result = importExternalPreset(externalFixture)
 
   it('imports the fixture', () => {
     expect(result.ok).toBe(true)
@@ -89,8 +89,8 @@ describe('importSillyTavernPreset', () => {
 
   it('uses the name and tags the source', () => {
     expect(preset.name).toBe('测试破限 v3')
-    expect(preset.source?.format).toBe('sillytavern')
-    expect(preset.source?.raw).toBe(stFixture)
+    expect(preset.source?.format).toBe('external')
+    expect(preset.source?.raw).toBe(externalFixture)
   })
 
   it('orders prompts by the character_id 100001 prompt_order, appends CharaVerse markers before chatHistory, and puts unlisted prompts last (disabled)', () => {
@@ -126,7 +126,7 @@ describe('importSillyTavernPreset', () => {
     expect(enabled.summaries).toBe(true)
   })
 
-  it('marks ST markers as markers and content prompts as content', () => {
+  it('marks external markers as markers and content prompts as content', () => {
     const byId = Object.fromEntries(preset.prompts.map((p) => [p.id, p]))
     for (const id of ['chatHistory', 'dialogueExamples', 'worldInfoBefore', 'worldInfoAfter', 'charDescription', 'charPersonality', 'scenario', 'personaDescription']) {
       expect(byId[id].marker, id).toBe(true)
@@ -158,7 +158,7 @@ describe('importSillyTavernPreset', () => {
   })
 
   it('defaults absolute depth to 4 and name to 导入的预设, and appends chatHistory when missing', () => {
-    const r = importSillyTavernPreset({
+    const r = importExternalPreset({
       prompts: [
         { identifier: 'jailbreak', content: 'jb', injection_position: 1 },
         { identifier: 'main', content: 'm' },
@@ -175,7 +175,7 @@ describe('importSillyTavernPreset', () => {
   })
 
   it('falls back to character_id 100000 then the first group', () => {
-    const r = importSillyTavernPreset({
+    const r = importExternalPreset({
       prompts: [{ identifier: 'a', content: 'a' }, { identifier: 'b', content: 'b' }],
       prompt_order: [
         { character_id: 5, order: [{ identifier: 'b', enabled: true }] },
@@ -187,31 +187,31 @@ describe('importSillyTavernPreset', () => {
     expect(r.preset.prompts.slice(0, 2).map((p) => [p.id, p.enabled])).toEqual([['a', false], ['b', false]])
   })
 
-  it('rejects non-ST input', () => {
-    expect(importSillyTavernPreset({ name: 'x' }).ok).toBe(false)
-    expect(importSillyTavernPreset(null).ok).toBe(false)
+  it('rejects non-preset input', () => {
+    expect(importExternalPreset({ name: 'x' }).ok).toBe(false)
+    expect(importExternalPreset(null).ok).toBe(false)
   })
 })
 
 describe('importPresetJson / exportPreset', () => {
-  it('detects ST vs CharaVerse format', () => {
-    expect(isSillyTavernPreset(stFixture)).toBe(true)
-    expect(isSillyTavernPreset(BUILTIN_DEFAULT_PRESET)).toBe(false)
-    const st = importPresetJson(JSON.stringify(stFixture))
-    expect(st.ok && st.preset.source?.format).toBe('sillytavern')
+  it('detects external vs CharaVerse format', () => {
+    expect(isExternalPresetFormat(externalFixture)).toBe(true)
+    expect(isExternalPresetFormat(BUILTIN_DEFAULT_PRESET)).toBe(false)
+    const ext = importPresetJson(JSON.stringify(externalFixture))
+    expect(ext.ok && ext.preset.source?.format).toBe('external')
     const cv = importPresetJson(JSON.stringify(BUILTIN_DEFAULT_PRESET))
     expect(cv.ok && cv.preset.name).toBe('CharaVerse 默认')
     expect(importPresetJson('{not json').ok).toBe(false)
   })
 
   it('exportPreset round-trips through parsePreset and omits source.raw', () => {
-    const imported = importSillyTavernPreset(stFixture)
+    const imported = importExternalPreset(externalFixture)
     expect(imported.ok).toBe(true)
     if (!imported.ok) return
     const json = exportPreset(imported.preset)
     expect(json).not.toContain('prompt_order')
     const parsed = JSON.parse(json)
-    expect(parsed.source).toEqual({ format: 'sillytavern' })
+    expect(parsed.source).toEqual({ format: 'external' })
     const again = parsePreset(parsed)
     expect(again.ok).toBe(true)
     if (!again.ok) return

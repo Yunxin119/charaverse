@@ -14,6 +14,8 @@ export const snapshotSchema = z.object({
   prompt_template: z.record(z.string(), z.unknown()),
   /** characters.skin as-is (css / regexScripts / renderHtml / allowedUrlHosts) */
   skin: z.record(z.string(), z.unknown()),
+  /** characters.lorebook as-is (world book embedded in the card) */
+  lorebook: z.record(z.string(), z.unknown()).default({}),
 })
 export type Snapshot = z.infer<typeof snapshotSchema>
 
@@ -22,6 +24,7 @@ export interface SnapshotInput {
   avatar_url?: string | null
   prompt_template: unknown
   skin?: unknown
+  lorebook?: unknown
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -36,6 +39,7 @@ export function buildSnapshot(input: SnapshotInput): Snapshot {
     avatar_url: input.avatar_url || null,
     prompt_template: tpl,
     skin: isRecord(input.skin) ? input.skin : {},
+    lorebook: isRecord(input.lorebook) ? input.lorebook : {},
   }
 }
 

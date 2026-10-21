@@ -43,13 +43,13 @@
 - 没有 swipe / 多候选回复，regenerate 直接覆盖
 - 没有自动触发摘要/记忆（只在 memory 页手动生成）
 - 贴纸、打字效果、消息分段全是死代码
-- **消息里的 HTML 不渲染**（`rehype-raw` 没接）→ 你写的 `html.html` / `mobile.html` / `rancheng.md` 这类酒馆美化卡在 app 里完全显示不出来
+- **消息里的 HTML 不渲染**（`rehype-raw` 没接）→ 你写的 `html.html` / `mobile.html` / `rancheng.md` 这类主流角色扮演前端美化卡在 app 里完全显示不出来
 - 作者自定义 CSS（`prompt_template.custom_css` + `CharacterStyleInjector`）是刚起步的 WIP：正则清洗、**没有真正作用域隔离**、允许 `url()` 外链
 
 ### 1.4 安全 / AI infra 风险（按优先级）
 
 **P0 — 上线前必须修**
-1. `POST /api/chat` **无任何鉴权**，客户端指定 `baseUrl` → 任意人可把你的服务器当免费中转 + **完整 SSRF**（可打内网 / 云元数据），上游错误体原样回显（读 SSRF）。`model` 直接拼进 Gemini URL。
+1. `PO外部格式 /api/chat` **无任何鉴权**，客户端指定 `baseUrl` → 任意人可把你的服务器当免费中转 + **完整 SSRF**（可打内网 / 云元数据），上游错误体原样回显（读 SSRF）。`model` 直接拼进 Gemini URL。
 2. `api/comments/*`、`api/characters/copy` 用匿名 client + 信任 body 里的 `userId`（IDOR）。无人调用，直接删。
 3. **Next 15.4.6 / React 19.1.0**：`npm audit` 确认 1 critical（React flight 协议 RCE）+ 22 high。必须升级。
 
@@ -96,15 +96,15 @@
 | A5 | BYOK 模型 | key 留在客户端（zustand + localStorage，不进 DB），每次请求带 `x-cv-connection` header（base64url JSON：kind / apiKey / baseUrl / model）；**服务端只做鉴权 + 校验 + 转发 + 限流**，不落盘不打日志 | 隐私承诺不变；后续可选「加密同步到 Supabase」多设备 |
 | A6 | `baseUrl` 安全 | 服务端校验：必须 https、禁止 IP 字面量/私网/localhost/云元数据、禁止 `?#`、路径固定拼接；可选 host allowlist | 堵 SSRF |
 | A7 | 数据库 | 用 Supabase CLI 建 `supabase/migrations/0001_baseline.sql`，根目录全部 SQL 归档；`supabase gen types` 生成 `types/database.ts` 作为唯一类型来源 | 结束 3 份类型 + 33 个零散 SQL |
-| A8 | 主题系统 | 三层：① **App 主题** = `--cv-*` token JSON（可导入/导出，像酒馆主题）② **聊天皮肤** = 作者的 CSS（+可选 HTML 模板）作用于 `#cv_chat_root` ③ **消息内 HTML 块** = 正则脚本 → sandboxed iframe | 见 §5 |
+| A8 | 主题系统 | 三层：① **App 主题** = `--cv-*` token JSON（可导入/导出，像主题文件）② **聊天皮肤** = 作者的 CSS（+可选 HTML 模板）作用于 `#cv_chat_root` ③ **消息内 HTML 块** = 正则脚本 → sandboxed iframe | 见 §5 |
 | A9 | 作者 CSS 隔离 | 用 `css-tree`/`postcss` 真解析：丢弃 `@import`/`@font-face` 外链/`url()` 非 allowlist/`position:fixed` 覆盖整屏；所有选择器加 `#cv_chat_root` 前缀（或 `@scope`） | 正则清洗挡不住 CSS 打点与假 UI |
-| A10 | 作者 HTML/JS | `<iframe sandbox="allow-scripts">`（**不给** `allow-same-origin`）+ `srcdoc` + CSP meta + postMessage 回传高度；不渲染任何 HTML 到主文档 | 支持酒馆式美化卡（含 `<script>`）又不碰主站 origin |
+| A10 | 作者 HTML/JS | `<iframe sandbox="allow-scripts">`（**不给** `allow-same-origin`）+ `srcdoc` + CSP meta + postMessage 回传高度；不渲染任何 HTML 到主文档 | 支持通用格式美化卡（含 `<script>`）又不碰主站 origin |
 | A11 | Markdown | react-markdown + remark-gfm，`img`/`a` 走 host allowlist（Supabase storage + 用户自定义白名单），不启用 rehype-raw | 堵 markdown 图片外泄 |
 | A12 | 公开角色 | **发布即快照**：`characters` 增加 `published_snapshot jsonb + published_at`，explore / 他人开聊只读快照；作者改稿需手动「重新发布」 | 堵「活的注入通道」+ 作者隐私（`src/migrate.md` 已提过） |
 | A13 | PWA / 手机方向 | **移除 `next-pwa` 且不加回**；不做手机 App、不做 IM 式手机聊天；网页保持响应式即可 | 用户决定：手机方向必要性不强 |
 | A14 | i18n | 暂不做；删 `next-intl`。UI 文案先集中到 `lib/strings.ts` 为以后留口 | 现状全硬编码中文 |
 | A15 | 多角色「剧本」模式 | **彻底删除**：代码随 P2（聊天页）/ P4（角色编辑器）重写一起删，`session_characters` 表与 `script_*` 字段在 baseline 迁移里移除 | 用户决定：不做多人聊天 |
-| A16 | 预设系统（酒馆式） | 可导入/导出的 **Preset**：prompt 条目列表（可排序、可开关、含占位 marker）+ 采样参数；支持直接导入酒馆 chat-completion 预设 JSON；system prompt 由「预设 × 角色卡 × 记忆」组装 | 用户需求；也让 prompt 组装从组件里彻底解耦 |
+| A16 | 预设系统（通用格式） | 可导入/导出的 **Preset**：prompt 条目列表（可排序、可开关、含占位 marker）+ 采样参数；支持直接导入通用预设格式 JSON；system prompt 由「预设 × 角色卡 × 记忆」组装 | 用户需求；也让 prompt 组装从组件里彻底解耦 |
 
 ---
 
@@ -186,12 +186,12 @@ docs/                       # 本文件 + design/
 ```
 导入 = 校验 schema（zod）→ 存 `user_themes` 表 + localStorage 缓存 → `applyTheme()` 写 `:root` 变量。导出就是这个 JSON。
 
-### 5.5 作者定制的三个层级（对标酒馆）
+### 5.5 作者定制的三个层级（对标主流角色扮演前端）
 1. **聊天皮肤 CSS**（角色卡 `custom_css` → 迁到 `characters.skin jsonb`）：经 A9 清洗后作用于 `#cv_chat_root`。提供选择器文档 + 3 个预设 + 实时预览编辑器。
-2. **消息内 HTML 块**：正则脚本（酒馆 regex script 格式：`find / replace / flags / trimStrings`，作用于 AI 输出显示层）把 `<qsm>…</qsm>` 之类的块替换成 HTML 模板 → `HtmlBlockFrame` 用 sandboxed iframe 渲染，自动高度。`mobile.html`、`rancheng.md` 就能直接跑。
+2. **消息内 HTML 块**：正则脚本（通用正则脚本 script 格式：`find / replace / flags / trimStrings`，作用于 AI 输出显示层）把 `<qsm>…</qsm>` 之类的块替换成 HTML 模板 → `HtmlBlockFrame` 用 sandboxed iframe 渲染，自动高度。`mobile.html`、`rancheng.md` 就能直接跑。
 3. **全局 UI 主题**（上面的 JSON）：换整个 app 的皮。
 
-### 5.6 预设系统（Preset，对标酒馆 chat-completion preset）
+### 5.6 预设系统（Preset，对标主流角色扮演前端 chat-completion preset）
 **数据模型**（`user_presets.data jsonb`，zod 校验）：
 ```json
 { "name": "我的破限", "version": 1,
@@ -209,8 +209,8 @@ docs/                       # 本文件 + design/
   "formatting": { "assistantPrefill": "" } }   // 另有 sampling.top_k 与 source（导入来源）
 ```
 - **marker 条目**是占位符，组装时用我们自己的数据填：`charDescription` / `charPersonality` / `scenario`（角色卡模块）、`personaDescription`（用户人设）、`memoryTable`、`summaries`、`worldInfo`（预留）、`chatHistory`、`dialogueExamples`（预留）。
-- **普通条目**就是作者写的文本，按 `prompts[]` 顺序进 messages；`injection.position: absolute` 的条目按 `depth` 插进历史里（酒馆 in-chat 注入）。
-- **导入酒馆预设**：解析 ST 的 `prompts[]` + `prompt_order[]`（取 `character_id` 100001 那组）+ 采样字段，marker identifier 一一映射；不认识的字段保留在 `raw` 里以便导出还原。
+- **普通条目**就是作者写的文本，按 `prompts[]` 顺序进 messages；`injection.position: absolute` 的条目按 `depth` 插进历史里（主流角色扮演前端 in-chat 注入）。
+- **导入外部预设**：解析 外部格式的 `prompts[]` + `prompt_order[]`（取 `character_id` 100001 那组）+ 采样字段，marker identifier 一一映射；不认识的字段保留在 `raw` 里以便导出还原。
 - **作用域**：用户级默认预设 + 每个会话可覆盖（`chat_sessions.settings.presetId`）。角色卡可以「推荐预设」但不能强制。
 - **安全**：预设是用户自己导入的，可信度等同角色卡；长度上限、条目数上限；组装时各段用分隔符包裹。
 
@@ -223,7 +223,7 @@ docs/                       # 本文件 + design/
 - [x] 新建分支 `v2` from `multichars`；先把当前 WIP（branch API、custom_css tab、memory 表单）commit 保存
 - [x] 删除 §1.1 列出的全部死代码（页面、API、组件、hooks、lib、types、`ui/sheet`）
 - [x] 删除未用依赖：`next-intl`、`rehype-raw`、`rehype-highlight`、`next-pwa`/`@types/next-pwa`（A13）；删 `public/sw.js`、`workbox-*.js`、`PWAInstallPrompt`、`generate-icons.html`、`scripts/generate-placeholder-icons.js`
-- [x] 根目录清理：`*.sql` → `docs/legacy-sql/`；`*_FIX.md` 等 → `docs/legacy-notes/`；`html.html / mobile.html / multiverse.html / rancheng.md / fix.html` → `docs/skin-samples/`（P3 要用）；删 `style.html`、`_mv_head.txt`、`replace.py`
+- [x] 根目录清理：`*.sql` → `docs/legacy-sql/`；`*_FIX.md` 等 → `docs/legacy-notes/`；`html.html / mobile.html / multiverse.html / rancheng.md / fix.html` → （第三方样本已移除，测试用自写样本）（P3 要用）；删 `style.html`、`_mv_head.txt`、`replace.py`
 - [x] `npm i next@latest react@latest react-dom@latest`，修编译错误（`metadata.viewport/themeColor` 改为 `export const viewport`）
 - [x] `/api/chat`：加 Supabase JWT 校验；`baseUrl` 按 A6 校验；错误体不再回显；Gemini key 改 header
 - [x] 删掉所有打印 key / headers / 对话全文的 `console.log`（至少：`page.tsx` getThinkingBudget、`memory/page.tsx` L456、`api/chat`、`api/diary/*`）
@@ -257,7 +257,7 @@ docs/                       # 本文件 + design/
 - [x] 安装 `ai` + providers；`lib/llm/providers.ts` 根据连接类型（openai-compatible / google / deepseek / anthropic）返回 model；`guards.ts` 做 A6
 - [x] `api/chat/route.ts` 重写：鉴权 → 读 `x-cv-connection` header（base64url JSON：kind/apiKey/baseUrl/model）→ 服务端加载会话/角色卡/记忆/摘要/预设 → `streamText` → `toUIMessageStreamResponse()`；actions：send / opening / regenerate / continue / inspire；客户端不再发送对话历史
 - [x] `lib/prompt/assemble.ts`：**预设驱动**的 messages 组装（§5.6）：输入 preset + 角色卡 + 用户人设 + 记忆表 + 摘要 + 历史 → 输出 `{ messages, sampling }`；纯函数 + 单测；各段用分隔符包裹（防注入边界）
-- [x] `lib/prompt/presets.ts`：zod schema、内置默认预设（把现在 `buildSystemPrompt` 的逻辑翻译成一个预设）、酒馆预设导入转换器 + 单测（用 1–2 个真实 ST 预设 JSON 当 fixture）
+- [x] `lib/prompt/presets.ts`：zod schema、内置默认预设（把现在 `buildSystemPrompt` 的逻辑翻译成一个预设）、外部预设导入转换器 + 单测（用 1–2 个真实 外部预设 JSON 当 fixture）
 - [x] `user_presets` 表 + `useBuiltinOrUserPreset()`；会话设置里可选预设
 - [x] `lib/prompt/tokens.ts` + `assemble.trimHistory`：token 估算与截断；`lib/chat/loadContext.ts` 服务端统一加载上下文（旧 ContextManager 已删）
 - [x] `components/chat/ChatView`：自写 `useChatStream`（解析 UI message stream，DB 为唯一真相源，流结束后 refetch）；`MessageList`（虚拟滚动 or 分页）、`MessageBubble`（glass AI / primary user）、`MessageActions`（重生成、编辑、删除、续写、分支、复制）、`Composer`（neu 输入框，Enter/Shift+Enter，粘贴图片占位）、`TypingIndicator`
@@ -269,21 +269,21 @@ docs/                       # 本文件 + design/
 - [x] 删 `chatSlice` / `enhancedChatSlice` / Redux 依赖
 - [x] 删多角色代码：`multiCharacterManager.ts`、`MultiCharacterMessage.tsx`、`ChatCharacterSelector.tsx` 及 chat 页里的 speaker 逻辑（A15）
 - [ ] **需要你手动执行**：在 Supabase SQL editor 跑 `supabase/migrations/0002_chat_v2.sql`（swipes/meta 列、`chat_sessions.settings`、`user_presets` 表、`chat-backgrounds` bucket、两个 swipe RPC）。不跑的话新聊天页会报错
-- 验收：`tsc` / `eslint` / `next build` 全绿 ✅；`vitest` 47 个用例通过（macros / tokens / presets 含酒馆导入 / assemble）✅；流式打字、swipe、分支、续写、灵感、设置面板 —— **待你登录实测**
+- 验收：`tsc` / `eslint` / `next build` 全绿 ✅；`vitest` 47 个用例通过（macros / tokens / presets 含主流角色扮演前端导入 / assemble）✅；流式打字、swipe、分支、续写、灵感、设置面板 —— **待你登录实测**
 - 已知遗留（P4/P5 处理）：模型/连接仍由旧的 `useApiConfig` 解析（设置页三套 UI 未合并）；日记路由仍用自己的 provider 代码；memory 页仍 4k 行
 
 ### P3 · 可定制化（1.5 天）
 目标：用户能导入预设和主题，作者能做皮肤，且安全。
-- [x] 预设管理页 `settings/presets`：列表 / 导入（粘贴 JSON 或上传文件，自动识别酒馆格式）/ 导出 / 复制 / 设为默认
+- [x] 预设管理页 `settings/presets`：列表 / 导入（粘贴 JSON 或上传文件，自动识别外部格式）/ 导出 / 复制 / 设为默认
 - [x] 预设编辑器（Prompt Manager）：条目拖拽排序、开关、编辑内容与 role、marker 条目显示「将填入：角色描述」等说明、采样参数滑块、token 预估
 - [x] 会话级预设选择（会话设置面板）；header 显示当前模型 · 预设（快速切换下拉留到 P4 连接管理合并时一起做）
 - [x] `lib/theme/schema.ts`（zod）+ `ThemeImportDialog`（粘贴 JSON / 上传文件 / 导出）+ `user_themes` 表
 - [x] 内置主题：Warm Glass Light / Dark、Carbon Neon（冷调碳黑）、Sage Paper；`settings/appearance` 页 + `ThemeSync` 登录后同步 DB 里的激活主题
 - [x] `lib/skins/sanitizeCss.ts`：css-tree 解析 → 白名单属性/at-rule → `url()` 仅允许 Supabase storage + 用户白名单 → 选择器加 `#cv_chat_root` 前缀 → 序列化
 - [x] `characters.skin jsonb`（迁移 `prompt_template.custom_css`）+ `SkinEditor`（左代码右实时预览、选择器文档、3 预设）
-- [x] 正则脚本：`characters.skin.regexScripts[]`，格式对齐酒馆（find / replace / flags / 作用于显示层）；支持导入酒馆 regex JSON
+- [x] 正则脚本：`characters.skin.regexScripts[]`，格式对齐主流角色扮演前端（find / replace / flags / 作用于显示层）；支持导入通用正则脚本 JSON
 - [x] `HtmlBlockFrame`：sandboxed iframe + srcdoc + CSP meta + ResizeObserver→postMessage 高度；在 markdown 渲染管线里把正则替换出的 HTML 块交给它
-- [x] `src/lib/skins/__tests__/samples.test.ts` 用三份真实样本做回归（CSS 清洗后保留 >50% 且全部加了作用域、HTML 块能被切出）；视觉效果待登录实测
+- [x] `src/lib/skins/__tests__/samples.test.ts` 用自写样本做回归（CSS 清洗后保留 >50% 且全部加了作用域、HTML 块能被切出）；视觉效果待登录实测
 - [x] Markdown `img`/`a` host allowlist（A11）
 - [ ] **需要你手动执行**：Supabase SQL editor 跑 `supabase/migrations/0003_skins_themes.sql`（`characters.skin` 列并回填旧 custom_css、`user_themes` 表）
 - 验收：`tsc` / `eslint` / `next build` 全绿 ✅；91 个测试通过 ✅；导入主题 JSON 全站变色、作者 CSS 不越界、iframe 里 `<script>` 拿不到主站 cookie —— **待你登录实测**（入口：我的 → 外观 / 预设；聊天 → 更多 → 角色皮肤）
@@ -314,23 +314,29 @@ docs/                       # 本文件 + design/
 - [x] `next.config` headers：CSP（script 仅 self + inline、connect 仅 self + Supabase、frame-src self/blob、frame-ancestors none）、HSTS（生产）、nosniff、X-Frame-Options DENY、Referrer-Policy、Permissions-Policy
 - [x] 日志：`lib/log.ts`，生产只打 level ≥ warn；`src` 里已无 `console.log`（测试除外）
 - [x] 错误边界（`error.tsx` / `global-error.tsx` / `not-found.tsx`）+ toast（sonner，`AppToaster`）统一
-- [x] 测试：vitest 116 个用例，覆盖 assemble / presets（含酒馆导入）/ macros / tokens / sanitizeCss / regexScripts / 真实皮肤样本 / SSRF guards / 连接头编码 / 角色卡解析 / 记忆表格式化（Playwright 冒烟未做：需要测试账号，留 backlog）
+- [x] 测试：vitest 116 个用例，覆盖 assemble / presets（含主流角色扮演前端导入）/ macros / tokens / sanitizeCss / regexScripts / 真实皮肤样本 / SSRF guards / 连接头编码 / 角色卡解析 / 记忆表格式化（Playwright 冒烟未做：需要测试账号，留 backlog）
 - [x] favicon.svg / icon-base.svg / manifest 换新色，8 个 PNG 图标 + apple-touch-icon + favicon.ico 已从新 SVG 重新生成
 - [~] 性能：消息按 40 条分页懒加载（虚拟化留 backlog）、字体走 `next/font`、`prefers-reduced-transparency` / `prefers-reduced-motion` 降级已在 tokens.css
 - [x] 旧代码 / SQL / 笔记归档到 git tag `v1-archive`，`docs/legacy-*` 已删；README 重写
 - [ ] **需要你手动执行**：Supabase SQL editor 跑 `supabase/migrations/0006_rate_limits.sql`（`rate_limits` 表 + `consume_rate_limit` 函数）。不跑也能用（内存兜底），但多实例部署时限流不准
 - 验收：`tsc` / `eslint` / `next build` / 116 测试全绿 ✅；旧 `x-api-key` 兼容层已删；`@types/node` 升到 22 后 `npm install` 不再需要 `--legacy-peer-deps`；浏览器响应头能看到 CSP、连续快速发 31 条消息会收到 429 —— **待你实测**
 
+### 迭代 2（2026-10-21）
+- [x] 全部界面 / 文档 / 注释去掉第三方前端与第三方作者的名字；第三方美化卡样本从仓库移除，测试改用自写样本
+- [x] 多开场白：角色卡 `basic_info.alternateGreetings[]`，开新对话时第一条消息可左右切换
+- [x] 世界书：`lib/lorebook`（schema、通用 world-info JSON 导入、关键词 / 常驻 / 次级关键词 / 概率 / 扫描深度 / 预算）；角色内嵌世界书（`characters.lorebook`，随发布快照一起走）+ 用户世界书库（`lorebooks` 表，启用即应用到全部对话）；注入到预设的 `worldInfoBefore / After` 占位；`0008_lorebooks.sql`
+- [ ] 摘要 / 日记的任务 prompt 仍在代码里（`api/chat/summary`、`api/diary/_lib`），下一步可做成可编辑设置
+
 ### 迭代 1（2026-10-21，P6 之后）
 - [x] 角色主页 `/characters/[id]`：该角色的全部对话（分支缩进显示「分支自 #id」）、继续最近 / 开新对话 / 重命名 / 删除；「对话」页改为按角色分组，角色卡片点进主页，聊天 header 加「切换 / 管理对话」
-- [x] 删除模板库（页面、导航、TemplateManager、`prompt_templates` 相关代码；`0007_drop_templates.sql` 可选执行删表）—— 酒馆式预设已覆盖这个需求
+- [x] 删除模板库（页面、导航、TemplateManager、`prompt_templates` 相关代码；`0007_drop_templates.sql` 可选执行删表）—— 通用格式预设已覆盖这个需求
 - [x] 聊天气泡长行不换行：加 `overflow-wrap: anywhere`
 - [x] 会话级采样覆盖（temperature / top_p / max_tokens，默认跟随预设）+「流式输出」开关
 
 ### Backlog（不排期）
 - API key 加密同步（多设备）
 - 世界书 / lorebook（`ContextManager` 已留参数）
-- 角色卡导入导出：酒馆 PNG/JSON (`chara_card_v2`) 互通
+- 角色卡导入导出：主流角色扮演前端 PNG/JSON (`chara_card_v2`) 互通
 - 语音 / 图片消息、贴纸（如果真要，重新设计，不恢复旧代码）
 - 评论系统恢复（走 RLS 直连，不要 API 路由）
 - 关注作者 / 分享海报（`src/migrate.md` 的建议）
@@ -360,6 +366,6 @@ docs/                       # 本文件 + design/
 2. **A2** 去 Redux，换 Zustand + TanStack Query ✅
 3. **A13** 手机方向（PWA / App / IM 式手机聊天）不做，只保持响应式 ✅
 4. **A15** 多角色彻底删除 ✅
-5. **A16** 新增酒馆式预设系统（§5.6）✅
+5. **A16** 新增预设系统（§5.6）✅
 6. 贴纸两套都删；日记保留；模板库页暂留（P4 视情况并进角色编辑器）
 7. 配色：Warm Glass，accent 暂用 sienna，可随时改 token

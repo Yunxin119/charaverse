@@ -1,5 +1,5 @@
 /**
- * SillyTavern-compatible "regex scripts": ordered find/replace rules applied to
+ * Regex scripts (compatible with the common external JSON format): ordered find/replace rules applied to
  * message text for display. Pure TypeScript; runs in browser and node.
  */
 import { z } from 'zod'
@@ -77,7 +77,7 @@ function formatZodError(err: z.ZodError): string {
 }
 
 /**
- * Split a SillyTavern `findRegex` of the form `/pattern/flags` into its parts.
+ * Split an external-format `findRegex` of the form `/pattern/flags` into its parts.
  * Returns null when the string is not in slash form.
  */
 export function splitSlashRegex(src: string): { pattern: string; flags: string } | null {
@@ -94,7 +94,7 @@ export function splitSlashRegex(src: string): { pattern: string; flags: string }
   return { pattern: s.slice(1, last), flags }
 }
 
-/** ST uses `{{match}}` for the whole match; JS uses `$&`. */
+/** The external format uses `{{match}}` for the whole match; JS uses `$&`. */
 function translateReplace(replace: string): string {
   return replace.replace(/\{\{match\}\}/gi, () => '$&')
 }
@@ -119,7 +119,7 @@ export function parseRegexScripts(raw: unknown): ParseResult {
   return { ok: true, scripts: result.data }
 }
 
-/** SillyTavern regex_placement: 0 MD_DISPLAY, 1 USER_INPUT, 2 AI_OUTPUT, 3 SLASH, 5 WORLD_INFO, 6 REASONING. */
+/** External `placement` codes: 0 MD_DISPLAY, 1 USER_INPUT, 2 AI_OUTPUT, 3 SLASH, 5 WORLD_INFO, 6 REASONING. */
 function mapPlacement(placement: unknown): RegexScript['target'] {
   if (!Array.isArray(placement)) return 'ai'
   const nums = placement.filter((p): p is number => typeof p === 'number')
@@ -133,10 +133,10 @@ function mapPlacement(placement: unknown): RegexScript['target'] {
   return 'ai'
 }
 
-/** Import SillyTavern regex script JSON (single object, array, or `{ scripts }`). */
-export function importSillyTavernRegex(raw: unknown): ParseResult {
+/** Import external regex script JSON (single object, array, or `{ scripts }`). */
+export function importExternalRegex(raw: unknown): ParseResult {
   const list = toList(raw)
-  if (!list) return { ok: false, error: '需要一个酒馆正则脚本对象或数组' }
+  if (!list) return { ok: false, error: '需要一个正则脚本对象或数组（外部格式）' }
 
   const converted: RegexScriptInput[] = []
   for (let index = 0; index < list.length; index++) {
@@ -157,7 +157,7 @@ export function importSillyTavernRegex(raw: unknown): ParseResult {
     if (promptOnly) name = `${name} (promptOnly, 未支持)`.trim()
 
     const id =
-      typeof item.id === 'string' && item.id.trim() ? item.id.trim().slice(0, 64) : deriveId(name, index, 'st')
+      typeof item.id === 'string' && item.id.trim() ? item.id.trim().slice(0, 64) : deriveId(name, index, 'ext')
 
     const trimStrings = Array.isArray(item.trimStrings)
       ? item.trimStrings.filter((t): t is string => typeof t === 'string' && t.length > 0)
@@ -181,14 +181,14 @@ export function importSillyTavernRegex(raw: unknown): ParseResult {
   return { ok: true, scripts: result.data }
 }
 
-function looksLikeSillyTavern(raw: unknown): boolean {
+function looksLikeExternalRegex(raw: unknown): boolean {
   const list = toList(raw)
   if (!list || list.length === 0) return false
   const first = list[0]
   return isRecord(first) && ('findRegex' in first || 'scriptName' in first)
 }
 
-/** JSON-parse then auto-detect SillyTavern vs our own format. */
+/** JSON-parse then auto-detect the external format vs our own. */
 export function importRegexJson(json: string): ParseResult {
   let data: unknown
   try {
@@ -196,7 +196,7 @@ export function importRegexJson(json: string): ParseResult {
   } catch {
     return { ok: false, error: 'JSON 解析失败' }
   }
-  return looksLikeSillyTavern(data) ? importSillyTavernRegex(data) : parseRegexScripts(data)
+  return looksLikeExternalRegex(data) ? importExternalRegex(data) : parseRegexScripts(data)
 }
 
 /* ------------------------------------------------------------------------ */
@@ -227,7 +227,7 @@ function stripTrim(value: string | undefined, trimStrings: string[]): string {
 }
 
 /**
- * Expand a JS-style replacement template against one match, with ST trimStrings
+ * Expand a JS-style replacement template against one match, with trimStrings
  * applied to `$&`/`$0`/`$n`/`$<name>` before insertion.
  */
 function expandTemplate(

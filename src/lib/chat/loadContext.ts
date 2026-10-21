@@ -5,6 +5,7 @@ import { parseSnapshot } from '@/components/character/snapshot'
 import { parseCharacterCard, type CharacterCard } from './characterCard'
 import { formatMemoryTable, type MemoryRow } from './memoryTable'
 import { parseSessionSettings, type SessionSettings } from './settings'
+import { parseLorebook, type Lorebook } from '@/lib/lorebook/schema'
 
 export interface HistoryMessage {
   id: number
@@ -15,12 +16,14 @@ export interface HistoryMessage {
 
 export interface ChatContext {
   session: { id: string; user_id: string; character_id: number; title: string | null; settings: SessionSettings }
-  character: { id: number; user_id: string; name: string; prompt_template: unknown; skin?: unknown; published_snapshot?: unknown }
+  character: { id: number; user_id: string; name: string; prompt_template: unknown; skin?: unknown; lorebook?: unknown; published_snapshot?: unknown }
   card: CharacterCard
   preset: PresetFile
   history: HistoryMessage[]
   summaries: string[]
   memoryTable: string
+  /** character-embedded book first, then the user's enabled library books */
+  lorebooks: Lorebook[]
 }
 
 export class ContextError extends Error {
@@ -44,7 +47,7 @@ export async function loadChatContext(supabase: SupabaseClient, sessionId: strin
 
   const { data: row, error: cErr } = await supabase
     .from('characters')
-    .select('id, user_id, name, prompt_template, skin, published_snapshot')
+    .select('id, user_id, name, prompt_template, skin, published_snapshot, lorebook')
     .eq('id', session.character_id)
     .single()
   if (cErr || !row) throw new ContextError(404, '找不到角色')
@@ -55,10 +58,10 @@ export async function loadChatContext(supabase: SupabaseClient, sessionId: strin
   if (row.user_id !== userId) {
     const snap = parseSnapshot(row.published_snapshot)
     if (!snap) throw new ContextError(403, '这个角色还没有发布')
-    character = { ...row, name: snap.name, prompt_template: snap.prompt_template, skin: snap.skin }
+    character = { ...row, name: snap.name, prompt_template: snap.prompt_template, skin: snap.skin, lorebook: snap.lorebook }
   }
 
-  const [preset, historyRows, summaries, memoryRows] = await Promise.all([
+  const [preset, historyRows, summaries, memoryRows, libraryBooks] = await Promise.all([
     loadPreset(supabase, userId, settings.presetId ?? null),
     supabase
       .from('chat_messages')
@@ -81,7 +84,17 @@ export async function loadChatContext(supabase: SupabaseClient, sessionId: strin
           .limit(80)
           .then(({ data }) => (data ?? []) as MemoryRow[])
       : Promise.resolve([] as MemoryRow[]),
+    supabase
+      .from('lorebooks')
+      .select('data')
+      .eq('user_id', userId)
+      .eq('enabled', true)
+      .then(({ data }) => (data ?? []).map((r) => { const p = parseLorebook(r.data); return p.ok ? p.book : null }).filter((b): b is Lorebook => !!b)),
   ])
+
+  const embeddedRaw = (character as { lorebook?: unknown }).lorebook
+  const embeddedParsed = parseLorebook(embeddedRaw)
+  const embeddedBook = embeddedParsed.ok ? embeddedParsed.book : null
 
   return {
     session: { ...session, settings },
@@ -91,6 +104,7 @@ export async function loadChatContext(supabase: SupabaseClient, sessionId: strin
     history: historyRows,
     summaries,
     memoryTable: formatMemoryTable(memoryRows),
+    lorebooks: [embeddedBook, ...libraryBooks].filter((b): b is Lorebook => !!b && b.entries.length > 0),
   }
 }
 

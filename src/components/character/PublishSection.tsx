@@ -44,8 +44,9 @@ export function PublishSection({ character, draft }: { character: Character; dra
         avatar_url: draft ? draft.avatar_url : row.avatar_url,
         prompt_template: draft?.prompt_template ?? row.prompt_template,
         skin: row.skin,
+        lorebook: row.lorebook,
       }),
-    [draft, row.name, row.avatar_url, row.prompt_template, row.skin]
+    [draft, row.name, row.avatar_url, row.prompt_template, row.skin, row.lorebook]
   )
   const dirty = row.is_public && !!published && !snapshotsEqual(published, next)
 

@@ -4,7 +4,7 @@ import { regexScriptSchema } from './regexScripts'
 /**
  * `characters.skin` — everything an author can do to the chat's look (plan §5.5).
  *   css           : scoped + sanitized before injection (sanitizeCss)
- *   regexScripts  : SillyTavern-style display rewrites (regexScripts.ts)
+ *   regexScripts  : regex-script display rewrites (regexScripts.ts)
  *   renderHtml    : let raw HTML blocks in AI replies render inside the sandboxed iframe
  *   allowedUrlHosts : extra https hosts the css may load images/fonts from
  */

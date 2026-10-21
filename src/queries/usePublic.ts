@@ -115,6 +115,7 @@ export function useForkCharacter() {
           avatar_url: snapshot.avatar_url,
           prompt_template: snapshot.prompt_template,
           skin: snapshot.skin ?? {},
+          lorebook: snapshot.lorebook ?? {},
           is_public: false,
           likes_count: 0,
         })

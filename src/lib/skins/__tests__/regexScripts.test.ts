@@ -4,7 +4,7 @@ import {
   HTML_BLOCK_OPEN,
   applyRegexScripts,
   importRegexJson,
-  importSillyTavernRegex,
+  importExternalRegex,
   parseRegexScripts,
   regexScriptSchema,
   splitSlashRegex,
@@ -30,9 +30,9 @@ describe('splitSlashRegex', () => {
   })
 })
 
-describe('importSillyTavernRegex', () => {
-  it('imports a single ST script with slashes, flags, {{match}}, placement, trimStrings', () => {
-    const res = importSillyTavernRegex({
+describe('importExternalRegex', () => {
+  it('imports a single external script with slashes, flags, {{match}}, placement, trimStrings', () => {
+    const res = importExternalRegex({
       scriptName: 'Thoughts',
       findRegex: '/<think>([\\s\\S]*?)<\\/think>/gi',
       replaceString: '<details>{{match}} :: $1</details>',
@@ -51,12 +51,12 @@ describe('importSillyTavernRegex', () => {
     expect(s.target).toBe('ai')
     expect(s.enabled).toBe(true)
     expect(s.name).toBe('Thoughts')
-    expect(s.id).toMatch(/^st-thoughts-0$/)
+    expect(s.id).toMatch(/^ext-thoughts-0$/)
   })
 
   it('maps placement to target', () => {
     const run = (placement?: number[]) =>
-      importSillyTavernRegex({ scriptName: 'p', findRegex: 'x', replaceString: '', placement })
+      importExternalRegex({ scriptName: 'p', findRegex: 'x', replaceString: '', placement })
     const t = (r: ReturnType<typeof run>) => (r.ok ? r.scripts[0].target : 'ERR')
     expect(t(run([1]))).toBe('user')
     expect(t(run([2]))).toBe('ai')
@@ -66,13 +66,13 @@ describe('importSillyTavernRegex', () => {
   })
 
   it('uses flags g for non-slash findRegex and keeps given id', () => {
-    const res = importSillyTavernRegex({ id: 'keep-me', scriptName: 'n', findRegex: 'a+', replaceString: 'b' })
+    const res = importExternalRegex({ id: 'keep-me', scriptName: 'n', findRegex: 'a+', replaceString: 'b' })
     expect(res.ok && res.scripts[0].flags).toBe('g')
     expect(res.ok && res.scripts[0].id).toBe('keep-me')
   })
 
   it('respects disabled and promptOnly', () => {
-    const res = importSillyTavernRegex([
+    const res = importExternalRegex([
       { scriptName: 'off', findRegex: 'a', replaceString: '', disabled: true },
       { scriptName: 'po', findRegex: 'a', replaceString: '', promptOnly: true },
     ])
@@ -85,20 +85,20 @@ describe('importSillyTavernRegex', () => {
 
   it('accepts array, single object and { scripts } wrappers', () => {
     const one = { scriptName: 'a', findRegex: 'a', replaceString: '' }
-    expect(importSillyTavernRegex(one).ok && (importSillyTavernRegex(one) as { scripts: unknown[] }).scripts.length).toBe(1)
-    const arr = importSillyTavernRegex([one, one])
+    expect(importExternalRegex(one).ok && (importExternalRegex(one) as { scripts: unknown[] }).scripts.length).toBe(1)
+    const arr = importExternalRegex([one, one])
     expect(arr.ok && arr.scripts.length).toBe(2)
-    const wrapped = importSillyTavernRegex({ scripts: [one, one, one] })
+    const wrapped = importExternalRegex({ scripts: [one, one, one] })
     expect(wrapped.ok && wrapped.scripts.length).toBe(3)
     // derived ids are unique
     expect(wrapped.ok && new Set(wrapped.scripts.map((s) => s.id)).size).toBe(3)
   })
 
   it('rejects entries without findRegex', () => {
-    const res = importSillyTavernRegex({ scriptName: 'x', replaceString: '' })
+    const res = importExternalRegex({ scriptName: 'x', replaceString: '' })
     expect(res.ok).toBe(false)
     expect(!res.ok && res.error).toContain('findRegex')
-    expect(importSillyTavernRegex('nope').ok).toBe(false)
+    expect(importExternalRegex('nope').ok).toBe(false)
   })
 })
 
@@ -116,9 +116,9 @@ describe('parseRegexScripts / importRegexJson', () => {
     expect(!res.ok && res.error).toContain('flags')
   })
 
-  it('importRegexJson detects ST vs our format and bad JSON', () => {
-    const st = importRegexJson(JSON.stringify({ scriptName: 'a', findRegex: '/a/g', replaceString: 'b' }))
-    expect(st.ok && st.scripts[0]).toMatchObject({ find: 'a', replace: 'b' })
+  it('importRegexJson detects external vs our format and bad JSON', () => {
+    const ext = importRegexJson(JSON.stringify({ scriptName: 'a', findRegex: '/a/g', replaceString: 'b' }))
+    expect(ext.ok && ext.scripts[0]).toMatchObject({ find: 'a', replace: 'b' })
     const ours = importRegexJson(JSON.stringify({ scripts: [{ id: 'q', find: 'a', replace: 'b' }] }))
     expect(ours.ok && ours.scripts[0].id).toBe('q')
     expect(importRegexJson('{not json').ok).toBe(false)

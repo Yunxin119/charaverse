@@ -36,7 +36,7 @@ create trigger chat_sessions_touch before update on public.chat_sessions
   for each row execute function public.touch_updated_at();
 
 -- ---------------------------------------------------------------
--- 3. User presets (SillyTavern-style, see docs/REFACTOR_PLAN.md §5.6)
+-- 3. User presets (prompt presets, see docs/REFACTOR_PLAN.md §5.6)
 -- ---------------------------------------------------------------
 create table if not exists public.user_presets (
   id uuid primary key default gen_random_uuid(),

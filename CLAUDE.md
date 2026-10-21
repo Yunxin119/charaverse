@@ -1,11 +1,11 @@
 # CharaVerse
 
-SillyTavern-style AI character chat app. Next.js 16 (App Router) + Supabase (auth, Postgres with RLS, storage) + Tailwind v4 + shadcn/Radix. Users bring their own LLM API keys (BYOK); keys live only in the browser and are forwarded per request to our `/api/*` proxy routes.
+AI character role-play chat app. Next.js 16 (App Router) + Supabase (auth, Postgres with RLS, storage) + Tailwind v4 + shadcn/Radix. Users bring their own LLM API keys (BYOK); keys live only in the browser and are forwarded per request to our `/api/*` proxy routes.
 
 ## Start here
 - **`docs/REFACTOR_PLAN.md`** is the source of truth for the v2 refactor: phase tracker, architecture decisions (A1–A16), design system, security checklist. Read it first, work the next unchecked item of the current phase, and tick boxes / update the status table as work lands.
 - Design tokens preview: `docs/design/tokens-preview.html`. Palette: ink `#33251b`, mist `#adbcc3`, oxblood `#41140e`, cream `#f2dece`, accent sienna `#c9643b`. Style: liquid glass + neumorphism + flat poster accents. All colors go through `--cv-*` tokens; never hard-code `slate-*`.
-- Skin samples the theming system must be able to render: `docs/skin-samples/` (SillyTavern-style HTML/CSS cards, also used by tests). The pre-v2 code, SQL and design notes live at git tag `v1-archive`.
+- The theming pipeline (CSS sanitizer + HTML block splitter) is exercised end-to-end by `src/lib/skins/__tests__/samples.test.ts`, which embeds an original sample card; author cards from third parties must not be checked in. The pre-v2 code, SQL and design notes live at git tag `v1-archive`.
 
 ## Conventions
 - Auth: cookie sessions via `@supabase/ssr`. Pages are guarded by `src/proxy.ts` (Next 16 proxy; it must live under `src/`). Client components read the user with `useAuth()` from `src/providers/AuthProvider.tsx`. Every `/api/*` route starts with `requireUser(request)` from `src/lib/server/auth.ts`; client calls use `authedFetch` from `src/lib/authedFetch.ts`.

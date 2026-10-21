@@ -55,7 +55,7 @@ export const CSS_PRESETS: { name: string; css: string }[] = [
 #cv_chat_input_box { background: rgba(255,244,230,.9) !important; }
 #cv_send_button { background: linear-gradient(135deg,#ff9a44 0%,#fc6076 100%) !important; }
 ` },
-  { name: '碳黑霓虹（酒馆风）', css: `/* 碳黑霓虹 · 搭配 design by censy 风格的美化卡 */
+  { name: '碳黑霓虹', css: `/* 碳黑霓虹 · 搭配深色美化卡 */
 #cv_chat_root { background: #0c0c0e !important; color: #f5f7fa !important; }
 #cv_background_overlay { background: radial-gradient(800px 400px at 50% -10%, rgba(255,204,153,.12), transparent 60%); }
 #cv_chat_header > div { background: rgba(20,20,22,.85) !important; border: 1px solid rgba(255,204,153,.15) !important; color: #f5f7fa; }

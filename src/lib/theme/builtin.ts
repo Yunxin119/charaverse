@@ -17,7 +17,7 @@ export const BUILTIN_THEMES: { id: string; description: string; theme: ThemeInpu
   },
   {
     id: 'carbon-neon',
-    description: '冷调碳黑 · 近黑底、低饱和桃橙霓虹，适合酒馆风美化卡',
+    description: '冷调碳黑 · 近黑底、低饱和桃橙霓虹，适合深色美化卡',
     theme: {
       name: 'Carbon Neon',
       mode: 'dark',

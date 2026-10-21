@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, type ChatMessage, type ChatSession } from '@/app/lib/supabase'
 import { authedFetch } from '@/lib/authedFetch'
 import type { SessionSettings } from '@/lib/chat/settings'
+import { parseCharacterCard } from '@/lib/chat/characterCard'
 import { qk } from './keys'
 
 function useInvalidateMessages(sessionId: string) {
@@ -140,11 +141,14 @@ export function useStartSession() {
         .select('id')
         .single()
       if (error || !session) throw error ?? new Error('创建会话失败')
-      const opening = (character.prompt_template as { basic_info?: { initialMessage?: string } } | null)?.basic_info?.initialMessage?.trim()
-      if (opening) {
-        await supabase.from('chat_messages').insert({ session_id: session.id, role: 'assistant', content: opening, type: 'message' })
+      const greetings = parseCharacterCard(character).greetings
+      if (greetings.length) {
+        await supabase.from('chat_messages').insert({
+          session_id: session.id, role: 'assistant', content: greetings[0], type: 'message',
+          ...(greetings.length > 1 ? { swipes: greetings, swipe_index: 0 } : {}),
+        })
       }
-      return { sessionId: session.id as string, created: true, needsOpening: !opening }
+      return { sessionId: session.id as string, created: true, needsOpening: greetings.length === 0 }
     },
     onSuccess: (_r, vars) => {
       qc.invalidateQueries({ queryKey: qk.sessions(vars.userId) })

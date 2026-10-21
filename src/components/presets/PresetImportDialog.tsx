@@ -27,7 +27,7 @@ export function PresetImportDialog({ open, onOpenChange, onImport }: Props) {
         <DialogHeader>
           <DialogTitle className="font-display text-xl">导入预设</DialogTitle>
           <DialogDescription>
-            粘贴 JSON 或选择 <code className="font-mono text-xs">.json</code> 文件。自动识别酒馆（SillyTavern）聊天补全预设与 CharaVerse 格式。
+            粘贴 JSON 或选择 <code className="font-mono text-xs">.json</code> 文件。自动识别通用预设格式与 CharaVerse 格式。
           </DialogDescription>
         </DialogHeader>
         {/* Body unmounts with the dialog, so every open starts from a clean form. */}
@@ -132,8 +132,8 @@ function ImportBody({ onImport, onClose }: { onImport: Props['onImport']; onClos
         {parsed?.ok && summary && (
           <div className="neu space-y-3 rounded-cv-md p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <Chip tone={format === 'sillytavern' ? 'accent' : 'info'}>
-                {format === 'sillytavern' ? '酒馆格式' : 'CharaVerse 格式'}
+              <Chip tone={format === 'external' ? 'accent' : 'info'}>
+                {format === 'external' ? '外部格式' : 'CharaVerse 格式'}
               </Chip>
               <Chip tone="outline">{summary.total} 条目</Chip>
               <Chip tone="outline">{summary.enabled} 启用</Chip>

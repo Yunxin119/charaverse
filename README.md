@@ -1,15 +1,17 @@
 # CharaVerse
 
-酒馆（SillyTavern）风格的 AI 角色聊天 Web 应用：自带 API key、流式回复、可导入酒馆预设与主题、作者可做角色皮肤，并带长期记忆与日记。
+AI 角色扮演聊天 Web 应用：自带 API key、流式回复、可导入通用格式的预设与主题、作者可做角色皮肤，并带长期记忆与日记。
 
 ## 核心特性
 
 - **BYOK（自带 key）**：API key 只存在浏览器 localStorage，每次请求随 `x-cv-connection` 请求头发给本站 `/api/*` 代理，服务端只做鉴权、校验、转发、限流，不落库、不打日志。
 - **流式聊天**：基于 Vercel AI SDK `streamText`，支持发送 / 角色开场 / 重新生成（多候选 swipe）/ 续写 / 灵感 / 分支会话。
-- **酒馆式预设**：Prompt 条目可排序、开关、marker 占位；直接导入酒馆 chat-completion 预设 JSON；用户级默认 + 会话级覆盖。
+- **Prompt 预设**：Prompt 条目可排序、开关、占位条目；直接导入通用预设格式的 chat-completion 预设 JSON；用户级默认 + 会话级覆盖。
 - **主题导入**：整站颜色、圆角、字体、玻璃参数都是 `--cv-*` token，一份 JSON 即可换肤；内置 Warm Glass Light / Dark、Carbon Neon、Sage Paper。
-- **角色皮肤**：作者 CSS 经真正的 CSS 解析器清洗并限定在 `#cv_chat_root`；酒馆格式正则脚本改写显示层；HTML 块在沙箱 iframe 里渲染（酒馆美化卡可直接跑）。
+- **角色皮肤**：作者 CSS 经真正的 CSS 解析器清洗并限定在 `#cv_chat_root`；正则脚本（兼容通用格式）改写显示层；HTML 块在沙箱 iframe 里渲染（状态栏、手机壳这类美化卡可直接跑）。
 - **长期记忆**：自动摘要 + 8 类记忆表（人物 / 事件 / 设定 / 情感 / 时空 / 关系 / 任务约定 / 重要物品）+ 记忆版本与删除回滚（Postgres 函数单事务）。
+- **世界书**：角色内嵌世界书 + 用户世界书库，关键词 / 常驻 / 次级关键词 / 概率 / 扫描深度 / 预算，直接导入通用的 world-info JSON，注入到预设的 `worldInfoBefore / After` 占位。
+- **多开场白**：角色卡可写多个开场白，开新对话时第一条消息可左右切换。
 - **日记**：按会话由模型生成角色日记，可重新生成。
 - **发布即快照**：公开角色卡是作者点「发布」时冻结的副本，作者之后改稿不会实时作用到别人的聊天。
 
@@ -53,6 +55,8 @@ npm install
 4. `supabase/migrations/0004_publish_snapshot.sql` — `published_snapshot` / `published_at`（回填已公开角色）
 5. `supabase/migrations/0005_memory_fixes.sql` — 记忆表列类型修正、`delete_summary_with_rollback` 函数
 6. `supabase/migrations/0006_rate_limits.sql` — `rate_limits` 表 + `consume_rate_limit` 函数（没跑时服务端自动退到进程内计数）
+7. `supabase/migrations/0007_drop_templates.sql` — 可选，删除已下线的模板表
+8. `supabase/migrations/0008_lorebooks.sql` — `characters.lorebook` 列 + `lorebooks` 表
 
 跑 hotfix 前建议先导出一份现有策略对照：`select * from pg_policies order by schemaname, tablename, policyname;`
 
@@ -96,7 +100,7 @@ src/
     glass/ ui/ shell/     Glass/Neu/Poster 面、shadcn 原子、AppShell + 导航
   lib/
     llm/                  connection（请求头编解码）、providers（AI SDK 模型解析）、complete
-    prompt/               presets（schema + 酒馆导入）、assemble（预设 × 角色卡 × 记忆 → messages）、macros、tokens
+    prompt/               presets（schema + 外部预设导入）、assemble（预设 × 角色卡 × 记忆 → messages）、macros、tokens
     skins/                sanitizeCss、regexScripts、htmlBlocks、schema、docs（选择器文档 + 预设）
     theme/                schema、builtin、applyTheme
     chat/ memory/         会话设置、上下文加载、记忆表格式、记忆类型 schema
@@ -112,7 +116,6 @@ supabase/
 docs/
   REFACTOR_PLAN.md        架构决策 A1–A16、设计系统、phase tracker
   design/tokens-preview.html  token 预览页
-  skin-samples/           酒馆美化卡样本（测试也用）
 ```
 
 ## 安全模型
@@ -152,7 +155,7 @@ schema 在 `src/lib/theme/schema.ts`，只需写要覆盖的键，其余回退�
 
 ### 预设 JSON（我的 → 预设 → 导入）
 
-schema 在 `src/lib/prompt/presets.ts`。酒馆 chat-completion 预设会被自动识别并转换；本站格式的最小例子：
+schema 在 `src/lib/prompt/presets.ts`。通用预设格式的 chat-completion 预设会被自动识别并转换；本站格式的最小例子：
 
 ```json
 {
@@ -174,7 +177,7 @@ schema 在 `src/lib/prompt/presets.ts`。酒馆 chat-completion 预设会被自�
 ```
 
 - marker 条目由本站数据填充：`charDescription` `charPersonality` `scenario` `charModules` `personaDescription` `memoryTable` `summaries` `chatHistory` `worldInfoBefore` `worldInfoAfter` `dialogueExamples`（后三者预留）。
-- 普通条目按顺序进入 messages；`injection.position: "absolute"` 的条目按 `depth` 插进聊天历史（酒馆 in-chat 注入）。
+- 普通条目按顺序进入 messages；`injection.position: "absolute"` 的条目按 `depth` 插进聊天历史（in-chat 注入）。
 - 支持宏 `{{char}}` `{{user}}` `{{date}}` `{{time}}` `{{newline}}` `{{trim}}` 等（`src/lib/prompt/macros.ts`）。
 - 上限：200 条、单条 50k 字、整体 300k 字。
 
@@ -194,7 +197,7 @@ CSS 只作用于聊天页，常用选择器（完整列表见编辑器侧栏 / `
 | `.cv_message_avatar` / `.cv-markdown` | 头像 / 气泡内 Markdown |
 | `#cv_chat_input_box` / `#cv_chat_input_textarea` / `#cv_send_button` | 输入框 / 文本域 / 发送键 |
 
-正则脚本字段（对齐酒馆，可直接导入酒馆 regex JSON）：
+正则脚本字段（兼容通用格式，可直接导入外部 regex JSON）：
 
 | 字段 | 说明 |
 |---|---|
@@ -207,6 +210,21 @@ CSS 只作用于聊天页，常用选择器（完整列表见编辑器侧栏 / `
 | `enabled` | 开关 |
 
 `renderHtml: true` 时，AI 回复里的 `<div>` / `<section>` / `<style>` 等块级原始 HTML 也会被切出送进沙箱。
+
+### 世界书（角色 → 编辑 → 世界书；我的 → 世界书库）
+
+两种来源：写在角色卡里的（随发布快照一起给别人）和你自己库里的（勾选「启用」就应用到所有对话）。每次生成前，服务端扫描最近 `scanDepth` 条消息（加上你正要发送的这句），命中关键词或标为「常驻」的条目按 `order` 排好，分别填进预设的 `worldInfoBefore` / `worldInfoAfter` 占位；每本书有 `tokenBudget`（字符数）上限。
+
+```json
+{ "name": "城市设定", "scanDepth": 6, "tokenBudget": 2000,
+  "entries": [
+    { "id": "rain", "name": "天气", "keys": ["雨夜", "/下.{0,2}雨/"], "content": "这座城市一年有二百天在下雨。", "position": "before", "order": 10 },
+    { "id": "world", "name": "世界观", "constant": true, "content": "故事发生在 2031 年。" },
+    { "id": "garage", "keys": ["车库"], "secondaryKeys": ["钥匙"], "selective": true, "content": "…", "probability": 100 }
+  ] }
+```
+
+导入时也接受通用的 world-info JSON（`entries` 为对象映射，字段 `key / keysecondary / content / constant / selective / order / position / disable / probability / depth`）和角色卡内嵌的 `character_book` 数组格式。
 
 ## 开发
 

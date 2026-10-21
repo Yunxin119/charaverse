@@ -26,7 +26,7 @@ import {
 const ROUTE = '/settings/presets'
 
 function toRowData(preset: PresetFile): Record<string, unknown> {
-  // Rows store the schema-validated JSON; `source.raw` (the original ST blob) stays with it.
+  // Rows store the schema-validated JSON; `source.raw` (the original imported blob) stays with it.
   return JSON.parse(JSON.stringify(preset)) as Record<string, unknown>
 }
 
@@ -205,7 +205,7 @@ function PresetsPageInner() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">预设</h1>
-          <p className="mt-1 text-sm text-cv-fg-muted">决定 system prompt 的拼装顺序与采样参数，可导入酒馆预设。</p>
+          <p className="mt-1 text-sm text-cv-fg-muted">决定 system prompt 的拼装顺序与采样参数，可导入外部预设。</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="neu" size="sm" onClick={() => setImportOpen(true)}>
@@ -266,14 +266,14 @@ function PresetsPageInner() {
           <div className="flex h-full flex-col gap-4">
             <div className="flex flex-wrap gap-2">
               <Chip tone="glass">Prompt Manager</Chip>
-              <Chip tone="glass">酒馆预设兼容</Chip>
+              <Chip tone="glass">兼容外部预设</Chip>
             </div>
             <PosterTitle className="max-w-md">
               还没有自己的预设。
             </PosterTitle>
             <p className="max-w-lg text-sm leading-relaxed opacity-85">
               预设决定每次对话时 system prompt 的拼装顺序——主提示、角色描述、用户人设、记忆表、聊天历史——以及温度、top_p 等采样参数。
-              你可以直接导入酒馆（SillyTavern）的聊天补全预设，占位条目会自动映射。
+              你可以直接导入通用预设格式的聊天补全预设 JSON，占位条目会自动映射。
             </p>
             <div className="mt-auto flex flex-wrap gap-2">
               <Button variant="accent" size="sm" onClick={() => setImportOpen(true)}>

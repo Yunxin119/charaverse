@@ -144,7 +144,7 @@ export function SkinEditor({ character }: Props) {
           </TabsContent>
 
           <TabsContent value="regex" className="space-y-4 pt-3">
-            <p className="text-xs text-cv-fg-muted">正则脚本只改变显示，不改变发给模型的内容。格式与酒馆一致：`find` 是正则，`replace` 里可用 <code>$1</code> 和 <code>{'{{match}}'}</code>；勾选「输出为 HTML」后替换结果会在沙箱 iframe 里渲染（手机壳、状态栏这类美化卡就靠它）。</p>
+            <p className="text-xs text-cv-fg-muted">正则脚本只改变显示，不改变发给模型的内容。兼容通用格式：`find` 是正则，`replace` 里可用 <code>$1</code> 和 <code>{'{{match}}'}</code>；勾选「输出为 HTML」后替换结果会在沙箱 iframe 里渲染（手机壳、状态栏这类美化卡就靠它）。</p>
             <div className="space-y-3">
               {skin.regexScripts.map((r, i) => (
                 <GlassPanel key={r.id} padding="sm" className={cn(!r.enabled && 'opacity-60')}>
@@ -171,16 +171,16 @@ export function SkinEditor({ character }: Props) {
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="neu" onClick={() => set('regexScripts', [...skin.regexScripts, emptyScript(skin.regexScripts.length)])}><Plus /> 新建脚本</Button>
               <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) importRegex(await f.text()); e.target.value = '' }} />
-              <Button size="sm" variant="neu" onClick={() => fileRef.current?.click()}><Upload /> 导入酒馆正则 JSON</Button>
+              <Button size="sm" variant="neu" onClick={() => fileRef.current?.click()}><Upload /> 导入正则脚本 JSON</Button>
             </div>
-            <Textarea value={regexImport} onChange={(e) => setRegexImport(e.target.value)} placeholder="或把酒馆的 regex 脚本 JSON 粘贴到这里…" className="min-h-20 font-mono text-xs" />
+            <Textarea value={regexImport} onChange={(e) => setRegexImport(e.target.value)} placeholder="或把正则脚本 JSON（兼容通用格式）粘贴到这里…" className="min-h-20 font-mono text-xs" />
             {regexImport.trim() && <Button size="sm" onClick={() => importRegex(regexImport)}>导入粘贴的内容</Button>}
             {regexImportError && <p className="text-xs text-cv-danger">{regexImportError}</p>}
           </TabsContent>
 
           <TabsContent value="options" className="space-y-4 pt-3">
             <div className="flex items-center justify-between rounded-cv-md neu px-4 py-3">
-              <div><div className="text-sm font-semibold">渲染 AI 回复里的原生 HTML</div><div className="text-xs text-cv-fg-muted">让模型直接输出的 &lt;div&gt;/&lt;style&gt; 块在沙箱里显示（design by censy 那类美化卡需要开启）</div></div>
+              <div><div className="text-sm font-semibold">渲染 AI 回复里的原生 HTML</div><div className="text-xs text-cv-fg-muted">让模型直接输出的 &lt;div&gt;/&lt;style&gt; 块在沙箱里显示（状态栏、手机壳这类美化卡需要开启）</div></div>
               <Switch checked={skin.renderHtml} onCheckedChange={(v) => set('renderHtml', v)} />
             </div>
             <div className="space-y-1.5">

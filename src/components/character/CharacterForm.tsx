@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, Globe, LayoutList, Loader2, MessageSquareQuote, Palette, Save, UserRound } from 'lucide-react'
+import { ArrowLeft, BookOpen, Check, Globe, LayoutList, Loader2, MessageSquareQuote, Palette, Save, UserRound } from 'lucide-react'
 import { supabase, type Character } from '@/app/lib/supabase'
 import { deleteAvatar } from '@/app/lib/avatarUpload'
 import { useAuth } from '@/providers/AuthProvider'
@@ -16,6 +16,7 @@ import { SectionHeader } from './form/Field'
 import { BasicInfoSection } from './form/BasicInfoSection'
 import { ModulesSection } from './form/ModulesSection'
 import { OpeningSection } from './form/OpeningSection'
+import { LorebookSection } from './form/LorebookSection'
 import { SkinSection } from './form/SkinSection'
 import { buildPromptTemplate, draftFromCharacter, emptyDraft, validateDraft, type CharacterDraft, type DraftErrors } from './form/types'
 
@@ -44,7 +45,7 @@ export function CharacterForm({ mode, character }: Props) {
   const [active, setActive] = useState<SectionId>(() => {
     if (typeof window === 'undefined' || mode !== 'edit') return 'basic'
     const q = new URLSearchParams(window.location.search).get('section')
-    return q === 'modules' || q === 'opening' || q === 'skin' || q === 'publish' ? q : 'basic'
+    return q === 'modules' || q === 'opening' || q === 'lorebook' || q === 'skin' || q === 'publish' ? q : 'basic'
   })
   const [submitted, setSubmitted] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -67,7 +68,8 @@ export function CharacterForm({ mode, character }: Props) {
     mutationFn: async (d: CharacterDraft) => {
       if (!user) throw new Error('请先登录')
       const prompt_template = buildPromptTemplate(d, character?.prompt_template)
-      const row = { name: d.name.trim(), avatar_url: d.avatar_url || null, prompt_template }
+      // the embedded world book lives in its own jsonb column, not inside prompt_template
+      const row = { name: d.name.trim(), avatar_url: d.avatar_url || null, prompt_template, lorebook: d.lorebook }
       if (!editing || !character) {
         const { data, error } = await supabase.from('characters').insert({ user_id: user.id, ...row, is_public: false }).select('id').single()
         if (error) throw error
@@ -119,6 +121,7 @@ export function CharacterForm({ mode, character }: Props) {
     { id: 'basic', label: '基本信息', icon: UserRound, error: !!(shown.name || shown.content) },
     { id: 'modules', label: '人设模块', icon: LayoutList, error: !!shown.content, meta: draft.modules.length ? String(draft.modules.length) : undefined },
     { id: 'opening', label: '开场白', icon: MessageSquareQuote, meta: draft.initialMessage.trim() ? '✓' : undefined },
+    { id: 'lorebook', label: '世界书', icon: BookOpen, meta: draft.lorebook.entries.length ? String(draft.lorebook.entries.length) : undefined },
     { id: 'skin', label: '外观皮肤', icon: Palette },
     { id: 'publish', label: '发布', icon: Globe, meta: editing && character?.is_public ? '公开' : undefined },
   ]
@@ -162,7 +165,8 @@ export function CharacterForm({ mode, character }: Props) {
         <div className="min-w-0">
           {active === 'basic' && <BasicInfoSection draft={draft} errors={shown} onChange={set} />}
           {active === 'modules' && <ModulesSection modules={draft.modules} error={shown.content} onChange={(m) => set('modules', m)} />}
-          {active === 'opening' && <OpeningSection value={draft.initialMessage} onChange={(v) => set('initialMessage', v)} />}
+          {active === 'opening' && <OpeningSection value={draft.initialMessage} onChange={(v) => set('initialMessage', v)} alternates={draft.alternateGreetings} onAlternatesChange={(v) => set('alternateGreetings', v)} />}
+          {active === 'lorebook' && <LorebookSection value={draft.lorebook} onChange={(v) => set('lorebook', v)} characterName={draft.name.trim() || undefined} />}
           {active === 'skin' && <SkinSection characterId={editing ? character?.id : undefined} />}
           {active === 'publish' && (
             <section aria-labelledby="sec-publish">

@@ -16,6 +16,8 @@ export interface CharacterCard {
   /** 用户角色设定.userRoleName, falls back to '用户' */
   userName: string
   initialMessage?: string
+  /** all opening lines: initialMessage first, then alternates (non-empty) */
+  greetings: string[]
   customCss?: string
   introduction?: string
 }
@@ -70,6 +72,7 @@ export function parseCharacterCard(character: { name?: string; prompt_template?:
     persona,
     userName,
     initialMessage: str(basic.initialMessage),
+    greetings: [str(basic.initialMessage), ...(Array.isArray(basic.alternateGreetings) ? (basic.alternateGreetings as unknown[]).map(str) : [])].filter((g): g is string => !!g),
     customCss: str(tpl.custom_css),
     introduction: str(basic.introduction),
   }

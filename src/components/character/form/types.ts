@@ -1,4 +1,5 @@
 import type { Character } from '@/app/lib/supabase'
+import { EMPTY_LOREBOOK, parseLorebook, type Lorebook } from '@/lib/lorebook/schema'
 
 /**
  * Editable draft behind `CharacterForm`. It is flat on purpose: every field the
@@ -47,10 +48,14 @@ export interface CharacterDraft {
   personality: string
   introduction: string
   initialMessage: string
+  /** extra opening lines; the first message becomes swipeable between all of them */
+  alternateGreetings: string[]
   keywords: string[]
   age: string
   gender: Gender | ''
   modules: DraftModule[]
+  /** world book embedded in the card; stored in `characters.lorebook`, not in prompt_template */
+  lorebook: Lorebook
 }
 
 export type DraftErrors = Partial<Record<'name' | 'content', string>>
@@ -65,7 +70,13 @@ export function newModule(type: ModuleType): DraftModule {
 }
 
 export function emptyDraft(): CharacterDraft {
-  return { name: '', avatar_url: '', description: '', personality: '', introduction: '', initialMessage: '', keywords: [], age: '', gender: '', modules: [] }
+  return { name: '', avatar_url: '', description: '', personality: '', introduction: '', initialMessage: '', alternateGreetings: [], keywords: [], age: '', gender: '', modules: [], lorebook: EMPTY_LOREBOOK }
+}
+
+/** Tolerant: a missing or malformed column becomes an empty book instead of blocking the form. */
+export function lorebookFromCharacter(c: Pick<Character, 'lorebook'>): Lorebook {
+  const r = parseLorebook(c.lorebook)
+  return r.ok ? r.book : EMPTY_LOREBOOK
 }
 
 type AnyRecord = Record<string, unknown>
@@ -121,10 +132,12 @@ export function draftFromCharacter(c: Character): CharacterDraft {
     personality: str(basic.personality),
     introduction: str(basic.introduction),
     initialMessage: str(basic.initialMessage),
+    alternateGreetings: Array.isArray(basic.alternateGreetings) ? basic.alternateGreetings.filter((g): g is string => typeof g === 'string' && !!g.trim()) : [],
     keywords: Array.isArray(basic.keywords) ? basic.keywords.filter((k): k is string => typeof k === 'string' && !!k.trim()) : [],
     age: str(basic.age),
     gender: isGender(basic.gender) ? basic.gender : '',
     modules,
+    lorebook: lorebookFromCharacter(c),
   }
 }
 
@@ -163,6 +176,7 @@ export function buildPromptTemplate(draft: CharacterDraft, existing?: unknown): 
       personality: draft.personality,
       introduction: draft.introduction,
       initialMessage: draft.initialMessage,
+      alternateGreetings: draft.alternateGreetings.map((g) => g.trim()).filter(Boolean),
       keywords: draft.keywords,
       age: draft.age.trim(),
       gender: draft.gender,
