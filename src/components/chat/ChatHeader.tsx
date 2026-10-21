@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Brain, History, MoreHorizontal, Settings2, BookOpen, GitBranch, ChevronDown, Palette, MessagesSquare } from 'lucide-react'
+import { ArrowLeft, Brain, History, MoreHorizontal, Settings2, GitBranch, ChevronDown, Palette, MessagesSquare } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { IconButton } from '@/components/glass'
@@ -52,7 +52,6 @@ export function ChatHeader({ sessionId, character, title, modelLabel, presetLabe
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild><Link href={`/chat/${sessionId}/memory`}><Brain />记忆与摘要</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link href={`/chat/${sessionId}/history`}><History />完整历史</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link href={`/chat/${sessionId}/diary`}><BookOpen />角色日记</Link></DropdownMenuItem>
             <DropdownMenuSeparator />
             {onNewBranchFromEnd && <DropdownMenuItem onClick={onNewBranchFromEnd}><GitBranch />从当前进度分支</DropdownMenuItem>}
             <DropdownMenuItem asChild><Link href={`/characters/${character.id}/edit`}><Settings2 />编辑角色卡</Link></DropdownMenuItem>

@@ -11,7 +11,7 @@ export interface CompleteInput {
   timeoutMs?: number
 }
 
-/** Non-streaming completion for background jobs (summaries, diaries, memory extraction). */
+/** Non-streaming completion for background jobs (summaries, memory extraction). */
 export async function completeText(input: CompleteInput): Promise<{ text: string; model: string }> {
   const { model, label } = resolveModel(input.connection)
   const result = await generateText({

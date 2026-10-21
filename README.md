@@ -1,6 +1,6 @@
 # CharaVerse
 
-AI 角色扮演聊天 Web 应用：自带 API key、流式回复、可导入通用格式的预设与主题、作者可做角色皮肤，并带长期记忆与日记。
+AI 角色扮演聊天 Web 应用：自带 API key、流式回复、可导入通用格式的预设与主题、作者可做角色皮肤，并带长期记忆。
 
 ## 核心特性
 
@@ -9,10 +9,10 @@ AI 角色扮演聊天 Web 应用：自带 API key、流式回复、可导入通�
 - **Prompt 预设**：Prompt 条目可排序、开关、占位条目；直接导入通用预设格式的 chat-completion 预设 JSON；用户级默认 + 会话级覆盖。
 - **主题导入**：整站颜色、圆角、字体、玻璃参数都是 `--cv-*` token，一份 JSON 即可换肤；内置 Warm Glass Light / Dark、Carbon Neon、Sage Paper。
 - **角色皮肤**：作者 CSS 经真正的 CSS 解析器清洗并限定在 `#cv_chat_root`；正则脚本（兼容通用格式）改写显示层；HTML 块在沙箱 iframe 里渲染（状态栏、手机壳这类美化卡可直接跑）。
+- **任务提示词可编辑**：摘要 + 记忆提取的 prompt（system、模板、风格范例、采样）在「我的 → 任务提示词」里改，占位符填入角色卡 / 人设 / 上文 / 对话。
 - **长期记忆**：自动摘要 + 8 类记忆表（人物 / 事件 / 设定 / 情感 / 时空 / 关系 / 任务约定 / 重要物品）+ 记忆版本与删除回滚（Postgres 函数单事务）。
 - **世界书**：角色内嵌世界书 + 用户世界书库，关键词 / 常驻 / 次级关键词 / 概率 / 扫描深度 / 预算，直接导入通用的 world-info JSON，注入到预设的 `worldInfoBefore / After` 占位。
 - **多开场白**：角色卡可写多个开场白，开新对话时第一条消息可左右切换。
-- **日记**：按会话由模型生成角色日记，可重新生成。
 - **发布即快照**：公开角色卡是作者点「发布」时冻结的副本，作者之后改稿不会实时作用到别人的聊天。
 
 ## 技术栈
@@ -57,6 +57,8 @@ npm install
 6. `supabase/migrations/0006_rate_limits.sql` — `rate_limits` 表 + `consume_rate_limit` 函数（没跑时服务端自动退到进程内计数）
 7. `supabase/migrations/0007_drop_templates.sql` — 可选，删除已下线的模板表
 8. `supabase/migrations/0008_lorebooks.sql` — `characters.lorebook` 列 + `lorebooks` 表
+9. `supabase/migrations/0009_task_prompts.sql` — `user_task_prompts` 表（可编辑的摘要 / 记忆提取 prompt）
+10. `supabase/migrations/0010_drop_diaries.sql` — 可选，删除已下线的日记表和列
 
 跑 hotfix 前建议先导出一份现有策略对照：`select * from pg_policies order by schemaname, tablename, policyname;`
 
@@ -84,8 +86,7 @@ src/
   app/                    路由与 layout；页面组件尽量薄
     api/chat/             流式聊天（唯一 LLM 出口）、branch、memory、summary
     api/connections/test  连接测试（8 token ping）
-    api/diary/            日记生成 / 重生成
-    chat/[sessionId]/     聊天页 + memory / history / diary 子页
+    chat/[sessionId]/     聊天页 + memory / history 子页
     characters/           我的角色、新建、[id]/edit、[id]/skin
     character/public/[id] 公开角色页（只读快照）
     explore/ user/[id]/   探索、作者主页
@@ -95,7 +96,7 @@ src/
   components/
     chat/                 ChatView、MessageList/Bubble、Composer、Markdown、HtmlBlockFrame、SkinStyle
     presets/ skins/ theme/  预设编辑器、皮肤编辑器、主题导入
-    memory/ history/ diary/ 记忆表单（schema 驱动）、摘要时间线、历史、日记
+    memory/ history/      记忆表单（schema 驱动）、摘要时间线、历史
     character/            CharacterForm（新建/编辑合一）、发布、快照
     glass/ ui/ shell/     Glass/Neu/Poster 面、shadcn 原子、AppShell + 导航
   lib/
@@ -123,7 +124,7 @@ docs/
 - **key 不入库**：连接信息只在浏览器 localStorage（`cv.connections`），服务端只在单次请求内持有，不写 DB、不进日志、不进 URL、不进错误信息。
 - **`x-cv-connection` 请求头**：`base64url(JSON { kind, apiKey, baseUrl?, model, label? })`，服务端用 zod 解码校验；`/api/*` 另需 `Authorization: Bearer <Supabase JWT>`（`requireUser`），页面则由 `proxy.ts` 的 cookie session 守卫。
 - **SSRF 守卫**：`assertSafeBaseUrl` 只放行 https、拒绝 IP 字面量 / localhost / `.local` / `.internal` / 云元数据 / 带账号密码或 `?#` 的 URL；模型名走白名单正则；上游错误体只摘取 `error.message` 并截断，不回显。
-- **限流**：每用户固定窗口，chat 30 次/分、摘要 6、日记 6、连接测试 12（`consume_rate_limit`，RPC 不可用时退到进程内计数）。
+- **限流**：每用户固定窗口，chat 30 次/分、摘要 6、连接测试 12（`consume_rate_limit`，RPC 不可用时退到进程内计数）。
 - **RLS**：每张表 owner-only；Storage 对象只能由上传者改删；点赞走 `toggle_character_like` RPC，客户端不能直接改别人的行。
 - **CSS 作用域清洗**：css-tree 解析成 AST → 丢弃 `@import` / 危险属性 / `expression()` / `javascript:` → `url()` 只允许 Supabase Storage、少数图床与作者自填的 `allowedUrlHosts` → 每条选择器加 `#cv_chat_root` 前缀后再序列化。
 - **iframe 沙箱**：作者 / 模型输出的 HTML 只在 `<iframe sandbox="allow-scripts">`（无 `allow-same-origin`）+ `srcdoc` 里渲染，带独立 meta CSP（`connect-src 'none'`、`form-action 'none'`），高度经 postMessage 回传；主文档从不插入作者 HTML。

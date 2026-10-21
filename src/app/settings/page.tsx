@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plug, Palette, SlidersHorizontal, Users, LogOut, Loader2, Check, ChevronRight, BookOpen } from 'lucide-react'
+import { Plug, Palette, SlidersHorizontal, Users, LogOut, Loader2, Check, ChevronRight, BookOpen, Wand2 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/providers/AuthProvider'
 import { supabase } from '@/app/lib/supabase'
@@ -77,6 +77,7 @@ export default function SettingsHubPage() {
     { href: '/settings/presets', icon: SlidersHorizontal, title: '预设', desc: 'Prompt 预设：导入 / 排序 / 采样' },
     { href: '/settings/lorebooks', icon: BookOpen, title: '世界书库', desc: '关键词触发的背景设定，启用后应用到所有对话' },
     { href: '/settings/appearance', icon: Palette, title: '主题与外观', desc: '明暗模式、内置主题、导入主题 JSON' },
+    { href: '/settings/tasks', icon: Wand2, title: '任务提示词', desc: '摘要 + 记忆提取用的 prompt，可改可恢复默认' },
     { href: '/characters', icon: Users, title: '我的角色', desc: `${charactersQ.data?.length ?? '…'} 个角色` },
   ]
 

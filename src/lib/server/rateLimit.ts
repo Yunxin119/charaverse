@@ -8,7 +8,6 @@ export interface RateLimitRule { bucket: string; limit: number; windowSeconds: n
 export const RATE_LIMITS = {
   chat: { bucket: 'chat', limit: 30, windowSeconds: 60 },
   summary: { bucket: 'summary', limit: 6, windowSeconds: 60 },
-  diary: { bucket: 'diary', limit: 6, windowSeconds: 60 },
   connectionTest: { bucket: 'conn-test', limit: 12, windowSeconds: 60 },
 } satisfies Record<string, RateLimitRule>
 

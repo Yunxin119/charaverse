@@ -32,8 +32,6 @@ export type ChatSession = {
   user_id: string
   character_id: number
   title?: string
-  last_diary_cutoff_message_id?: number
-  last_forum_cutoff_message_id?: number
   created_at: string
   updated_at?: string
   /** per-session settings (see lib/chat/settings.ts) */
@@ -47,7 +45,7 @@ export type ChatMessage = {
   session_id: string
   role: 'user' | 'assistant' | 'system'
   content: string
-  type: 'message' | 'diary' | 'forum_post'
+  type: 'message' | 'forum_post'
   created_at: string
   /** alternative replies; content mirrors swipes[swipe_index] once populated */
   swipes?: string[]
@@ -63,17 +61,6 @@ export type UserPreset = {
   is_default: boolean
   created_at: string
   updated_at: string
-}
-
-export type Diary = {
-  id: number
-  session_id: string
-  user_id: string
-  content: string
-  created_at: string
-  updated_at: string
-  source_message_id_start?: number
-  source_message_id_end?: number
 }
 
 export type ChatSummary = {

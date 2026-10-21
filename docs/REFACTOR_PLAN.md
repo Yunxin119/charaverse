@@ -304,7 +304,7 @@ docs/                       # 本文件 + design/
 - [x] memory 页拆成 `SummaryTimeline` / `MemoryGrid` / `ContextCoverage` 三个组件 + `useMemories`/`useSummaries` queries
 - [x] `/api/chat/summary` 不再 HTTP 回调自己：直接调 `lib/llm`；prompt 用分隔符；记忆写回前做字段校验 + 长度上限（防投毒/膨胀）
 - [x] 记忆版本/软删除逻辑移到 Postgres function `delete_summary_with_rollback`（一个事务），前端不再手动回滚；历史页也重做（load-more、搜索、跳转 #id、编辑 swipe）
-- [x] 日记：入口恢复（header 菜单），复用 `lib/llm`，删 2 份复制的 provider 代码
+- [x] 日记功能已于迭代 3 移除
 - [x] 修 schema 不一致：`chat_memories.session_id` text→uuid，`summary_id`/message id int→bigint
 - [ ] **需要你手动执行**：Supabase SQL editor 跑 `supabase/migrations/0005_memory_fixes.sql`（列类型修正 + `delete_summary_with_rollback` 函数）。不跑的话删除摘要会报错
 - 验收：memory 页 193 行（组件化）✅；`tsc` / `eslint` / `next build` / 测试全绿 ✅；自动摘要 + 记忆深化闭环已实测 ✅
@@ -325,7 +325,7 @@ docs/                       # 本文件 + design/
 - [x] 全部界面 / 文档 / 注释去掉第三方前端与第三方作者的名字；第三方美化卡样本从仓库移除，测试改用自写样本
 - [x] 多开场白：角色卡 `basic_info.alternateGreetings[]`，开新对话时第一条消息可左右切换
 - [x] 世界书：`lib/lorebook`（schema、通用 world-info JSON 导入、关键词 / 常驻 / 次级关键词 / 概率 / 扫描深度 / 预算）；角色内嵌世界书（`characters.lorebook`，随发布快照一起走）+ 用户世界书库（`lorebooks` 表，启用即应用到全部对话）；注入到预设的 `worldInfoBefore / After` 占位；`0008_lorebooks.sql`
-- [ ] 摘要 / 日记的任务 prompt 仍在代码里（`api/chat/summary`、`api/diary/_lib`），下一步可做成可编辑设置
+- [x] 摘要 / 记忆提取的任务 prompt 做成可编辑：`lib/tasks/summary.ts`（默认值 + 占位符渲染），`user_task_prompts` 表（0009），`/settings/tasks` 页（system / 模板 / 风格范例 / 采样，可恢复默认）；日记功能整体移除（0010）
 
 ### 迭代 1（2026-10-21，P6 之后）
 - [x] 角色主页 `/characters/[id]`：该角色的全部对话（分支缩进显示「分支自 #id」）、继续最近 / 开新对话 / 重命名 / 删除；「对话」页改为按角色分组，角色卡片点进主页，聊天 header 加「切换 / 管理对话」
