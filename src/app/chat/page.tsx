@@ -1,408 +1,127 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { 
-  MessageCircle,
-  Search,
-  MoreHorizontal,
-  Clock,
-  ChevronRight,
-  Plus,
-  Edit3,
-  Trash2
-} from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
+import { Search, Users, MessageSquarePlus, ChevronRight, MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { useAppSelector } from '../store/hooks'
-import { supabase } from '../lib/supabase'
-import { useAppDispatch } from '../store/hooks'
-import { getExistingSession } from '../store/chatSlice'
+import { PosterCard, PosterTitle, CardSkeleton, Chip } from '@/components/glass'
+import { useAuth } from '@/providers/AuthProvider'
+import { useSessions, type SessionWithCharacter } from '@/queries'
+import { useStartSession } from '@/queries/useChatMutations'
+import { SessionList, relativeTime, sessionTitle } from '@/components/sessions/SessionList'
 
-interface ChatSessionWithCharacter {
-  id: string
-  user_id: string
-  character_id: number
-  title?: string
-  created_at: string
-  character: {
-    id: number
-    name: string
-    avatar_url?: string
-  }
-  message_count: number
-  last_message_at?: string
+interface CharacterGroup {
+  characterId: number
+  name: string
+  avatarUrl?: string | null
+  sessions: SessionWithCharacter[]
+  latestAt: string
 }
 
-export default function ChatPage() {
-  const { user } = useAppSelector((state) => state.auth)
-  const dispatch = useAppDispatch()
+const PREVIEW = 3
+const listVariants = { hidden: {}, visible: { transition: { staggerChildren: 0.03 } } }
+const itemVariants = { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.24, ease: [0.2, 0.8, 0.2, 1] as const } } }
+
+/** Conversations grouped by character; each character's full history lives on its hub page. */
+export default function ChatListPage() {
+  const { user } = useAuth()
   const router = useRouter()
-  
-  const [sessions, setSessions] = useState<ChatSessionWithCharacter[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isSearchVisible, setIsSearchVisible] = useState(false)
+  const sessions = useSessions(user?.id)
+  const start = useStartSession()
+  const [query, setQuery] = useState('')
 
-  useEffect(() => {
-    if (!user) {
-      router.push('/login')
-      return
-    }
-    
-    fetchChatSessions()
-  }, [user, router])
-
-  const fetchChatSessions = async () => {
-    if (!user) return
-    
-    setIsLoading(true)
-    try {
-      // 获取聊天会话和相关角色信息
-      const { data: sessionsData, error: sessionsError } = await supabase
-        .from('chat_sessions')
-        .select(`
-          *,
-          characters!inner (
-            id,
-            name,
-            avatar_url
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false })
-
-      if (sessionsError) throw sessionsError
-
-      // 为每个会话获取消息数量和最后消息时间
-      const sessionsWithStats = await Promise.all(
-        (sessionsData || []).map(async (session) => {
-          const { data: messagesData, error: messagesError } = await supabase
-            .from('chat_messages')
-            .select('created_at')
-            .eq('session_id', session.id)
-            .order('created_at', { ascending: false })
-
-          if (messagesError) {
-            console.error('获取消息统计失败:', messagesError)
-            return {
-              ...session,
-              character: session.characters,
-              message_count: 0,
-              last_message_at: session.created_at
-            }
-          }
-
-          return {
-            ...session,
-            character: session.characters,
-            message_count: messagesData.length,
-            last_message_at: messagesData.length > 0 ? messagesData[0].created_at : session.created_at
-          }
-        })
-      )
-
-      setSessions(sessionsWithStats)
-    } catch (error) {
-      console.error('获取聊天记录失败:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // 删除聊天会话
-  const deleteSession = async (sessionId: string) => {
-    if (!confirm('确定要删除这个对话吗？此操作无法撤销。')) return
-    
-    try {
-      // 先删除消息
-      await supabase
-        .from('chat_messages')
-        .delete()
-        .eq('session_id', sessionId)
-
-      // 再删除会话
-      const { error } = await supabase
-        .from('chat_sessions')
-        .delete()
-        .eq('id', sessionId)
-
-      if (error) throw error
-      
-      // 更新本地状态
-      setSessions(prev => prev.filter(session => session.id !== sessionId))
-    } catch (error) {
-      console.error('删除聊天记录失败:', error)
-    }
-  }
-
-  // 处理开始新对话
-  const handleStartNewChat = async () => {
-    router.push('/characters')
-  }
-
-  // 过滤和搜索会话
-  const filteredSessions = sessions.filter(session => {
-    if (!searchQuery) return true
-    
-    const matchesSearch = 
-      session.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      session.character.name.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    return matchesSearch
-  })
-
-  // 格式化时间 - 微信风格
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
-    const diffInHours = Math.floor(diffInMinutes / 60)
-    const diffInDays = Math.floor(diffInHours / 24)
-    
-    if (diffInMinutes < 1) return '刚刚'
-    if (diffInMinutes < 60) return `${diffInMinutes}分钟前`
-    if (diffInHours < 24) {
-      if (diffInHours < 1) return '刚刚'
-      return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-    }
-    if (diffInDays === 1) return '昨天'
-    if (diffInDays < 7) return `${diffInDays}天前`
-    
-    return date.toLocaleDateString('zh-CN', { 
-      month: 'short', 
-      day: 'numeric' 
-    })
-  }
-
-  // 获取最后一条消息预览
-  const getLastMessagePreview = (session: ChatSessionWithCharacter) => {
-    if (session.message_count === 0) {
-      return '开始新对话'
-    }
-    return `${session.message_count}条消息`
-  }
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-        duration: 0.3
+  const groups = useMemo<CharacterGroup[]>(() => {
+    const q = query.trim().toLowerCase()
+    const byChar = new Map<number, CharacterGroup>()
+    for (const s of sessions.data ?? []) {
+      if (q && !sessionTitle(s).toLowerCase().includes(q) && !(s.character?.name ?? '').toLowerCase().includes(q)) continue
+      const g = byChar.get(s.character_id) ?? {
+        characterId: s.character_id, name: s.character?.name ?? '已删除的角色', avatarUrl: s.character?.avatar_url, sessions: [], latestAt: s.updated_at ?? s.created_at,
       }
+      g.sessions.push(s)
+      byChar.set(s.character_id, g)
     }
-  }
+    return [...byChar.values()].sort((a, b) => b.latestAt.localeCompare(a.latestAt))
+  }, [sessions.data, query])
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.4 }
-    }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center space-y-4">
-          <div className="w-8 h-8 mx-auto animate-spin rounded-full border-2 border-slate-900 border-t-transparent" />
-          <p className="text-slate-600">加载聊天记录中...</p>
-        </div>
-      </div>
-    )
-  }
+  const total = sessions.data?.length ?? 0
 
   return (
-    <div className="min-h-screen bg-slate-50 -mx-4 -my-6 sm:-mx-6 sm:-my-8">
-      {/* 顶部标题栏 - 微信风格 */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="sticky top-0 bg-white/95 backdrop-blur-lg border-b border-slate-200/60 px-4 py-3 z-10"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <h1 className="text-xl font-semibold text-slate-900">聊天</h1>
-            {sessions.length > 0 && (
-              <span className="text-sm text-slate-500">({sessions.length})</span>
-            )}
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsSearchVisible(!isSearchVisible)}
-              className="h-9 w-9 p-0 rounded-full"
-            >
-              <Search className="w-5 h-5" />
-            </Button>
-            <Link href="/characters">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 w-9 p-0 rounded-full"
-              >
-                <Plus className="w-5 h-5" />
-              </Button>
-            </Link>
-          </div>
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-3xl font-semibold">对话</h1>
+          <p className="mt-1 text-sm text-cv-fg-muted">{total > 0 ? `${groups.length} 个角色 · ${total} 段对话，按最近活动排序` : '从一个角色开始新的对话。'}</p>
         </div>
-        
-        {/* 搜索栏 */}
-        <AnimatePresence>
-          {isSearchVisible && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="mt-3"
-            >
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <Input
-                  placeholder="搜索对话..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-slate-100 border-none rounded-full h-9"
-                  autoFocus
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+        <Button asChild variant="accent"><Link href="/characters"><Users />选择角色</Link></Button>
+      </header>
 
-      {/* 聊天列表 */}
-      <div className="pb-4">
-        {filteredSessions.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
-            className="flex flex-col items-center justify-center py-20 px-4"
-          >
-            <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center mb-4">
-              <MessageCircle className="w-10 h-10 text-slate-400" />
-            </div>
-            <h3 className="text-lg font-medium text-slate-900 mb-2">
-              {searchQuery ? '没有找到匹配的对话' : '还没有聊天记录'}
-            </h3>
-            <p className="text-slate-500 text-center mb-6">
-              {searchQuery 
-                ? '试试其他关键词'
-                : '选择一个角色开始你的第一次对话'
-              }
-            </p>
-            {!searchQuery && (
-              <Button 
-                className="bg-blue-500 hover:bg-blue-600 rounded-full px-6"
-                onClick={handleStartNewChat}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                开始新对话
+      {total > 3 && (
+        <div className="relative mb-5">
+          <Search className="pointer-events-none absolute inset-y-0 left-4 my-auto size-4 text-cv-fg-subtle" />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索角色或对话标题…" className="pl-11" aria-label="搜索对话" />
+        </div>
+      )}
+
+      {sessions.isLoading && <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} variant="row" />)}</div>}
+
+      {sessions.isError && (
+        <PosterCard tone="ink" className="text-center">
+          <PosterTitle>加载失败</PosterTitle>
+          <p className="mt-2 text-sm opacity-80">网络或权限问题，稍后再试。</p>
+          <Button variant="glass" size="sm" className="mt-4" onClick={() => sessions.refetch()}>重试</Button>
+        </PosterCard>
+      )}
+
+      {sessions.isSuccess && total === 0 && (
+        <PosterCard tone="primary" className="flex min-h-64 flex-col items-start justify-between p-6 sm:p-8">
+          <span className="flex size-10 items-center justify-center rounded-cv-sm bg-cv-accent text-white shadow-[0_10px_24px_-10px_var(--cv-accent)]"><MessageSquare className="size-5" /></span>
+          <div className="mt-8">
+            <PosterTitle className="text-3xl sm:text-4xl">还没有对话。</PosterTitle>
+            <p className="mt-2 max-w-sm text-sm opacity-80">去「角色」页挑一个角色，进角色主页点「开新对话」。</p>
+            <Button asChild variant="glass" className="mt-5"><Link href="/characters"><Users />去角色页</Link></Button>
+          </div>
+        </PosterCard>
+      )}
+
+      {sessions.isSuccess && total > 0 && groups.length === 0 && (
+        <div className="glass rounded-cv-lg p-8 text-center text-sm text-cv-fg-muted">没有匹配的对话。</div>
+      )}
+
+      <motion.div variants={listVariants} initial="hidden" animate="visible" className="space-y-4">
+        {groups.map((g) => (
+          <motion.section key={g.characterId} variants={itemVariants} className="glass rounded-cv-lg p-3 sm:p-4">
+            <div className="mb-2 flex items-center gap-3">
+              <Link href={`/characters/${g.characterId}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-cv-md outline-none focus-visible:ring-2 focus-visible:ring-cv-ring">
+                <Avatar className="size-12 shrink-0 rounded-cv-sm">
+                  <AvatarImage src={g.avatarUrl ?? undefined} alt="" className="object-cover" />
+                  <AvatarFallback className="rounded-cv-sm bg-cv-secondary font-display text-lg font-semibold text-cv-secondary-fg">{g.name.slice(0, 1)}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="truncate font-semibold leading-tight">{g.name}</h2>
+                    <Chip tone="flat">{g.sessions.length} 段</Chip>
+                  </div>
+                  <p className="truncate text-xs text-cv-fg-muted">最近 {relativeTime(g.latestAt)} · 点击进入角色主页</p>
+                </div>
+                <ChevronRight className="hidden size-4 text-cv-fg-subtle sm:block" aria-hidden />
+              </Link>
+              <Button size="sm" variant="neu" disabled={start.isPending}
+                onClick={() => user && start.mutate({ userId: user.id, characterId: g.characterId, forceNew: true }, { onSuccess: ({ sessionId, needsOpening }) => router.push(`/chat/${sessionId}${needsOpening ? '?opening=1' : ''}`) })}>
+                <MessageSquarePlus /> 新对话
               </Button>
+            </div>
+            <SessionList sessions={g.sessions} userId={user?.id} limit={PREVIEW} />
+            {g.sessions.length > PREVIEW && (
+              <Link href={`/characters/${g.characterId}`} className="mt-1 block px-3 py-1.5 text-xs text-cv-accent hover:underline">查看全部 {g.sessions.length} 段对话 →</Link>
             )}
-          </motion.div>
-        ) : (
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="divide-y divide-slate-100"
-          >
-            {filteredSessions.map((session, index) => (
-              <motion.div
-                key={session.id}
-                variants={itemVariants}
-                custom={index}
-              >
-                <motion.div
-                  whileHover={{ backgroundColor: 'rgb(248 250 252)' }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ duration: 0.1 }}
-                  className="group"
-                >
-                  <Link href={`/chat/${session.id}`}>
-                    <div className="flex items-center px-4 py-4 active:bg-slate-100 transition-colors">
-                      {/* 头像 */}
-                      <Avatar className="w-12 h-12 mr-3 flex-shrink-0 ring-2 ring-transparent group-hover:ring-slate-200 transition-all">
-                        <AvatarImage src={session.character.avatar_url} />
-                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-medium">
-                          {session.character.name[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                      
-                      {/* 内容区域 */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <h3 className="font-medium text-slate-900 truncate">
-                            {session.title || session.character.name}
-                          </h3>
-                          <span className="text-xs text-slate-500 ml-2 flex-shrink-0">
-                            {formatTime(session.last_message_at || session.created_at)}
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm text-slate-500 truncate">
-                            {getLastMessagePreview(session)}
-                          </p>
-                          
-                          {/* 未读消息指示器 */}
-                          {session.message_count > 0 && (
-                            <motion.div 
-                              className="ml-2 flex items-center"
-                              whileHover={{ x: 2 }}
-                              transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                            >
-                              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
-                            </motion.div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* 更多操作 */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="opacity-0 group-hover:opacity-100 ml-2 h-8 w-8 p-0 rounded-full hover:bg-slate-200 transition-all"
-                            onClick={(e) => e.preventDefault()}
-                          >
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl shadow-lg border-slate-200/60">
-                          <DropdownMenuItem 
-                            onClick={(e) => {
-                              e.preventDefault()
-                              deleteSession(session.id)
-                            }}
-                            className="text-red-600 focus:text-red-700 focus:bg-red-50 rounded-lg"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            删除对话
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </Link>
-                </motion.div>
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
-      </div>
+          </motion.section>
+        ))}
+      </motion.div>
     </div>
   )
-} 
+}

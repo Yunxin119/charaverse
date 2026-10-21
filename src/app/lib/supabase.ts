@@ -1,32 +1,28 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export { supabase } from '@/lib/supabase/client'
+export type { User } from '@supabase/supabase-js'
 
 // Types for our database
-export type User = {
-  id: string
-  email?: string
-  user_metadata?: {
-    username?: string
-    avatar_url?: string
-  }
-}
-
 export type Profile = {
   id: string
   username?: string
   avatar_url?: string
 }
 
+// 主要的角色/剧本实体
 export type Character = {
   id: number
   user_id: string
-  name: string
-  avatar_url?: string
+  name: string // 剧本名称
+  avatar_url?: string // 剧本封面
   prompt_template: any
+  /** author skin: css / regexScripts / renderHtml (lib/skins/schema.ts) */
+  skin?: Record<string, unknown>
+  /** world book embedded in the card (lib/lorebook/schema.ts) */
+  lorebook?: Record<string, unknown>
+  /** what the public sees (plan A12); the live row is the author's private draft */
+  published_snapshot?: Record<string, unknown> | null
+  published_at?: string | null
+  likes_count?: number
   is_public: boolean
   created_at: string
 }
@@ -36,9 +32,12 @@ export type ChatSession = {
   user_id: string
   character_id: number
   title?: string
-  last_diary_cutoff_message_id?: number
-  last_forum_cutoff_message_id?: number
   created_at: string
+  updated_at?: string
+  /** per-session settings (see lib/chat/settings.ts) */
+  settings?: Record<string, unknown>
+  parent_session_id?: string | null
+  branched_from_message_id?: number | null
 }
 
 export type ChatMessage = {
@@ -46,19 +45,22 @@ export type ChatMessage = {
   session_id: string
   role: 'user' | 'assistant' | 'system'
   content: string
-  type: 'message' | 'diary' | 'forum_post'
+  type: 'message' | 'forum_post'
   created_at: string
+  /** alternative replies; content mirrors swipes[swipe_index] once populated */
+  swipes?: string[]
+  swipe_index?: number
+  meta?: Record<string, unknown>
 }
 
-export type Diary = {
-  id: number
-  session_id: string
+export type UserPreset = {
+  id: string
   user_id: string
-  content: string
+  name: string
+  data: Record<string, unknown>
+  is_default: boolean
   created_at: string
   updated_at: string
-  source_message_id_start?: number
-  source_message_id_end?: number
 }
 
 export type ChatSummary = {
@@ -72,17 +74,10 @@ export type ChatSummary = {
   end_message_id?: number
   original_message_count: number
   summary_method: string
+  summary_level: number          // 摘要层级：1=原始摘要，2=超级摘要
+  parent_summaries?: number[]    // 父摘要ID数组（用于超级摘要）
+  is_active: boolean            // 摘要是否有效
+  invalidated_at?: string       // 失效时间
+  compressed_at?: string        // 压缩时间
 }
 
-export type PromptTemplate = {
-  id: number
-  user_id: string | null
-  name: string
-  template_type: '用户角色设定' | '注意事项' | '初始情景' | '特殊要求' | '自定义模块'
-  content: Record<string, any>
-  description?: string
-  is_public: boolean
-  usage_count: number
-  created_at: string
-  updated_at: string
-} 

@@ -1,0 +1,6 @@
+<svg width="512" height="512" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- CharaVerse mark: oxblood rounded square, cream four-point sparkle, sienna dot (same artwork as /favicon.svg) -->
+  <rect width="64" height="64" rx="16" fill="#41140e"/>
+  <path d="M30 12 C31 24 34 29 48 32 C34 35 31 40 30 52 C29 40 26 35 12 32 C26 29 29 24 30 12 Z" fill="#f2dece"/>
+  <circle cx="47" cy="17" r="4" fill="#c9643b"/>
+</svg>
