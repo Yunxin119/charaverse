@@ -127,6 +127,42 @@ export function ChatSettingsSheet({ open, onOpenChange, sessionId, userId, title
             </div>
           </section>
 
+          <section className="space-y-3">
+            <Label>采样参数（留空 = 跟随预设）</Label>
+            {([
+              ['temperature', 'Temperature', 0, 2, 0.05],
+              ['top_p', 'Top P', 0, 1, 0.01],
+            ] as const).map(([key, label, min, max, step]) => {
+              const v = draft.sampling[key]
+              return (
+                <div key={key} className="rounded-cv-md neu px-4 py-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span>{label} <span className="text-cv-fg-subtle">{v === undefined ? '· 预设' : `· ${v}`}</span></span>
+                    <Switch checked={v !== undefined} onCheckedChange={(on) => set('sampling', { ...draft.sampling, [key]: on ? (key === 'temperature' ? 1 : 0.95) : undefined })} aria-label={`覆盖 ${label}`} />
+                  </div>
+                  {v !== undefined && (
+                    <input type="range" min={min} max={max} step={step} value={v} className="mt-2 w-full accent-[var(--cv-accent)]"
+                      onChange={(e) => set('sampling', { ...draft.sampling, [key]: Number(e.target.value) })} />
+                  )}
+                </div>
+              )
+            })}
+            <div className="rounded-cv-md neu px-4 py-3">
+              <div className="flex items-center justify-between text-sm">
+                <span>最大输出 token <span className="text-cv-fg-subtle">{draft.sampling.max_tokens === undefined ? '· 预设' : `· ${draft.sampling.max_tokens}`}</span></span>
+                <Switch checked={draft.sampling.max_tokens !== undefined} onCheckedChange={(on) => set('sampling', { ...draft.sampling, max_tokens: on ? 4096 : undefined })} aria-label="覆盖最大输出" />
+              </div>
+              {draft.sampling.max_tokens !== undefined && (
+                <Input type="number" min={64} max={65536} step={64} value={draft.sampling.max_tokens} className="mt-2"
+                  onChange={(e) => set('sampling', { ...draft.sampling, max_tokens: Math.min(65536, Math.max(64, Number(e.target.value) || 4096)) })} />
+              )}
+            </div>
+            <div className="flex items-center justify-between rounded-cv-md neu px-4 py-3">
+              <div><div className="text-sm">流式输出</div><div className="text-xs text-cv-fg-subtle">关闭后等整段回复生成完再显示</div></div>
+              <Switch checked={draft.streaming} onCheckedChange={(v) => set('streaming', v)} />
+            </div>
+          </section>
+
           <section className="space-y-2">
             <Label htmlFor="cv-username">你在对话里的名字</Label>
             <Input id="cv-username" placeholder="留空则用角色卡里的用户设定" value={draft.userName ?? ''} onChange={(e) => set('userName', e.target.value || undefined)} />

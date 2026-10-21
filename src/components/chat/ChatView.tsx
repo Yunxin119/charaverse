@@ -104,8 +104,8 @@ export function ChatView({ sessionId }: { sessionId: string }) {
     if (!session || messagesQ.isLoading || messages.length > 0 || !headers) return
     openingTried.current = true
     router.replace(`/chat/${sessionId}`)
-    void runSafe({ action: 'opening', headers })
-  }, [searchParams, session, messagesQ.isLoading, messages.length, headers, router, sessionId, runSafe])
+    void runSafe({ action: 'opening', headers, render: settings.streaming })
+  }, [searchParams, session, messagesQ.isLoading, messages.length, headers, router, sessionId, runSafe, settings.streaming])
 
   // --- actions ---
   const send = async () => {
@@ -113,7 +113,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
     const h = requireHeaders()
     if (!text || !h) return
     setInput('')
-    await runSafe({ action: 'send', text, headers: h })
+    await runSafe({ action: 'send', text, headers: h, render: settings.streaming })
     void autoSummary.maybeRun(messagesRef.current)
   }
 
@@ -139,15 +139,15 @@ export function ChatView({ sessionId }: { sessionId: string }) {
       onEdit: () => { setEditingId(m.id); setSelectedId(m.id) },
       onDelete: () => { if (confirm('删除这条消息？')) deleteMessages.mutate([m.id]) },
       onBranch: () => branch.mutate({ sessionId, messageId: m.id }, { onSuccess: (id) => router.push(`/chat/${id}`) }),
-      onRegenerate: isLast && m.role === 'assistant' ? () => { const hh = h(); if (hh) void runSafe({ action: 'regenerate', messageId: m.id, headers: hh }) } : undefined,
-      onContinue: isLast && m.role === 'assistant' ? () => { const hh = h(); if (hh) void runSafe({ action: 'continue', headers: hh }) } : undefined,
+      onRegenerate: isLast && m.role === 'assistant' ? () => { const hh = h(); if (hh) void runSafe({ action: 'regenerate', messageId: m.id, headers: hh, render: settings.streaming }) } : undefined,
+      onContinue: isLast && m.role === 'assistant' ? () => { const hh = h(); if (hh) void runSafe({ action: 'continue', headers: hh, render: settings.streaming }) } : undefined,
       onResend: isLast && m.role === 'user' ? async () => {
         const hh = h(); if (!hh) return
         await deleteFrom.mutateAsync(m.id)
-        await runSafe({ action: 'send', text: m.content, headers: hh })
+        await runSafe({ action: 'send', text: m.content, headers: hh, render: settings.streaming })
       } : undefined,
     }
-  }, [requireHeaders, deleteMessages, branch, sessionId, router, runSafe, deleteFrom])
+  }, [requireHeaders, deleteMessages, branch, sessionId, router, runSafe, deleteFrom, settings.streaming])
 
   const saveSettings = async (patch: { title?: string; settings: Partial<SessionSettings> }) => {
     if (patch.title !== undefined) await updateTitle.mutateAsync(patch.title)
@@ -220,7 +220,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
             <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-cv-md bg-cv-accent text-white shadow-[0_10px_24px_-10px_var(--cv-accent)]"><Sparkles className="size-5" /></div>
             <h2 className="font-display text-xl font-semibold">和 {card.name} 的故事还没开始</h2>
             <p className="mt-1 text-sm text-cv-fg-muted">{card.introduction || '发一句话，或者让角色先开口。'}</p>
-            {headers && <Button className="mt-4" variant="neu" size="sm" onClick={() => void runSafe({ action: 'opening', headers })}>让 {card.name} 先说</Button>}
+            {headers && <Button className="mt-4" variant="neu" size="sm" onClick={() => void runSafe({ action: 'opening', headers, render: settings.streaming })}>让 {card.name} 先说</Button>}
           </div>
         }
       />

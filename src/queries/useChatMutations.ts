@@ -151,3 +151,29 @@ export function useStartSession() {
     },
   })
 }
+
+/** Rename / delete a session; invalidates every sessions list of that user. */
+export function useRenameSession(userId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ sessionId, title }: { sessionId: string; title: string }) => {
+      const { error } = await supabase.from('chat_sessions').update({ title: title.trim() || null }).eq('id', sessionId)
+      if (error) throw error
+    },
+    onSuccess: (_r, v) => {
+      if (userId) qc.invalidateQueries({ queryKey: qk.sessions(userId) })
+      qc.invalidateQueries({ queryKey: qk.session(v.sessionId) })
+    },
+  })
+}
+
+export function useDeleteSession(userId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const { error } = await supabase.from('chat_sessions').delete().eq('id', sessionId)
+      if (error) throw error
+    },
+    onSuccess: () => { if (userId) qc.invalidateQueries({ queryKey: qk.sessions(userId) }) },
+  })
+}

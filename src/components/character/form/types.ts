@@ -184,21 +184,3 @@ export function validateDraft(d: CharacterDraft): DraftErrors {
   if (!d.description.trim() && !d.modules.some(moduleHasContent)) errors.content = '至少写一段角色设定，或添加一个有内容的人设模块'
   return errors
 }
-
-/* ---------- TemplateManager bridge ---------- */
-
-/** What `TemplateManager` saves for this module. */
-export function moduleTemplateContent(m: DraftModule): Record<string, unknown> {
-  if (m.type === '用户角色设定') return { userRoleName: m.userRoleName ?? '', userRoleAge: m.userRoleAge ?? '', userRoleGender: m.userRoleGender ?? '', userRoleDetails: m.userRoleDetails ?? '' }
-  if (m.type === '自定义模块') return { name: m.name ?? '', content: m.content ?? '' }
-  return { content: m.content ?? '' }
-}
-
-/** Apply a loaded template onto a module, keeping its id and type. */
-export function applyTemplateContent(m: DraftModule, content: Record<string, unknown>): DraftModule {
-  if (m.type === '用户角色设定') {
-    return { ...m, userRoleName: str(content.userRoleName), userRoleAge: str(content.userRoleAge), userRoleGender: isGender(content.userRoleGender) ? content.userRoleGender : '', userRoleDetails: str(content.userRoleDetails) }
-  }
-  if (m.type === '自定义模块') return { ...m, name: str(content.name) || m.name, content: str(content.content) }
-  return { ...m, content: str(content.content) }
-}

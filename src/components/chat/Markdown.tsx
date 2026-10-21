@@ -27,7 +27,7 @@ function isAllowedImage(src?: string): boolean {
 }
 
 const components: Components = {
-  p: ({ children }) => <p className="my-2 first:mt-0 last:mb-0 leading-[1.7]">{children}</p>,
+  p: ({ children }) => <p className="my-2 whitespace-pre-wrap first:mt-0 last:mb-0 leading-[1.7]">{children}</p>,
   strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
   em: ({ children }) => <em className="italic opacity-90">{children}</em>,
   a: ({ href, children }) => (
@@ -68,7 +68,7 @@ const components: Components = {
 
 export const Markdown = memo(function Markdown({ text, className }: { text: string; className?: string }) {
   return (
-    <div className={cn('cv-markdown text-[15px]', className)}>
+    <div className={cn('cv-markdown min-w-0 max-w-full break-words [overflow-wrap:anywhere] text-[15px]', className)}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} skipHtml>
         {text}
       </ReactMarkdown>

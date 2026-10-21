@@ -92,15 +92,3 @@ export type ChatSummary = {
   compressed_at?: string        // 压缩时间
 }
 
-export type PromptTemplate = {
-  id: number
-  user_id: string | null
-  name: string
-  template_type: '用户角色设定' | '注意事项' | '初始情景' | '特殊要求' | '自定义模块'
-  content: Record<string, any>
-  description?: string
-  is_public: boolean
-  usage_count: number
-  created_at: string
-  updated_at: string
-}

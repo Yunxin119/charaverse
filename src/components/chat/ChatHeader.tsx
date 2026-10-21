@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Brain, History, MoreHorizontal, Settings2, BookOpen, GitBranch, ChevronDown, Palette } from 'lucide-react'
+import { ArrowLeft, Brain, History, MoreHorizontal, Settings2, BookOpen, GitBranch, ChevronDown, Palette, MessagesSquare } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { IconButton } from '@/components/glass'
@@ -23,7 +23,7 @@ export function ChatHeader({ sessionId, character, title, modelLabel, presetLabe
   return (
     <header id="cv_chat_header" className="sticky top-0 z-20 px-3 pt-3 sm:px-5 sm:pt-4">
       <div className="glass mx-auto flex max-w-3xl items-center gap-2 rounded-full py-1.5 pl-1.5 pr-1.5">
-        <IconButton id="cv_back_button" label="返回" variant="ghost" size="sm" onClick={() => router.push('/chat')}>
+        <IconButton id="cv_back_button" label="返回" variant="ghost" size="sm" onClick={() => router.push(`/characters/${character.id}`)}>
           <ArrowLeft />
         </IconButton>
         <Avatar className="size-9 rounded-cv-sm">
@@ -48,6 +48,8 @@ export function ChatHeader({ sessionId, character, title, modelLabel, presetLabe
             <IconButton label="更多" variant="ghost" size="sm"><MoreHorizontal /></IconButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-44">
+            <DropdownMenuItem asChild><Link href={`/characters/${character.id}`}><MessagesSquare />切换 / 管理对话</Link></DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem asChild><Link href={`/chat/${sessionId}/memory`}><Brain />记忆与摘要</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link href={`/chat/${sessionId}/history`}><History />完整历史</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link href={`/chat/${sessionId}/diary`}><BookOpen />角色日记</Link></DropdownMenuItem>

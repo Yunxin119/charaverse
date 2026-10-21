@@ -25,6 +25,16 @@ export const sessionSettingsSchema = z.object({
     .prefault({}),
   /** override the persona name used for {{user}} */
   userName: z.string().max(60).optional(),
+  /** per-session sampling overrides; undefined = follow the preset */
+  sampling: z
+    .object({
+      temperature: z.number().min(0).max(2).optional(),
+      top_p: z.number().min(0).max(1).optional(),
+      max_tokens: z.number().int().min(64).max(65536).optional(),
+    })
+    .prefault({}),
+  /** show tokens as they arrive (off = wait for the whole reply) */
+  streaming: z.boolean().default(true),
 })
 export type SessionSettings = z.infer<typeof sessionSettingsSchema>
 

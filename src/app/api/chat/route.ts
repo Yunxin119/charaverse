@@ -130,17 +130,19 @@ export async function POST(request: NextRequest) {
       await supabase.from('chat_sessions').update({ updated_at: new Date().toISOString() }).eq('id', session.id)
     }
 
+    // session overrides win over the preset's sampling
+    const sampling = { ...assembled.sampling, ...stripUndefined(session.settings.sampling) }
     const result = streamText({
       model,
       instructions: assembled.instructions || undefined,
       messages: assembled.messages as ModelMessage[],
       allowSystemInMessages: true,
-      temperature: assembled.sampling.temperature ?? 1,
-      topP: assembled.sampling.top_p,
-      topK: assembled.sampling.top_k,
-      frequencyPenalty: assembled.sampling.frequency_penalty,
-      presencePenalty: assembled.sampling.presence_penalty,
-      maxOutputTokens: assembled.sampling.max_tokens ?? 4096,
+      temperature: sampling.temperature ?? 1,
+      topP: sampling.top_p,
+      topK: sampling.top_k,
+      frequencyPenalty: sampling.frequency_penalty,
+      presencePenalty: sampling.presence_penalty,
+      maxOutputTokens: sampling.max_tokens ?? 4096,
       abortSignal: request.signal,
       maxRetries: 1,
       onChunk({ chunk }) {
@@ -165,6 +167,10 @@ export async function POST(request: NextRequest) {
     console.error('[api/chat] unexpected:', error instanceof Error ? error.name : 'unknown')
     return NextResponse.json({ error: '服务器内部错误' }, { status: 500 })
   }
+}
+
+function stripUndefined<T extends object>(o: T): Partial<T> {
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>
 }
 
 /** Short, safe error text for the stream (never the raw upstream body). */

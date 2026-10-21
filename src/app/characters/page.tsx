@@ -149,6 +149,7 @@ export default function CharactersPage() {
               <CharacterCard
                 data={characterToCardData(c)}
                 variant="poster"
+                href={`/characters/${c.id}`}
                 className="h-full"
                 chips={c.is_public ? <Chip tone="success" className="bg-cv-success text-white"><Globe className="size-3" />已发布</Chip> : <Chip tone="outline" className="border-white/25 bg-white/15 text-white"><Lock className="size-3" />私人</Chip>}
                 menu={

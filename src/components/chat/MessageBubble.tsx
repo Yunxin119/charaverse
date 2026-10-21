@@ -56,7 +56,7 @@ export function MessageBubble({ message, speaker, skin, isLast, selected, onSele
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ type: 'spring', stiffness: 380, damping: 30 }}
           className={cn(
-            'cv_message_bubble relative px-4 py-2.5 text-cv-fg',
+            'cv_message_bubble relative min-w-0 max-w-full break-words [overflow-wrap:anywhere] px-4 py-2.5 text-cv-fg',
             isUser
               ? 'cv_user_message_bubble rounded-cv-lg rounded-br-md bg-cv-primary text-cv-primary-fg shadow-[0_12px_24px_-12px_var(--cv-primary)]'
               : 'cv_ai_message_bubble glass-strong rounded-cv-lg rounded-bl-md',
@@ -119,7 +119,7 @@ export function StreamingBubble({ text, speaker, skin }: { text: string; speaker
         <AvatarFallback className="rounded-cv-sm bg-cv-secondary text-xs font-semibold text-cv-secondary-fg">{speaker.name.slice(0, 1)}</AvatarFallback>
       </Avatar>
       <div className="flex max-w-[82%] min-w-0 flex-col gap-1 sm:max-w-[72%]">
-        <div className="cv_message_bubble cv_ai_message_bubble glass-strong rounded-cv-lg rounded-bl-md px-4 py-2.5 text-cv-fg">
+        <div className="cv_message_bubble cv_ai_message_bubble glass-strong min-w-0 max-w-full break-words [overflow-wrap:anywhere] rounded-cv-lg rounded-bl-md px-4 py-2.5 text-cv-fg">
           {text ? <MessageContent text={text} role="assistant" skin={skin} /> : <TypingIndicator />}
         </div>
         <div className="px-1 text-[11px] text-cv-fg-subtle">{speaker.name} · 正在输入…</div>

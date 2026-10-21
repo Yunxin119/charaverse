@@ -7,10 +7,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Chip, GlassPanel, IconButton, NeuSurface } from '@/components/glass'
-import { TemplateManager } from '@/app/components/TemplateManager'
 import { Field, SectionHeader } from './Field'
 import {
-  GENDER_OPTIONS, MODULE_HINT, MODULE_TYPES, applyTemplateContent, moduleTemplateContent, newModule,
+  GENDER_OPTIONS, MODULE_HINT, MODULE_TYPES, newModule,
   type DraftModule, type Gender, type ModuleType,
 } from './types'
 
@@ -58,7 +57,7 @@ export function ModulesSection({ modules, error, onChange }: Props) {
 
   return (
     <section aria-labelledby="sec-modules">
-      <SectionHeader title="人设模块" description="把设定拆成几块，按顺序注入提示词。可以从模板库里拿，也可以把写好的存成模板。" action={addMenu} />
+      <SectionHeader title="人设模块" description="把设定拆成几块，按顺序注入提示词。" action={addMenu} />
       {error && <p role="alert" className="mb-3 text-sm text-cv-danger">{error}</p>}
 
       {modules.length === 0 ? (
@@ -112,10 +111,7 @@ function ModuleCard({ module: m, index, count, onPatch, onRemove, onMove }: Card
       </div>
 
       <div className="space-y-4 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-cv-fg-subtle">{MODULE_HINT[m.type]}</p>
-          <TemplateManager templateType={m.type} currentContent={moduleTemplateContent(m)} onLoadTemplate={(c) => onPatch(applyTemplateContent(m, c))} />
-        </div>
+        <p className="text-xs text-cv-fg-subtle">{MODULE_HINT[m.type]}</p>
 
         {m.type === '用户角色设定' ? (
           <>

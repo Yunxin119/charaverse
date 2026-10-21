@@ -33,3 +33,20 @@ export function useSession(sessionId: string | undefined) {
     },
   })
 }
+
+export function useCharacterSessions(userId: string | undefined, characterId: number | undefined) {
+  return useQuery({
+    queryKey: [...qk.sessions(userId ?? ''), 'character', characterId ?? 0] as const,
+    enabled: !!userId && !!characterId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('chat_sessions')
+        .select('*, character:characters(id, name, avatar_url)')
+        .eq('user_id', userId!)
+        .eq('character_id', characterId!)
+        .order('updated_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as unknown as SessionWithCharacter[]
+    },
+  })
+}

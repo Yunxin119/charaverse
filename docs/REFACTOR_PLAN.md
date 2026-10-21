@@ -321,6 +321,12 @@ docs/                       # 本文件 + design/
 - [ ] **需要你手动执行**：Supabase SQL editor 跑 `supabase/migrations/0006_rate_limits.sql`（`rate_limits` 表 + `consume_rate_limit` 函数）。不跑也能用（内存兜底），但多实例部署时限流不准
 - 验收：`tsc` / `eslint` / `next build` / 116 测试全绿 ✅；旧 `x-api-key` 兼容层已删；`@types/node` 升到 22 后 `npm install` 不再需要 `--legacy-peer-deps`；浏览器响应头能看到 CSP、连续快速发 31 条消息会收到 429 —— **待你实测**
 
+### 迭代 1（2026-10-21，P6 之后）
+- [x] 角色主页 `/characters/[id]`：该角色的全部对话（分支缩进显示「分支自 #id」）、继续最近 / 开新对话 / 重命名 / 删除；「对话」页改为按角色分组，角色卡片点进主页，聊天 header 加「切换 / 管理对话」
+- [x] 删除模板库（页面、导航、TemplateManager、`prompt_templates` 相关代码；`0007_drop_templates.sql` 可选执行删表）—— 酒馆式预设已覆盖这个需求
+- [x] 聊天气泡长行不换行：加 `overflow-wrap: anywhere`
+- [x] 会话级采样覆盖（temperature / top_p / max_tokens，默认跟随预设）+「流式输出」开关
+
 ### Backlog（不排期）
 - API key 加密同步（多设备）
 - 世界书 / lorebook（`ContextManager` 已留参数）
