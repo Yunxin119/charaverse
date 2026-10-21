@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const PUBLIC_PATHS = new Set(['/login'])
+/** auth callbacks must be reachable without a session */
+const OPEN_PREFIXES = ['/auth/']
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
@@ -49,6 +51,8 @@ export async function proxy(request: NextRequest) {
   if (pathname === '/') {
     return redirectTo(user ? '/chat' : '/login')
   }
+
+  if (OPEN_PREFIXES.some((p) => pathname.startsWith(p))) return response
 
   if (PUBLIC_PATHS.has(pathname)) {
     return user ? redirectTo('/chat') : response

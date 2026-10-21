@@ -19,7 +19,10 @@ export interface AuthContextValue {
   /** True until the initial session has been read from cookies. */
   loading: boolean
   signIn: (email: string, password: string) => Promise<User | null>
-  signUp: (email: string, password: string, username: string) => Promise<User | null>
+  /** `needsConfirmation` = email verification required before the account can sign in */
+  signUp: (email: string, password: string, username: string) => Promise<{ user: User | null; needsConfirmation: boolean }>
+  /** re-send the sign-up confirmation email */
+  resendConfirmation: (email: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -41,9 +44,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession)
       setLoading(false)
+      if (event === 'SIGNED_IN' && nextSession?.user) {
+        const u = nextSession.user
+        const username = (u.user_metadata?.username as string | undefined)?.trim() || u.email?.split('@')[0] || '用户'
+        // no-op when the trigger already created it
+        void supabase.from('profiles').upsert({ id: u.id, username }, { onConflict: 'id', ignoreDuplicates: true })
+      }
     })
 
     return () => {
@@ -60,33 +69,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signUp = useCallback(async (email: string, password: string, username: string) => {
-    const { data, error } = await supabase.auth.signUp({ email, password })
+    const trimmedUsername = username?.trim()
+    if (!trimmedUsername) throw new Error('用户名不能为空')
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    // The profile row is created by the DB trigger handle_new_user() from this metadata;
+    // we must not insert it here (no session yet when email confirmation is on).
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { username: trimmedUsername }, emailRedirectTo: `${origin}/auth/callback?next=/chat` },
+    })
     if (error) throw error
+    if (data.session) setSession(data.session)
+    return { user: data.user, needsConfirmation: !data.session }
+  }, [])
 
-    // 如果注册成功，创建用户资料
-    if (data.user) {
-      // 确保username不为空
-      const trimmedUsername = username?.trim()
-      if (!trimmedUsername) {
-        throw new Error('用户名不能为空')
-      }
-
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: data.user.id,
-        username: trimmedUsername,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-
-      if (profileError) {
-        console.error('创建用户资料失败:', profileError)
-        // 抛出错误，因为没有用户资料会导致显示问题
-        throw new Error('创建用户资料失败，请重试')
-      }
-    }
-
-    setSession(data.session)
-    return data.user
+  const resendConfirmation = useCallback(async (email: string) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    const { error } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: `${origin}/auth/callback?next=/chat` } })
+    if (error) throw error
   }, [])
 
   const signOut = useCallback(async () => {
@@ -104,9 +105,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       signIn,
       signUp,
+      resendConfirmation,
       signOut,
     }),
-    [session, loading, signIn, signUp, signOut]
+    [session, loading, signIn, signUp, resendConfirmation, signOut]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -21,14 +21,18 @@ function LoginForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const [error, setError] = useState<string | null>(null)
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null)
+  const [resent, setResent] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const { user, signIn, signUp } = useAuth()
+  const { user, signIn, signUp, resendConfirmation } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   // Only allow same-origin relative paths as the post-login destination.
   const rawNext = searchParams.get('next')
   const nextPath = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/chat'
+  const verifyFailed = searchParams.get('verify') === 'failed'
+  const verifyReason = searchParams.get('reason')
 
   useEffect(() => {
     if (user) {
@@ -44,7 +48,8 @@ function LoginForm() {
     setLoading(true)
     try {
       if (isSignUp) {
-        await signUp(email, password, username)
+        const r = await signUp(email, password, username)
+        if (r.needsConfirmation) { setPendingEmail(email); return }
       } else {
         await signIn(email, password)
       }
@@ -109,6 +114,19 @@ function LoginForm() {
             <p className="mt-1 text-sm text-cv-fg-muted">{isSignUp ? '几秒钟就好，然后开始你的第一段对话。' : '登录以继续你的冒险。'}</p>
           </div>
 
+          {pendingEmail ? (
+            <div className="space-y-4">
+              <div className="rounded-cv-md neu px-4 py-4 text-sm">
+                <div className="font-semibold">验证邮件已发送到 {pendingEmail}</div>
+                <p className="mt-1 text-cv-fg-muted">点邮件里的链接完成验证，页面会自动登录并进入对话。没收到的话看看垃圾箱，或者一分钟后重发。</p>
+              </div>
+              {error && <p className="text-sm text-cv-danger">{error}</p>}
+              <div className="flex flex-wrap gap-2">
+                <Button variant="neu" size="sm" disabled={resent} onClick={async () => { setError(null); try { await resendConfirmation(pendingEmail); setResent(true); setTimeout(() => setResent(false), 60_000) } catch (e) { setError((e as Error).message || '重发失败') } }}>{resent ? '已重发，稍后再试' : '重发验证邮件'}</Button>
+                <Button variant="ghost" size="sm" onClick={() => { setPendingEmail(null); setIsSignUp(false); setError(null) }}>返回登录</Button>
+              </div>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email">邮箱</Label>
@@ -153,6 +171,11 @@ function LoginForm() {
               </motion.div>
             )}
 
+            {verifyFailed && !error && (
+              <div role="alert" className="rounded-cv-md border border-cv-danger/30 bg-[color-mix(in_oklab,var(--cv-danger)_10%,transparent)] px-4 py-3 text-sm text-cv-danger">
+                邮箱验证失败{verifyReason ? `：${verifyReason}` : ''}。链接可能已过期，登录后可重发验证邮件。
+              </div>
+            )}
             {error && (
               <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} role="alert" className="rounded-cv-md border border-cv-danger/30 bg-[color-mix(in_oklab,var(--cv-danger)_10%,transparent)] px-4 py-3 text-sm text-cv-danger">
                 {error}
@@ -177,6 +200,7 @@ function LoginForm() {
               {isSignUp ? '已有账户？立即登录' : '还没有账户？立即注册'}
             </button>
           </form>
+          )}
 
           <p className="mt-6 text-center text-xs text-cv-fg-subtle">继续使用即表示你同意我们的服务条款</p>
         </GlassPanel>
