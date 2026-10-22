@@ -56,7 +56,9 @@ export default function NotificationsPage() {
 function Row({ n, onDelete }: { n: NotificationItem; onDelete: () => void }) {
   const name = n.actor?.username?.trim() || '有人'
   const unread = !n.read_at
-  const href = n.character_id != null ? `/character/public/${n.character_id}` : '/explore'
+  const href = n.character_id != null
+    ? `/character/public/${n.character_id}${n.comment ? `?comment=${n.comment_id}` : ''}`
+    : '/explore'
   const verb = n.kind === 'reply' ? '回复了你的评论' : (n.comment?.parent_id != null ? '在你的角色下回复了评论' : '评论了你的角色')
   const Icon = n.kind === 'reply' ? CornerDownRight : MessageCircle
   return (

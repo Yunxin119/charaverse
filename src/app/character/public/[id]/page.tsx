@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Bookmark, ChevronDown, Copy, Heart, Link2, Loader2, MessageSquare, MessageCircle, Pencil, Repeat, Users } from 'lucide-react'
@@ -33,6 +33,13 @@ export default function PublicCharacterPage() {
   const favIds = useMyFavoriteIds(user?.id)
   const toggleFav = useToggleFavorite(user?.id)
   const favorited = favIds.data?.has(characterId) ?? false
+  // `?comment=<id>` (notification links) → scroll to that comment once loaded
+  const [targetComment, setTargetComment] = useState<number | null>(null)
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get('comment')
+    const n = raw ? Number(raw) : NaN
+    setTargetComment(Number.isFinite(n) ? n : null)
+  }, [])
 
   const c = q.data
   const isOwner = !!user && !!c && c.user_id === user.id
@@ -168,7 +175,7 @@ export default function PublicCharacterPage() {
               })()}
             </GlassPanel>
 
-            <Comments characterId={c.id} authorId={c.user_id} />
+            <Comments characterId={c.id} authorId={c.user_id} highlightId={targetComment} />
           </div>
         )}
       </div>

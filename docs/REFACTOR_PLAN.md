@@ -330,7 +330,8 @@ docs/                       # 本文件 + design/
 - [x] 分享链接：角色页「分享」（桌面复制链接，触屏走系统分享面板）；`/character/public/*` 登出可访问（proxy 放行），`generateMetadata` 给链接预览标题 / 简介 / 头像，根布局补 `metadataBase`
 - [x] 评论点赞：`character_comments.likes_count` + `comment_likes`，`toggle_comment_like` RPC（0013），评论项心形按钮，乐观更新
 - [x] 站内通知：`notifications` 表（owner-only RLS，只由触发器写入）；`notify_on_comment` 触发器：回复 → 被回复者，新评论 / 回复 → 角色作者；`/settings/notifications` 收件箱（打开即标已读，可删）；导航「我的」未读角标（60s 轮询 + 聚焦刷新）
-- [ ] 下一步候选：评论按热度排序、通知点进去定位到具体评论、角色更新提醒（收藏的角色重新发布时）
+- [x] 评论定位：通知链接带 `?comment=<id>`，角色页加载完评论后滚动到那条并高亮 3 秒；每条评论有 `#comment-<id>` 锚点；评论已删则提示
+- [ ] 下一步候选：评论按热度排序、角色更新提醒（收藏的角色重新发布时）
 
 ### 迭代 3（2026-10-21）
 - [x] 角色卡导入导出：`lib/cards`（PNG tEXt 块读写、通用卡 v1/v2/v3 ↔ 我们的格式，`extensions.charaverse` 无损往返）；导出 JSON / PNG 卡，导入 JSON / PNG 含世界书与头像

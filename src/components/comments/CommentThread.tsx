@@ -105,9 +105,14 @@ export interface CommentThreadProps {
   authorId: string
   variant?: 'page' | 'panel'
   className?: string
+  /** comment to scroll to and flash once the list is loaded (e.g. from a notification link) */
+  highlightId?: number | null
 }
 
-export function CommentThread({ characterId, authorId, variant = 'page', className }: CommentThreadProps) {
+/** DOM id of a comment's list item, used for deep links (`?comment=<id>`). */
+export const commentDomId = (id: number) => `comment-${id}`
+
+export function CommentThread({ characterId, authorId, variant = 'page', className, highlightId }: CommentThreadProps) {
   const { user } = useAuth()
   const qc = useQueryClient()
   const comments = useComments(characterId, user?.id)
@@ -119,6 +124,23 @@ export function CommentThread({ characterId, authorId, variant = 'page', classNa
 
   const threads = useMemo(() => buildThreads(comments.data ?? []), [comments.data])
   const total = comments.data?.length ?? 0
+
+  // deep link: scroll the target comment into view and flash it once the list has rendered
+  const [flashId, setFlashId] = useState<number | null>(null)
+  const highlightedRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!highlightId || !comments.data || highlightedRef.current === highlightId) return
+    highlightedRef.current = highlightId
+    const exists = comments.data.some((c) => c.id === highlightId)
+    if (!exists) { toast('这条评论已经被删除了'); return }
+    // the page above keeps growing for a moment (poster image, stat tiles), so re-scroll a few times
+    const scroll = () => document.getElementById(commentDomId(highlightId))?.scrollIntoView({ block: 'center' })
+    const timers = [50, 400, 1200].map((ms) => setTimeout(scroll, ms))
+    setFlashId(highlightId)
+    timers.push(setTimeout(() => setFlashId(null), 3200))
+    return () => timers.forEach(clearTimeout)
+  }, [highlightId, comments.data])
+  const flashClass = (id: number) => flashId === id && 'ring-2 ring-cv-accent/70 bg-cv-accent/10 transition-colors duration-700'
 
   const invalidate = () => qc.invalidateQueries({ queryKey: commentsKey(characterId) })
 
@@ -204,7 +226,7 @@ export function CommentThread({ characterId, authorId, variant = 'page', classNa
       )}
       <ul className={cn('flex flex-col', panel ? 'gap-2' : 'gap-3')}>
         {threads.map(({ root, replies }) => (
-          <li key={root.id} className={cn(panel ? 'rounded-cv-md bg-cv-bg-elevated/60 p-3' : 'glass rounded-cv-lg p-4')}>
+          <li key={root.id} id={commentDomId(root.id)} className={cn(panel ? 'rounded-cv-md bg-cv-bg-elevated/60 p-3' : 'glass rounded-cv-lg p-4', 'scroll-mt-24', flashClass(root.id))}>
             <CommentItem
               comment={root}
               compact={panel}
@@ -218,7 +240,7 @@ export function CommentThread({ characterId, authorId, variant = 'page', classNa
             {replies.length > 0 && (
               <ul className={cn('mt-2 flex flex-col border-l-2 border-cv-border', panel ? 'ml-3 gap-2 pl-3' : 'ml-5 gap-3 pl-4')}>
                 {replies.map((r) => (
-                  <li key={r.id}>
+                  <li key={r.id} id={commentDomId(r.id)} className={cn('scroll-mt-24 rounded-cv-md', flashClass(r.id))}>
                     <CommentItem
                       comment={r}
                       compact
