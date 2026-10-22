@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
-import { CornerDownRight, ImagePlus, Loader2, MessageCircle, Send, Trash2, X } from 'lucide-react'
+import { CornerDownRight, Heart, ImagePlus, Loader2, MessageCircle, Send, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/app/lib/supabase'
 import { compressImage, uploadCommentImages, validateImageFile, type CompressedImage } from '@/app/lib/imageUtils'
@@ -33,8 +33,11 @@ export interface CharacterComment {
   content: string
   images?: string[] | null
   parent_id?: number | null
+  likes_count?: number | null
   created_at: string
   author: { username?: string; avatar_url?: string } | null
+  /** the viewer has liked it (only known when signed in) */
+  liked?: boolean
 }
 
 interface Thread {
@@ -48,23 +51,29 @@ const MAX_REPLY = 500
 
 export const commentsKey = (characterId: number) => ['comments', characterId] as const
 
-function useComments(characterId: number) {
+function useComments(characterId: number, viewerId: string | undefined) {
   return useQuery({
-    queryKey: commentsKey(characterId),
+    queryKey: [...commentsKey(characterId), viewerId ?? ''],
     enabled: Number.isFinite(characterId),
     queryFn: async (): Promise<CharacterComment[]> => {
       const { data, error } = await supabase
         .from('character_comments')
-        .select('id, character_id, user_id, content, images, parent_id, created_at')
+        .select('id, character_id, user_id, content, images, parent_id, likes_count, created_at')
         .eq('character_id', characterId)
         .order('created_at', { ascending: true })
       if (error) throw error
       const rows = (data ?? []) as Omit<CharacterComment, 'author'>[]
       if (rows.length === 0) return []
       const ids = Array.from(new Set(rows.map((r) => r.user_id)))
-      const { data: profiles } = await supabase.from('profiles').select('id, username, avatar_url').in('id', ids)
+      const [{ data: profiles }, { data: myLikes }] = await Promise.all([
+        supabase.from('profiles').select('id, username, avatar_url').in('id', ids),
+        viewerId
+          ? supabase.from('comment_likes').select('comment_id').eq('user_id', viewerId).in('comment_id', rows.map((r) => r.id))
+          : Promise.resolve({ data: [] as { comment_id: number }[] }),
+      ])
       const byId = new Map((profiles ?? []).map((p) => [p.id as string, p as { username?: string; avatar_url?: string }]))
-      return rows.map((r) => ({ ...r, author: byId.get(r.user_id) ?? null }))
+      const liked = new Set((myLikes ?? []).map((l) => l.comment_id as number))
+      return rows.map((r) => ({ ...r, author: byId.get(r.user_id) ?? null, liked: liked.has(r.id) }))
     },
   })
 }
@@ -101,7 +110,7 @@ export interface CommentThreadProps {
 export function CommentThread({ characterId, authorId, variant = 'page', className }: CommentThreadProps) {
   const { user } = useAuth()
   const qc = useQueryClient()
-  const comments = useComments(characterId)
+  const comments = useComments(characterId, user?.id)
   const panel = variant === 'panel'
   const viewerIsAuthor = !!user && user.id === authorId
 
@@ -139,6 +148,36 @@ export function CommentThread({ characterId, authorId, variant = 'page', classNa
     onError: (e) => toast.error(errorText(e, '删除失败，请重试')),
   })
 
+  const like = useMutation({
+    mutationFn: async (id: number) => {
+      const { data, error } = await supabase.rpc('toggle_comment_like', { p_comment_id: id })
+      if (error) throw error
+      return typeof data === 'number' ? data : null
+    },
+    onMutate: async (id) => {
+      const key = [...commentsKey(characterId), user?.id ?? '']
+      await qc.cancelQueries({ queryKey: key })
+      const prev = qc.getQueryData<CharacterComment[]>(key)
+      qc.setQueryData<CharacterComment[]>(key, (old) => old?.map((c) => (
+        c.id === id ? { ...c, liked: !c.liked, likes_count: Math.max(0, (c.likes_count ?? 0) + (c.liked ? -1 : 1)) } : c
+      )))
+      return { prev, key }
+    },
+    onError: (e, _id, ctx) => {
+      if (ctx) qc.setQueryData(ctx.key, ctx.prev)
+      toast.error(errorText(e, '点赞失败，请重试'))
+    },
+    onSuccess: (count, id, ctx) => {
+      if (count === null || !ctx) return
+      qc.setQueryData<CharacterComment[]>(ctx.key, (old) => old?.map((c) => (c.id === id ? { ...c, likes_count: count } : c)))
+    },
+  })
+  const onLike = (c: CharacterComment) => {
+    if (!user) { toast('登录后可以点赞'); return }
+    if (like.isPending) return
+    like.mutate(c.id)
+  }
+
   const canDelete = (c: CharacterComment) => !!user && (c.user_id === user.id || viewerIsAuthor)
   const onDelete = (c: CharacterComment) => { if (confirm('确定删除这条评论？')) remove.mutate(c.id) }
   const openReply = (rootId: number, target?: CharacterComment) => {
@@ -173,6 +212,7 @@ export function CommentThread({ characterId, authorId, variant = 'page', classNa
               deletable={canDelete(root)}
               onDelete={() => onDelete(root)}
               onReply={() => openReply(root.id)}
+              onLike={() => onLike(root)}
               onOpenImage={(index) => setViewer({ images: root.images ?? [], index })}
             />
             {replies.length > 0 && (
@@ -186,6 +226,7 @@ export function CommentThread({ characterId, authorId, variant = 'page', classNa
                       deletable={canDelete(r)}
                       onDelete={() => onDelete(r)}
                       onReply={() => openReply(root.id, r)}
+                      onLike={() => onLike(r)}
                     />
                   </li>
                 ))}
@@ -253,7 +294,7 @@ function displayName(c: CharacterComment) {
 const LONG = (s: string) => s.length > 150 || s.split('\n').length > 3
 
 function CommentItem({
-  comment, compact, isAuthor, deletable, onDelete, onReply, onOpenImage,
+  comment, compact, isAuthor, deletable, onDelete, onReply, onLike, onOpenImage,
 }: {
   comment: CharacterComment
   compact?: boolean
@@ -261,8 +302,10 @@ function CommentItem({
   deletable: boolean
   onDelete: () => void
   onReply: () => void
+  onLike: () => void
   onOpenImage?: (i: number) => void
 }) {
+  const likes = comment.likes_count ?? 0
   const [expanded, setExpanded] = useState(false)
   const name = displayName(comment)
   const long = LONG(comment.content)
@@ -284,6 +327,15 @@ function CommentItem({
             </time>
           </div>
           <div className="flex shrink-0 items-center">
+            <button
+              type="button"
+              onClick={onLike}
+              aria-label={comment.liked ? '取消点赞' : '点赞'}
+              aria-pressed={!!comment.liked}
+              className={cn('flex h-7 items-center gap-1 rounded-full px-2 text-xs font-semibold transition-colors', comment.liked ? 'text-cv-accent' : 'text-cv-fg-muted hover:text-cv-fg')}
+            >
+              <Heart className={cn('size-3.5', comment.liked && 'fill-current')} />{likes > 0 && likes}
+            </button>
             <IconButton label="回复" size="sm" className="size-7 text-cv-fg-muted hover:text-cv-fg" onClick={onReply}>
               <CornerDownRight className="size-3.5" />
             </IconButton>

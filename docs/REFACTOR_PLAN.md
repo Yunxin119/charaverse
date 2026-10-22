@@ -328,7 +328,9 @@ docs/                       # 本文件 + design/
 - [x] 修评论区「发出去没反应」：线上库缺 `character_comments.images` 列（v1 的脚本没跑过），列表查询 400 但插入成功；0011 补列 + `hotfix/comments_images_column.sql`，评论区加载 / 发布 / 回复失败都显示真实错误并可重试
 - [x] 收藏：`character_favorites`（0012，owner-only RLS，私人）；探索卡片 / 角色页书签按钮，`/explore/favorites` 收藏夹（探索页分区切换 + 「我的」入口），撤回的角色自动隐藏并计数
 - [x] 分享链接：角色页「分享」（桌面复制链接，触屏走系统分享面板）；`/character/public/*` 登出可访问（proxy 放行），`generateMetadata` 给链接预览标题 / 简介 / 头像，根布局补 `metadataBase`
-- [ ] 下一步候选：评论点赞、评论回复通知
+- [x] 评论点赞：`character_comments.likes_count` + `comment_likes`，`toggle_comment_like` RPC（0013），评论项心形按钮，乐观更新
+- [x] 站内通知：`notifications` 表（owner-only RLS，只由触发器写入）；`notify_on_comment` 触发器：回复 → 被回复者，新评论 / 回复 → 角色作者；`/settings/notifications` 收件箱（打开即标已读，可删）；导航「我的」未读角标（60s 轮询 + 聚焦刷新）
+- [ ] 下一步候选：评论按热度排序、通知点进去定位到具体评论、角色更新提醒（收藏的角色重新发布时）
 
 ### 迭代 3（2026-10-21）
 - [x] 角色卡导入导出：`lib/cards`（PNG tEXt 块读写、通用卡 v1/v2/v3 ↔ 我们的格式，`extensions.charaverse` 无损往返）；导出 JSON / PNG 卡，导入 JSON / PNG 含世界书与头像

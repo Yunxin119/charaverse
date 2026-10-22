@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { NAV_ITEMS, isNavActive } from './nav'
+import { NavBadge } from './NavBadge'
 
 /** Mobile floating glass tab bar (< md). */
 export function BottomTabs() {
@@ -37,6 +38,7 @@ export function BottomTabs() {
               )}
               <Icon className="size-5" />
               <span>{item.name}</span>
+              {item.badge && <NavBadge className="top-0 right-1" />}
             </Link>
           )
         })}

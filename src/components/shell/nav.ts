@@ -6,13 +6,15 @@ export interface NavItem {
   icon: LucideIcon
   /** pathname prefixes that count as active (besides exact match) */
   match?: string[]
+  /** shows the unread-notification badge */
+  badge?: boolean
 }
 
 export const NAV_ITEMS: NavItem[] = [
   { name: '聊天', href: '/chat', icon: MessageSquare, match: ['/chat'] },
   { name: '角色', href: '/characters', icon: Users, match: ['/characters', '/character'] },
   { name: '探索', href: '/explore', icon: Globe, match: ['/explore', '/user'] },
-  { name: '我的', href: '/settings', icon: UserRound, match: ['/settings'] },
+  { name: '我的', href: '/settings', icon: UserRound, match: ['/settings'], badge: true },
 ]
 
 export function isNavActive(item: NavItem, pathname: string): boolean {

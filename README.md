@@ -14,7 +14,7 @@ AI 角色扮演聊天 Web 应用：自带 API key、流式回复、可导入通�
 - **世界书**：角色内嵌世界书 + 用户世界书库，关键词 / 常驻 / 次级关键词 / 概率 / 扫描深度 / 预算，直接导入通用的 world-info JSON，注入到预设的 `worldInfoBefore / After` 占位。
 - **多开场白**：角色卡可写多个开场白，开新对话时第一条消息可左右切换。
 - **导入导出**：角色卡导出为无损 JSON 或嵌入数据的 PNG 卡（通用角色卡 v2 格式，其他前端可读），导入支持 JSON 和 PNG（v1 / v2 / v3，含内嵌世界书与头像）；聊天记录导出 JSON / 通用 JSONL / Markdown，导入 JSON / JSONL 到任意角色下生成新对话。
-- **社交**：已发布角色在聊天页右侧有评论区（楼中楼回复、作者标识、作者可删评论）；探索页 / 角色页显示「N 人聊过 · M 轮」的公开聚合统计（数据库触发器累加，不含任何内容）；「我的」页有私人统计（对话数、轮数、字数、获赞、记忆条目），作者主页有公开汇总。
+- **社交**：已发布角色在聊天页右侧有评论区（楼中楼回复、作者标识、作者可删评论）；探索页 / 角色页显示「N 人聊过 · M 轮」的公开聚合统计（数据库触发器累加，不含任何内容）；「我的」页有私人统计（对话数、轮数、字数、获赞、记忆条目），作者主页有公开汇总。收藏公开角色（「探索 → 我的收藏」，只有自己可见）；角色页「分享」复制链接，分享页登出也能打开、带 OG 预览；评论点赞；站内通知（别人回复你的评论、评论你的角色），导航栏未读角标。
 - **发布即快照**：公开角色卡是作者点「发布」时冻结的副本，作者之后改稿不会实时作用到别人的聊天。
 
 ## 技术栈
@@ -63,6 +63,7 @@ npm install
 10. `supabase/migrations/0010_drop_diaries.sql` — 可选，删除已下线的日记表和列
 11. `supabase/migrations/0011_social_stats.sql` — 评论回复、补 `character_comments.images` 列、`character_stats` 表与触发器、`get_my_stats` / `get_author_stats`（已经跑过旧版 0011 的库只需再跑 `supabase/hotfix/comments_images_column.sql`）
 12. `supabase/migrations/0012_favorites.sql` — `character_favorites` 私人收藏表（owner-only RLS）
+13. `supabase/migrations/0013_comment_likes_notifications.sql` — 评论点赞（`comment_likes` + `toggle_comment_like`）、`notifications` 收件箱与评论触发器
 
 跑 hotfix 前建议先导出一份现有策略对照：`select * from pg_policies order by schemaname, tablename, policyname;`
 

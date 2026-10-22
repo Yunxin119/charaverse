@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { NAV_ITEMS, isNavActive } from './nav'
+import { NavBadge } from './NavBadge'
 import { ThemeToggle } from './ThemeToggle'
 
 /** Desktop left rail (md+). Glass column with stacked icon+label items. */
@@ -39,6 +40,7 @@ export function NavRail() {
               )}
               <Icon className="size-5" />
               <span>{item.name}</span>
+              {item.badge && <NavBadge className="top-1 right-2" />}
             </Link>
           )
         })}
