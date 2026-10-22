@@ -1,27 +1,23 @@
 'use client'
 
-import { useMemo, useState, type MouseEvent } from 'react'
-import Link from 'next/link'
+import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
-import { Heart, Search, Compass, Flame } from 'lucide-react'
+import { Search, Compass, Flame } from 'lucide-react'
 import { supabase } from '@/app/lib/supabase'
-import { usePublicCharacters, useToggleLike, type PublicCharacter, type PublicSort } from '@/queries/usePublic'
-import { useAuth } from '@/providers/AuthProvider'
+import { usePublicCharacters, type PublicCharacter, type PublicSort } from '@/queries/usePublic'
 import { useCharacterStats } from '@/queries'
-import { CharacterStatsLine } from '@/components/cards/CharacterCard'
+import { ExploreTabs } from '@/components/explore/ExploreTabs'
+import { CARD_TONES, PublicCardSkeleton, PublicCharacterCard, type CardStats } from '@/components/explore/PublicCharacterCard'
 import { PosterCard, PosterTitle, Chip } from '@/components/glass'
 import { cn } from '@/lib/utils'
 
-const TONES = ['primary', 'ink', 'accent', 'secondary'] as const
 type ExploreSort = PublicSort | 'active'
 const SORTS: { id: ExploreSort; label: string }[] = [
   { id: 'latest', label: '最新' },
   { id: 'likes', label: '最热' },
   { id: 'active', label: '最活跃' },
 ]
-type CardStats = { sessions: number; turns: number }
-
 export default function ExplorePage() {
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<ExploreSort>('latest')
@@ -45,9 +41,12 @@ export default function ExplorePage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
-      <header className="mb-6">
-        <h1 className="font-display text-3xl font-semibold">探索</h1>
-        <p className="mt-1 text-sm text-cv-fg-muted">别人发布的角色。看到喜欢的，直接开聊，或者复制一份到自己的角色库里改。</p>
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-3xl font-semibold">探索</h1>
+          <p className="mt-1 text-sm text-cv-fg-muted">别人发布的角色。看到喜欢的，直接开聊、收藏，或者复制一份到自己的角色库里改。</p>
+        </div>
+        <ExploreTabs />
       </header>
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -82,7 +81,7 @@ export default function ExplorePage() {
 
       {list.isLoading && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+          {Array.from({ length: 6 }).map((_, i) => <PublicCardSkeleton key={i} />)}
         </div>
       )}
       {list.isError && <PosterCard tone="ink"><PosterTitle>加载失败</PosterTitle><p className="mt-2 text-sm opacity-80">{(list.error as Error).message}</p></PosterCard>}
@@ -97,61 +96,12 @@ export default function ExplorePage() {
         <motion.div layout className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((c, i) => (
             <motion.div key={c.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, delay: Math.min(i, 8) * 0.03 }}>
-              <CharacterCard character={c} author={authors[c.user_id]} tone={TONES[i % TONES.length]} stats={statsOf(c.id)} onTag={setTag} />
+              <PublicCharacterCard character={c} author={authors[c.user_id]} tone={CARD_TONES[i % CARD_TONES.length]} stats={statsOf(c.id)} onTag={setTag} />
             </motion.div>
           ))}
         </motion.div>
       )}
     </div>
-  )
-}
-
-function CharacterCard({ character: c, author, tone, stats, onTag }: { character: PublicCharacter; author?: string; tone: (typeof TONES)[number]; stats?: CardStats; onTag: (t: string) => void }) {
-  const { user } = useAuth()
-  const like = useToggleLike()
-  const [optimistic, setOptimistic] = useState<number | null>(null)
-  const likes = optimistic ?? c.likes_count
-  const date = c.published_at ?? c.created_at
-
-  const onLike = (e: MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!user || like.isPending) return
-    setOptimistic(likes + 1)
-    like.mutate(c.id, { onSettled: () => setOptimistic(null) })
-  }
-
-  return (
-    <Link href={`/character/public/${c.id}`} className="group block h-full outline-none focus-visible:ring-2 focus-visible:ring-cv-ring rounded-cv-lg">
-      <PosterCard tone={tone} image={c.avatar_url ?? undefined} className="flex h-full min-h-64 flex-col justify-end transition-transform duration-(--cv-dur) ease-cv group-hover:[translate:0_-2px]">
-        <div className="flex items-start justify-between gap-2">
-          <PosterTitle className="line-clamp-2">{c.name}</PosterTitle>
-          <button
-            type="button"
-            onClick={onLike}
-            aria-label="点赞"
-            disabled={!user}
-            className="flex shrink-0 items-center gap-1 rounded-full bg-black/25 px-2.5 py-1 text-xs font-semibold backdrop-blur-sm transition-transform active:scale-95 disabled:opacity-70"
-          >
-            <Heart className={cn('size-3.5', optimistic !== null && 'fill-current')} />{likes}
-          </button>
-        </div>
-        <p className="mt-2 line-clamp-2 text-sm opacity-85">{c.introduction ?? '这位作者还没有写简介。'}</p>
-        {c.keywords.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {c.keywords.slice(0, 3).map((k) => (
-              <Chip key={k} tone="glass" interactive className="text-[11px]" onClick={(e) => { e.preventDefault(); onTag(k) }}>{k}</Chip>
-            ))}
-            {c.keywords.length > 3 && <Chip tone="glass" className="text-[11px]">+{c.keywords.length - 3}</Chip>}
-          </div>
-        )}
-        <div className="mt-3 flex items-center justify-between gap-2 text-[11px] opacity-75">
-          <span className="truncate">by {author ?? '创作者'}</span>
-          <CharacterStatsLine stats={stats} className="shrink-0" />
-          <time dateTime={date} className="shrink-0">{new Date(date).toLocaleDateString('zh-CN')}</time>
-        </div>
-      </PosterCard>
-    </Link>
   )
 }
 
@@ -170,15 +120,4 @@ function useAuthorNames(list: PublicCharacter[] | undefined): Record<string, str
     },
   })
   return q.data ?? {}
-}
-
-function SkeletonCard() {
-  return (
-    <div className="glass min-h-64 animate-pulse rounded-cv-lg p-6">
-      <div className="mt-28 h-6 w-2/3 rounded-full bg-cv-fg/10" />
-      <div className="mt-3 h-3.5 w-full rounded-full bg-cv-fg/10" />
-      <div className="mt-2 h-3.5 w-4/5 rounded-full bg-cv-fg/10" />
-      <div className="mt-4 flex gap-1.5"><span className="h-5 w-12 rounded-full bg-cv-fg/10" /><span className="h-5 w-16 rounded-full bg-cv-fg/10" /></div>
-    </div>
-  )
 }

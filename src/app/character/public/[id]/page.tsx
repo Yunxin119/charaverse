@@ -3,12 +3,14 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronDown, Copy, Heart, Loader2, MessageSquare, MessageCircle, Pencil, Repeat, Users } from 'lucide-react'
+import { ArrowLeft, Bookmark, ChevronDown, Copy, Heart, Link2, Loader2, MessageSquare, MessageCircle, Pencil, Repeat, Users } from 'lucide-react'
+import { toast } from 'sonner'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/app/lib/supabase'
 import { useAuth } from '@/providers/AuthProvider'
 import { useForkCharacter, usePublicCharacter, useToggleLike } from '@/queries/usePublic'
 import { useCharacterStats } from '@/queries'
+import { useMyFavoriteIds, useToggleFavorite } from '@/queries/useFavorites'
 import { StatTiles } from '@/components/stats/StatTiles'
 import { describeTemplate, type SnapshotModule } from '@/components/character/snapshot'
 import { Comments } from '@/components/character/Comments'
@@ -28,6 +30,9 @@ export default function PublicCharacterPage() {
   const [optimistic, setOptimistic] = useState<number | null>(null)
   const statsQ = useCharacterStats(Number.isFinite(characterId) ? [characterId] : [])
   const commentsQ = useCommentCount(characterId)
+  const favIds = useMyFavoriteIds(user?.id)
+  const toggleFav = useToggleFavorite(user?.id)
+  const favorited = favIds.data?.has(characterId) ?? false
 
   const c = q.data
   const isOwner = !!user && !!c && c.user_id === user.id
@@ -38,6 +43,27 @@ export default function PublicCharacterPage() {
     if (!user || !c || like.isPending) return
     setOptimistic(likes + 1)
     like.mutate(c.id, { onSettled: () => setOptimistic(null) })
+  }
+  const onFavorite = () => {
+    if (!user || !c || toggleFav.isPending) return
+    toggleFav.mutate({ characterId: c.id, next: !favorited }, {
+      onSuccess: (next) => toast.success(next ? '已收藏，在「探索 → 我的收藏」里找它' : '已取消收藏'),
+      onError: (err) => toast.error((err as Error).message || '操作失败，请重试'),
+    })
+  }
+  const onShare = async () => {
+    if (!c) return
+    const url = `${window.location.origin}/character/public/${c.id}`
+    const coarse = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
+    if (coarse && typeof navigator.share === 'function') {
+      try { await navigator.share({ title: `${c.name} · CharaVerse`, text: c.introduction ?? '', url }); return } catch { /* cancelled or unsupported: fall back to copying */ }
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('链接已复制，发给朋友就能打开这个角色')
+    } catch {
+      toast.error('复制失败，请手动复制地址栏里的链接')
+    }
   }
   const onFork = () => {
     if (!user || !c?.snapshot) return
@@ -89,11 +115,22 @@ export default function PublicCharacterPage() {
               <Button variant="glass" onClick={onLike} disabled={!user || like.isPending} aria-label="点赞">
                 <Heart className={cn(optimistic !== null && 'fill-current text-cv-accent')} />{likes}
               </Button>
+              <Button variant="glass" onClick={onFavorite} disabled={!user || toggleFav.isPending} aria-pressed={favorited}>
+                <Bookmark className={cn(favorited && 'fill-current text-cv-accent')} />{favorited ? '已收藏' : '收藏'}
+              </Button>
+              <Button variant="glass" onClick={onShare} aria-label="复制分享链接">
+                <Link2 />分享
+              </Button>
               {isOwner && (
                 <Button variant="outline" asChild><Link href={`/characters/${c.id}/edit`}><Pencil />编辑</Link></Button>
               )}
             </div>
             {fork.isError && <p className="text-xs text-cv-danger">复制失败：{(fork.error as Error).message}</p>}
+            {!user && (
+              <p className="text-sm text-cv-fg-muted">
+                <Link href={`/login?next=/character/public/${c.id}`} className="font-semibold text-cv-accent hover:underline">登录</Link> 后就可以和它聊天、点赞和收藏。
+              </p>
+            )}
 
             <StatTiles
               compact

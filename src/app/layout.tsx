@@ -17,7 +17,14 @@ const fraunces = Fraunces({
   style: ["normal", "italic"],
 });
 
+/** Absolute base for OG / canonical URLs (link previews need absolute image URLs). */
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL
+  ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined)
+  ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: { default: "CharaVerse", template: "%s · CharaVerse" },
   description: "创建、聊天、分享属于你的 AI 角色。",
   icons: { icon: [{ url: "/favicon.svg", type: "image/svg+xml" }, { url: "/favicon.ico" }], apple: "/apple-touch-icon.png" },

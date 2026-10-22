@@ -3,7 +3,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 const PUBLIC_PATHS = new Set(['/login'])
 /** auth callbacks must be reachable without a session */
-const OPEN_PREFIXES = ['/auth/']
+// Routes that work signed out: auth callbacks, and shared character pages
+// (their data is public under RLS; the page disables chat / like / favorite for guests).
+const OPEN_PREFIXES = ['/auth/', '/character/public/']
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })

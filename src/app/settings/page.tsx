@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plug, Palette, SlidersHorizontal, Users, LogOut, Loader2, Check, ChevronRight, BookOpen, Wand2, MessagesSquare, Repeat, Keyboard, Inbox, Heart, Brain } from 'lucide-react'
+import { Plug, Palette, SlidersHorizontal, Users, LogOut, Loader2, Check, ChevronRight, BookOpen, Wand2, MessagesSquare, Repeat, Keyboard, Inbox, Heart, Brain, Bookmark } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/providers/AuthProvider'
 import { supabase } from '@/app/lib/supabase'
@@ -81,6 +81,7 @@ export default function SettingsHubPage() {
     { href: '/settings/appearance', icon: Palette, title: '主题与外观', desc: '明暗模式、内置主题、导入主题 JSON' },
     { href: '/settings/tasks', icon: Wand2, title: '任务提示词', desc: '摘要 + 记忆提取用的 prompt，可改可恢复默认' },
     { href: '/characters', icon: Users, title: '我的角色', desc: `${charactersQ.data?.length ?? '…'} 个角色` },
+    { href: '/explore/favorites', icon: Bookmark, title: '我的收藏', desc: '收藏过的公开角色，只有你自己能看到' },
   ]
 
   const st = statsQ.data
