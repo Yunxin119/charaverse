@@ -3,9 +3,13 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronDown, Copy, Heart, Loader2, MessageSquare, Pencil } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Copy, Heart, Loader2, MessageSquare, MessageCircle, Pencil, Repeat, Users } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '@/app/lib/supabase'
 import { useAuth } from '@/providers/AuthProvider'
 import { useForkCharacter, usePublicCharacter, useToggleLike } from '@/queries/usePublic'
+import { useCharacterStats } from '@/queries'
+import { StatTiles } from '@/components/stats/StatTiles'
 import { describeTemplate, type SnapshotModule } from '@/components/character/snapshot'
 import { Comments } from '@/components/character/Comments'
 import { Button } from '@/components/ui/button'
@@ -22,6 +26,8 @@ export default function PublicCharacterPage() {
   const fork = useForkCharacter()
   const like = useToggleLike()
   const [optimistic, setOptimistic] = useState<number | null>(null)
+  const statsQ = useCharacterStats(Number.isFinite(characterId) ? [characterId] : [])
+  const commentsQ = useCommentCount(characterId)
 
   const c = q.data
   const isOwner = !!user && !!c && c.user_id === user.id
@@ -89,6 +95,17 @@ export default function PublicCharacterPage() {
             </div>
             {fork.isError && <p className="text-xs text-cv-danger">复制失败：{(fork.error as Error).message}</p>}
 
+            <StatTiles
+              compact
+              className="sm:grid-cols-4"
+              items={[
+                { label: '人聊过', icon: Users, value: statsQ.isSuccess ? statsQ.data.get(c.id)?.session_count ?? 0 : statsQ.isError ? 0 : undefined },
+                { label: '轮数', icon: Repeat, value: statsQ.isSuccess ? statsQ.data.get(c.id)?.turn_count ?? 0 : statsQ.isError ? 0 : undefined },
+                { label: '点赞', icon: Heart, value: likes },
+                { label: '评论', icon: MessageCircle, value: commentsQ.isSuccess ? commentsQ.data : commentsQ.isError ? 0 : undefined },
+              ]}
+            />
+
             {(detail.introduction || detail.keywords.length > 0) && (
               <GlassPanel>
                 {detail.introduction && <p className="whitespace-pre-wrap text-sm leading-relaxed">{detail.introduction}</p>}
@@ -114,12 +131,26 @@ export default function PublicCharacterPage() {
               })()}
             </GlassPanel>
 
-            <Comments characterId={c.id} />
+            <Comments characterId={c.id} authorId={c.user_id} />
           </div>
         )}
       </div>
     </div>
   )
+}
+
+/** Head-only count of comments under a character (public read). */
+function useCommentCount(characterId: number) {
+  return useQuery({
+    queryKey: ['character-comments', 'count', characterId] as const,
+    enabled: Number.isFinite(characterId),
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { count, error } = await supabase.from('character_comments').select('id', { count: 'exact', head: true }).eq('character_id', characterId)
+      if (error) throw error
+      return count ?? 0
+    },
+  })
 }
 
 function ModuleRow({ module: m, defaultOpen }: { module: SnapshotModule; defaultOpen?: boolean }) {

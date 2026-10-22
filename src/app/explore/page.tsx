@@ -1,28 +1,47 @@
 'use client'
 
-import { useState, type MouseEvent } from 'react'
+import { useMemo, useState, type MouseEvent } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
-import { Heart, Search, Compass } from 'lucide-react'
+import { Heart, Search, Compass, Flame } from 'lucide-react'
 import { supabase } from '@/app/lib/supabase'
 import { usePublicCharacters, useToggleLike, type PublicCharacter, type PublicSort } from '@/queries/usePublic'
 import { useAuth } from '@/providers/AuthProvider'
+import { useCharacterStats } from '@/queries'
+import { CharacterStatsLine } from '@/components/cards/CharacterCard'
 import { PosterCard, PosterTitle, Chip } from '@/components/glass'
 import { cn } from '@/lib/utils'
 
 const TONES = ['primary', 'ink', 'accent', 'secondary'] as const
-const SORTS: { id: PublicSort; label: string }[] = [
+type ExploreSort = PublicSort | 'active'
+const SORTS: { id: ExploreSort; label: string }[] = [
   { id: 'latest', label: '最新' },
   { id: 'likes', label: '最热' },
+  { id: 'active', label: '最活跃' },
 ]
+type CardStats = { sessions: number; turns: number }
 
 export default function ExplorePage() {
   const [q, setQ] = useState('')
-  const [sort, setSort] = useState<PublicSort>('latest')
+  const [sort, setSort] = useState<ExploreSort>('latest')
   const [tag, setTag] = useState<string | undefined>()
-  const list = usePublicCharacters({ q, sort, tag })
+  // 「最活跃」 is a client-side re-order of the 「最热」 list by turn count.
+  const list = usePublicCharacters({ q, sort: sort === 'active' ? 'likes' : sort, tag })
   const authors = useAuthorNames(list.data)
+  const ids = useMemo(() => (list.data ?? []).map((c) => c.id), [list.data])
+  const statsQ = useCharacterStats(ids)
+  const statsOf = (id: number): CardStats | undefined => {
+    const row = statsQ.data?.get(id)
+    return row ? { sessions: row.session_count, turns: row.turn_count } : statsQ.data ? { sessions: 0, turns: 0 } : undefined
+  }
+  const items = useMemo(() => {
+    const data = list.data ?? []
+    if (sort !== 'active') return data
+    const turns = (id: number) => statsQ.data?.get(id)?.turn_count ?? 0
+    const sessions = (id: number) => statsQ.data?.get(id)?.session_count ?? 0
+    return [...data].sort((a, b) => turns(b.id) - turns(a.id) || sessions(b.id) - sessions(a.id) || b.likes_count - a.likes_count)
+  }, [list.data, sort, statsQ.data])
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
@@ -49,7 +68,7 @@ export default function ExplorePage() {
               onClick={() => setSort(s.id)}
               className={cn('rounded-full px-4 py-1.5 text-sm font-semibold transition-colors', sort === s.id ? 'bg-cv-bg-elevated text-cv-fg shadow-neu-sm' : 'text-cv-fg-muted hover:text-cv-fg')}
             >
-              {s.label}
+              {s.id === 'active' && <Flame className="mr-1 inline size-3.5 align-[-2px]" aria-hidden />}{s.label}
             </button>
           ))}
         </div>
@@ -76,9 +95,9 @@ export default function ExplorePage() {
       )}
       {list.data && list.data.length > 0 && (
         <motion.div layout className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {list.data.map((c, i) => (
-            <motion.div key={c.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, delay: Math.min(i, 8) * 0.03 }}>
-              <CharacterCard character={c} author={authors[c.user_id]} tone={TONES[i % TONES.length]} onTag={setTag} />
+          {items.map((c, i) => (
+            <motion.div key={c.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, delay: Math.min(i, 8) * 0.03 }}>
+              <CharacterCard character={c} author={authors[c.user_id]} tone={TONES[i % TONES.length]} stats={statsOf(c.id)} onTag={setTag} />
             </motion.div>
           ))}
         </motion.div>
@@ -87,7 +106,7 @@ export default function ExplorePage() {
   )
 }
 
-function CharacterCard({ character: c, author, tone, onTag }: { character: PublicCharacter; author?: string; tone: (typeof TONES)[number]; onTag: (t: string) => void }) {
+function CharacterCard({ character: c, author, tone, stats, onTag }: { character: PublicCharacter; author?: string; tone: (typeof TONES)[number]; stats?: CardStats; onTag: (t: string) => void }) {
   const { user } = useAuth()
   const like = useToggleLike()
   const [optimistic, setOptimistic] = useState<number | null>(null)
@@ -126,9 +145,10 @@ function CharacterCard({ character: c, author, tone, onTag }: { character: Publi
             {c.keywords.length > 3 && <Chip tone="glass" className="text-[11px]">+{c.keywords.length - 3}</Chip>}
           </div>
         )}
-        <div className="mt-3 flex items-center justify-between text-[11px] opacity-75">
+        <div className="mt-3 flex items-center justify-between gap-2 text-[11px] opacity-75">
           <span className="truncate">by {author ?? '创作者'}</span>
-          <time dateTime={date}>{new Date(date).toLocaleDateString('zh-CN')}</time>
+          <CharacterStatsLine stats={stats} className="shrink-0" />
+          <time dateTime={date} className="shrink-0">{new Date(date).toLocaleDateString('zh-CN')}</time>
         </div>
       </PosterCard>
     </Link>

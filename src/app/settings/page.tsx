@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plug, Palette, SlidersHorizontal, Users, LogOut, Loader2, Check, ChevronRight, BookOpen, Wand2 } from 'lucide-react'
+import { Plug, Palette, SlidersHorizontal, Users, LogOut, Loader2, Check, ChevronRight, BookOpen, Wand2, MessagesSquare, Repeat, Keyboard, Inbox, Heart, Brain } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/providers/AuthProvider'
 import { supabase } from '@/app/lib/supabase'
 import { uploadUserAvatar } from '@/app/lib/avatarUpload'
-import { useProfile, useCharacters, qk } from '@/queries'
+import { useProfile, useCharacters, useMyStats, qk } from '@/queries'
+import { StatTiles } from '@/components/stats/StatTiles'
 import { useConnectionsStore } from '@/stores/connections'
 import { AvatarUpload } from '@/app/components/AvatarUpload'
 import { UserBanner } from '@/app/components/UserBanner'
@@ -27,6 +28,7 @@ export default function SettingsHubPage() {
   const profileQ = useProfile(user?.id)
   const charactersQ = useCharacters(user?.id)
   const connections = useConnectionsStore((s) => s.connections)
+  const statsQ = useMyStats(user?.id)
 
   const [profile, setProfile] = useState<ProfileRow>({})
   const [draft, setDraft] = useState({ username: '', bio: '' })
@@ -81,6 +83,18 @@ export default function SettingsHubPage() {
     { href: '/characters', icon: Users, title: '我的角色', desc: `${charactersQ.data?.length ?? '…'} 个角色` },
   ]
 
+  const st = statsQ.data
+  const sv = (v: number | undefined) => (statsQ.isSuccess ? v ?? 0 : statsQ.isError ? 0 : undefined)
+  const myTiles = [
+    { label: '对话数', icon: MessagesSquare, value: sv(st?.sessions) },
+    { label: '发言轮数', icon: Repeat, value: sv(st?.turns) },
+    { label: '我打的字', icon: Keyboard, value: sv(st?.chars_typed) },
+    { label: '收到的字', icon: Inbox, value: sv(st?.chars_received) },
+    { label: '角色数', icon: Users, value: sv(st?.characters), hint: statsQ.isSuccess ? `${st?.published ?? 0} 个已发布` : undefined },
+    { label: '获赞', icon: Heart, value: sv(st?.likes_received) },
+    { label: '记忆条目', icon: Brain, value: sv(st?.memories) },
+  ]
+
   if (!user) return <div className="flex h-dvh items-center justify-center text-cv-fg-muted"><Loader2 className="mr-2 size-5 animate-spin" />加载…</div>
 
   return (
@@ -98,6 +112,7 @@ export default function SettingsHubPage() {
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_1.2fr]">
+        <div className="flex flex-col gap-4">
         <GlassPanel>
           <h2 className="mb-4 font-display text-xl font-semibold">个人资料</h2>
           <div className="flex items-start gap-4">
@@ -119,6 +134,16 @@ export default function SettingsHubPage() {
             <Button variant="ghost" size="sm" className="text-cv-danger hover:bg-cv-danger/10" onClick={async () => { if (confirm('退出登录？')) { await signOut(); router.replace('/login') } }}><LogOut /> 退出登录</Button>
           </div>
         </GlassPanel>
+
+        <GlassPanel>
+          <div className="mb-4 flex items-baseline justify-between gap-3">
+            <h2 className="font-display text-xl font-semibold">我的数据</h2>
+            <span className="text-xs text-cv-fg-subtle">只有你自己能看到</span>
+          </div>
+          <StatTiles compact items={myTiles} className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3" />
+          {statsQ.isError && <p className="mt-3 text-xs text-cv-danger">统计加载失败：{(statsQ.error as Error).message}</p>}
+        </GlassPanel>
+        </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
           {links.map((l) => {

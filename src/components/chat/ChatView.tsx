@@ -20,7 +20,8 @@ import { parseSkin } from '@/lib/skins/schema'
 import { parseSnapshot } from '@/components/character/snapshot'
 import { SkinStyle } from './SkinStyle'
 import { Button } from '@/components/ui/button'
-import { PosterCard, PosterTitle } from '@/components/glass'
+import { GlassSheet, GlassSheetContent, IconButton, PosterCard, PosterTitle } from '@/components/glass'
+import { CommentThread } from '@/components/comments/CommentThread'
 import type { ChatMessage } from '@/app/lib/supabase'
 import { ChatHeader } from './ChatHeader'
 import { MessageList } from './MessageList'
@@ -28,6 +29,21 @@ import { Composer } from './Composer'
 import { ChatSettingsSheet } from './ChatSettingsSheet'
 import { ExportChatDialog } from './ExportChatDialog'
 import type { MessageActionHandlers } from './MessageActions'
+
+const COMMENTS_STORAGE_KEY = 'cv.chat.comments'
+const LARGE_QUERY = '(min-width: 1024px)' // tailwind `lg`
+
+function useIsLarge(): boolean {
+  const [large, setLarge] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia(LARGE_QUERY)
+    const update = () => setLarge(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+  return large
+}
 
 export function ChatView({ sessionId }: { sessionId: string }) {
   const router = useRouter()
@@ -76,6 +92,20 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  // comments side column (public characters only): lg+ aside persisted in localStorage, < lg a transient sheet
+  const isLarge = useIsLarge()
+  // lazy read is hydration-safe: the aside only mounts once `isLarge` flips after mount
+  const [commentsOpen, setCommentsOpen] = useState(() => {
+    try { return localStorage.getItem(COMMENTS_STORAGE_KEY) !== '0' } catch { return true }
+  })
+  const [commentsSheetOpen, setCommentsSheetOpen] = useState(false)
+  const toggleComments = useCallback(() => {
+    if (!isLarge) { setCommentsSheetOpen(true); return }
+    setCommentsOpen((v) => {
+      try { localStorage.setItem(COMMENTS_STORAGE_KEY, v ? '0' : '1') } catch { /* storage unavailable */ }
+      return !v
+    })
+  }, [isLarge])
   const [inspiring, setInspiring] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const autoSummary = useAutoSummary({
@@ -178,6 +208,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const characterSpeaker = { name: card.name, avatarUrl: character.avatar_url }
   const userSpeaker = { name: settings.userName || profileQ.data?.username || card.userName, avatarUrl: profileQ.data?.avatar_url }
   const bg = settings.background
+  const commentsAvailable = !!character.is_public
   const presetLabel = settings.presetId ? presetsQ.data?.find((p) => p.id === settings.presetId)?.name : (presetsQ.data?.find((p) => p.is_default)?.name ?? BUILTIN_DEFAULT_PRESET.name)
 
   return (
@@ -190,62 +221,88 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         </>
       )}
 
-      <ChatHeader
-        sessionId={sessionId}
-        character={{ id: character.id, ...characterSpeaker }}
-        title={session.title}
-        modelLabel={modelId ? conn.displayName(modelId) : undefined}
-        presetLabel={presetLabel}
-        onOpenSettings={() => setSettingsOpen(true)}
-        onExport={() => setExportOpen(true)}
-        onNewBranchFromEnd={messages.length ? () => branch.mutate({ sessionId, messageId: messages[messages.length - 1].id }, { onSuccess: (id) => router.push(`/chat/${id}`) }) : undefined}
-      />
+      {/* row: chat column + optional comments aside. #cv_chat_root keeps `flex h-dvh flex-col` for skins. */}
+      <div id="cv_chat_row" className="flex min-h-0 flex-1">
+        <div id="cv_chat_column" className="flex min-w-0 flex-1 flex-col">
+          <ChatHeader
+            sessionId={sessionId}
+            character={{ id: character.id, ...characterSpeaker }}
+            title={session.title}
+            modelLabel={modelId ? conn.displayName(modelId) : undefined}
+            presetLabel={presetLabel}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onExport={() => setExportOpen(true)}
+            commentsAvailable={commentsAvailable}
+            commentsOpen={isLarge ? commentsOpen : commentsSheetOpen}
+            onToggleComments={toggleComments}
+            onNewBranchFromEnd={messages.length ? () => branch.mutate({ sessionId, messageId: messages[messages.length - 1].id }, { onSuccess: (id) => router.push(`/chat/${id}`) }) : undefined}
+          />
 
-      <MessageList
-        messages={messages}
-        character={characterSpeaker}
-        user={userSpeaker}
-        skin={{ regexScripts: skin.regexScripts, renderHtml: skin.renderHtml, char: card.name, user: userSpeaker.name }}
-        streamingText={stream.isStreaming && stream.streamingAction !== 'inspire' ? stream.streamingText : null}
-        busy={busy}
-        selectedId={selectedId}
-        editingId={editingId}
-        onSelect={setSelectedId}
-        handlersFor={handlersFor}
-        onEditSave={(m, content) => editMessage.mutate({ message: m, content }, { onSuccess: () => setEditingId(null) })}
-        onEditCancel={() => setEditingId(null)}
-        onSwipe={(m, index) => selectSwipe.mutate({ messageId: m.id, index })}
-        hasOlder={!!messagesQ.hasNextPage}
-        loadingOlder={messagesQ.isFetchingNextPage}
-        onLoadOlder={() => void messagesQ.fetchNextPage()}
-        emptyState={
-          <div className="mx-auto mt-10 max-w-sm text-center">
-            <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-cv-md bg-cv-accent text-white shadow-[0_10px_24px_-10px_var(--cv-accent)]"><Sparkles className="size-5" /></div>
-            <h2 className="font-display text-xl font-semibold">和 {card.name} 的故事还没开始</h2>
-            <p className="mt-1 text-sm text-cv-fg-muted">{card.introduction || '发一句话，或者让角色先开口。'}</p>
-            {headers && <Button className="mt-4" variant="neu" size="sm" onClick={() => void runSafe({ action: 'opening', headers, render: settings.streaming })}>让 {card.name} 先说</Button>}
-          </div>
-        }
-      />
+          <MessageList
+            messages={messages}
+            character={characterSpeaker}
+            user={userSpeaker}
+            skin={{ regexScripts: skin.regexScripts, renderHtml: skin.renderHtml, char: card.name, user: userSpeaker.name }}
+            streamingText={stream.isStreaming && stream.streamingAction !== 'inspire' ? stream.streamingText : null}
+            busy={busy}
+            selectedId={selectedId}
+            editingId={editingId}
+            onSelect={setSelectedId}
+            handlersFor={handlersFor}
+            onEditSave={(m, content) => editMessage.mutate({ message: m, content }, { onSuccess: () => setEditingId(null) })}
+            onEditCancel={() => setEditingId(null)}
+            onSwipe={(m, index) => selectSwipe.mutate({ messageId: m.id, index })}
+            hasOlder={!!messagesQ.hasNextPage}
+            loadingOlder={messagesQ.isFetchingNextPage}
+            onLoadOlder={() => void messagesQ.fetchNextPage()}
+            emptyState={
+              <div className="mx-auto mt-10 max-w-sm text-center">
+                <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-cv-md bg-cv-accent text-white shadow-[0_10px_24px_-10px_var(--cv-accent)]"><Sparkles className="size-5" /></div>
+                <h2 className="font-display text-xl font-semibold">和 {card.name} 的故事还没开始</h2>
+                <p className="mt-1 text-sm text-cv-fg-muted">{card.introduction || '发一句话，或者让角色先开口。'}</p>
+                {headers && <Button className="mt-4" variant="neu" size="sm" onClick={() => void runSafe({ action: 'opening', headers, render: settings.streaming })}>让 {card.name} 先说</Button>}
+              </div>
+            }
+          />
 
-      {(stream.error || notice) && (
-        <div className="mx-auto mb-1 flex w-[min(100%-1.5rem,48rem)] items-center gap-2 rounded-cv-md border border-cv-danger/30 bg-[color-mix(in_oklab,var(--cv-danger)_10%,var(--cv-bg-elevated))] px-3 py-2 text-sm text-cv-danger">
-          <AlertCircle className="size-4 shrink-0" />
-          <span className="flex-1">{stream.error ?? notice}</span>
-          <button type="button" aria-label="关闭" onClick={() => { stream.clearError(); setNotice(null) }} className="rounded-full p-1 hover:bg-cv-danger/10"><X className="size-4" /></button>
+          {(stream.error || notice) && (
+            <div className="mx-auto mb-1 flex w-[min(100%-1.5rem,48rem)] items-center gap-2 rounded-cv-md border border-cv-danger/30 bg-[color-mix(in_oklab,var(--cv-danger)_10%,var(--cv-bg-elevated))] px-3 py-2 text-sm text-cv-danger">
+              <AlertCircle className="size-4 shrink-0" />
+              <span className="flex-1">{stream.error ?? notice}</span>
+              <button type="button" aria-label="关闭" onClick={() => { stream.clearError(); setNotice(null) }} className="rounded-full p-1 hover:bg-cv-danger/10"><X className="size-4" /></button>
+            </div>
+          )}
+
+          <Composer
+            value={input}
+            onChange={setInput}
+            onSend={send}
+            onStop={stream.stop}
+            onInspire={inspire}
+            streaming={stream.isStreaming && stream.streamingAction !== 'inspire'}
+            inspiring={inspiring}
+            placeholder={`对 ${card.name} 说点什么…`}
+          />
         </div>
-      )}
 
-      <Composer
-        value={input}
-        onChange={setInput}
-        onSend={send}
-        onStop={stream.stop}
-        onInspire={inspire}
-        streaming={stream.isStreaming && stream.streamingAction !== 'inspire'}
-        inspiring={inspiring}
-        placeholder={`对 ${card.name} 说点什么…`}
-      />
+        {commentsAvailable && isLarge && commentsOpen && (
+          <aside id="cv_comments_panel" aria-label="评论" className="glass hidden w-[340px] shrink-0 flex-col border-l border-cv-border lg:flex">
+            <div className="flex shrink-0 items-center justify-between px-4 pb-1 pt-3">
+              <h2 className="font-display text-base font-semibold">评论</h2>
+              <IconButton label="收起评论" variant="ghost" size="sm" onClick={toggleComments}><X /></IconButton>
+            </div>
+            <CommentThread variant="panel" characterId={character.id} authorId={character.user_id} className="min-h-0 flex-1" />
+          </aside>
+        )}
+      </div>
+
+      {commentsAvailable && !isLarge && (
+        <GlassSheet open={commentsSheetOpen} onOpenChange={setCommentsSheetOpen}>
+          <GlassSheetContent side="right" title="评论" className="[&>div:last-child]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-1 [&>div:last-child]:flex-col">
+            <CommentThread variant="panel" characterId={character.id} authorId={character.user_id} className="min-h-0 flex-1" />
+          </GlassSheetContent>
+        </GlassSheet>
+      )}
 
       <ChatSettingsSheet
         open={settingsOpen}

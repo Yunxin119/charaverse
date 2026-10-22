@@ -2,11 +2,12 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { Heart } from 'lucide-react'
+import { Heart, MessagesSquare } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Chip, PosterCard, PosterTitle } from '@/components/glass'
 import type { Character } from '@/app/lib/supabase'
 import { cn } from '@/lib/utils'
+import { formatCount } from '@/components/stats/StatTiles'
 
 /** The minimum a card needs. Both the owner list and public lists map onto this. */
 export interface CharacterCardData {
@@ -60,6 +61,19 @@ export interface CharacterCardProps extends Omit<React.ComponentProps<'article'>
   footer?: React.ReactNode
   /** show the like count chip when `data.likes` is set */
   showLikes?: boolean
+  /** public chat aggregates; hidden when both are 0 */
+  stats?: { sessions: number; turns: number }
+}
+
+/** "N 人聊过 · M 轮" — one muted line; `null` when there is nothing to say. */
+export function CharacterStatsLine({ stats, className }: { stats?: { sessions: number; turns: number }; className?: string }) {
+  if (!stats || (stats.sessions <= 0 && stats.turns <= 0)) return null
+  return (
+    <span className={cn('inline-flex items-center gap-1 text-[11px] tabular-nums', className)} title="聊过的人数 · 发言轮数">
+      <MessagesSquare className="size-3 shrink-0" aria-hidden />
+      {formatCount(stats.sessions)} 人聊过 · {formatCount(stats.turns)} 轮
+    </span>
+  )
 }
 
 const POSTER_TONES = ['primary', 'ink', 'accent'] as const
@@ -74,7 +88,7 @@ function StretchedLink({ href, name, className }: { href: string; name: string; 
  * - `poster`: PosterCard cover (avatar as full-bleed image, big display-serif name).
  * - `glass`: compact row for lists.
  */
-export function CharacterCard({ data, variant = 'poster', href, chips, menu, footer, showLikes, className, ...props }: CharacterCardProps) {
+export function CharacterCard({ data, variant = 'poster', href, chips, menu, footer, showLikes, stats, className, ...props }: CharacterCardProps) {
   const keywords = (data.keywords ?? []).slice(0, MAX_KEYWORDS)
   const extra = (data.keywords?.length ?? 0) - keywords.length
   const likeChip = showLikes && typeof data.likes === 'number'
@@ -95,6 +109,7 @@ export function CharacterCard({ data, variant = 'poster', href, chips, menu, foo
             )}
           </div>
           <p className="truncate text-sm text-cv-fg-muted">{data.intro || '还没有介绍'}</p>
+          <CharacterStatsLine stats={stats} className="mt-0.5 text-cv-fg-subtle" />
           {(keywords.length > 0 || chips) && (
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {chips}
@@ -144,6 +159,7 @@ export function CharacterCard({ data, variant = 'poster', href, chips, menu, foo
           )}
           <PosterTitle className="line-clamp-2 text-xl sm:text-2xl">{data.name}</PosterTitle>
           <p className={cn('mt-1.5 line-clamp-2 text-sm', onImage ? 'text-white/85' : 'opacity-80')}>{data.intro || '还没有介绍'}</p>
+          <CharacterStatsLine stats={stats} className={cn('mt-2', onImage ? 'text-white/75' : 'opacity-70')} />
           {keywords.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {keywords.map((k) => <Chip key={k} tone="outline" className={cn('px-2 py-0.5 text-[11px]', posterChip)}>{k}</Chip>)}

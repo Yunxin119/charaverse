@@ -321,6 +321,12 @@ docs/                       # 本文件 + design/
 - [ ] **需要你手动执行**：Supabase SQL editor 跑 `supabase/migrations/0006_rate_limits.sql`（`rate_limits` 表 + `consume_rate_limit` 函数）。不跑也能用（内存兜底），但多实例部署时限流不准
 - 验收：`tsc` / `eslint` / `next build` / 116 测试全绿 ✅；旧 `x-api-key` 兼容层已删；`@types/node` 升到 22 后 `npm install` 不再需要 `--legacy-peer-deps`；浏览器响应头能看到 CSP、连续快速发 31 条消息会收到 429 —— **待你实测**
 
+### 迭代 4（2026-10-22）
+- [x] Vercel 构建修复：lockfile 补齐 Linux 平台二进制，`.npmrc` 固定 legacy-peer-deps
+- [x] 注册邮箱验证流程（`/auth/callback`）、找回密码（`/auth/reset`）
+- [x] 社交：聊天页右侧评论区（楼中楼、作者标识、作者可删），`character_stats` 公开聚合统计 + 触发器，探索 / 角色页 / 作者页 / 「我的」页统计（0011）
+- [ ] 下一步候选：收藏角色 + 收藏夹、复制分享链接、评论点赞、评论回复通知
+
 ### 迭代 3（2026-10-21）
 - [x] 角色卡导入导出：`lib/cards`（PNG tEXt 块读写、通用卡 v1/v2/v3 ↔ 我们的格式，`extensions.charaverse` 无损往返）；导出 JSON / PNG 卡，导入 JSON / PNG 含世界书与头像
 - [x] 聊天记录导入导出：`lib/chatlog`（JSON 无损、通用 JSONL、Markdown）；聊天页导出，角色主页导入成新对话

@@ -3,10 +3,11 @@
 import { useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Loader2, MessageSquarePlus, Play, Pencil, Palette, Globe, ArrowLeft, MoreHorizontal, FileJson, ImageDown, Upload } from 'lucide-react'
+import { Loader2, MessageSquarePlus, Play, Pencil, Palette, Globe, ArrowLeft, MoreHorizontal, FileJson, ImageDown, Upload, MessagesSquare, Repeat } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/providers/AuthProvider'
-import { useCharacter, useCharacterSessions, useChatImport } from '@/queries'
+import { useCharacter, useCharacterSessions, useChatImport, useCharacterStats } from '@/queries'
+import { formatCount } from '@/components/stats/StatTiles'
 import { useStartSession } from '@/queries/useChatMutations'
 import { parseCharacterCard } from '@/lib/chat/characterCard'
 import { importChatText } from '@/lib/chatlog/format'
@@ -29,6 +30,7 @@ export default function CharacterHubPage() {
   const start = useStartSession()
   const chatImport = useChatImport()
   const chatFileRef = useRef<HTMLInputElement>(null)
+  const statsQ = useCharacterStats(characterQ.data ? [characterQ.data.id] : [])
 
   if (characterQ.isLoading || !user) return <div className="flex h-dvh items-center justify-center text-cv-fg-muted"><Loader2 className="mr-2 size-5 animate-spin" />加载角色…</div>
   const c = characterQ.data
@@ -36,6 +38,7 @@ export default function CharacterHubPage() {
   if (c.user_id !== user.id) { router.replace(`/character/public/${c.id}`); return null }
 
   const card = parseCharacterCard(c)
+  const stats = statsQ.data?.get(c.id)
   const sessions = sessionsQ.data ?? []
   const latest = sessions[0]
   const open = (forceNew: boolean) =>
@@ -91,6 +94,12 @@ export default function CharacterHubPage() {
             <div className="mt-3 flex flex-wrap gap-2">
               {c.is_public ? <Chip tone="success"><Globe className="size-3" />已发布</Chip> : <Chip tone="outline" className="border-white/25 text-white/85">私人</Chip>}
               <Chip tone="outline" className="border-white/25 text-white/85">{sessions.length} 个对话</Chip>
+              {stats && (stats.session_count > 0 || stats.turn_count > 0) && (
+                <>
+                  <Chip tone="outline" className="border-white/25 text-white/85" title="聊过这个角色的对话数（公开聚合）"><MessagesSquare className="size-3" />{formatCount(stats.session_count)} 人聊过</Chip>
+                  <Chip tone="outline" className="border-white/25 text-white/85" title="用户发言轮数（公开聚合）"><Repeat className="size-3" />{formatCount(stats.turn_count)} 轮</Chip>
+                </>
+              )}
             </div>
           </div>
         </div>

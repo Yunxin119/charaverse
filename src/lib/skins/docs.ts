@@ -27,6 +27,12 @@ export const SELECTOR_GROUPS: { label: string; items: { selector: string; desc: 
     { selector: '#cv_send_button', desc: '发送 / 停止按钮' },
   ] },
   { label: '消息操作', items: [{ selector: '.cv_message_actions_box', desc: '消息操作按钮组' }] },
+  { label: '评论区（电脑版）', items: [
+    { selector: '#cv_chat_row', desc: '聊天列 + 评论栏的横向容器' },
+    { selector: '#cv_chat_column', desc: '聊天主列' },
+    { selector: '#cv_comments_panel', desc: '右侧评论栏（仅已发布角色）' },
+    { selector: '#cv_comments_button', desc: '顶部栏的评论开关' },
+  ] },
 ]
 
 export const CSS_PRESETS: { name: string; css: string }[] = [

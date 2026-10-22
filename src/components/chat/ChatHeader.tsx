@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Brain, History, MoreHorizontal, Settings2, GitBranch, ChevronDown, Palette, MessagesSquare, Download } from 'lucide-react'
+import { ArrowLeft, Brain, History, MoreHorizontal, Settings2, GitBranch, ChevronDown, Palette, MessagesSquare, Download, MessageSquareText } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { IconButton } from '@/components/glass'
@@ -18,9 +18,13 @@ interface Props {
   onNewBranchFromEnd?: () => void
   /** opens the export dialog (rendered by ChatView) */
   onExport?: () => void
+  /** public characters only: comment panel toggle (rendered by ChatView) */
+  commentsAvailable?: boolean
+  commentsOpen?: boolean
+  onToggleComments?: () => void
 }
 
-export function ChatHeader({ sessionId, character, title, modelLabel, presetLabel, onOpenSettings, onNewBranchFromEnd, onExport }: Props) {
+export function ChatHeader({ sessionId, character, title, modelLabel, presetLabel, onOpenSettings, onNewBranchFromEnd, onExport, commentsAvailable, commentsOpen, onToggleComments }: Props) {
   const router = useRouter()
   return (
     <header id="cv_chat_header" className="sticky top-0 z-20 px-3 pt-3 sm:px-5 sm:pt-4">
@@ -42,6 +46,19 @@ export function ChatHeader({ sessionId, character, title, modelLabel, presetLabe
         <IconButton label="记忆" variant="ghost" size="sm" onClick={() => router.push(`/chat/${sessionId}/memory`)} className="hidden sm:inline-flex">
           <Brain />
         </IconButton>
+        {commentsAvailable && onToggleComments && (
+          <IconButton
+            id="cv_comments_button"
+            label={commentsOpen ? '收起评论' : '评论'}
+            variant="ghost"
+            size="sm"
+            aria-pressed={!!commentsOpen}
+            onClick={onToggleComments}
+            className="aria-pressed:bg-[color-mix(in_oklab,var(--cv-accent)_14%,transparent)] aria-pressed:text-cv-accent"
+          >
+            <MessageSquareText />
+          </IconButton>
+        )}
         <IconButton label="会话设置" variant="ghost" size="sm" onClick={onOpenSettings}>
           <Settings2 />
         </IconButton>
