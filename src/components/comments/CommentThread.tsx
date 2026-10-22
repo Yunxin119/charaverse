@@ -84,8 +84,10 @@ function buildThreads(rows: CharacterComment[]): Thread[] {
   return threads.sort((a, b) => b.root.created_at.localeCompare(a.root.created_at))
 }
 
+/** PostgrestError is a plain object in some supabase-js builds, so don't rely on `instanceof Error`. */
 function errorText(e: unknown, fallback: string) {
-  return e instanceof Error && e.message ? e.message : fallback
+  const msg = typeof e === 'object' && e !== null && 'message' in e ? (e as { message?: unknown }).message : null
+  return typeof msg === 'string' && msg.trim() ? msg : fallback
 }
 
 export interface CommentThreadProps {
@@ -124,6 +126,7 @@ export function CommentThread({ characterId, authorId, variant = 'page', classNa
       toast.success('回复已发布')
       void invalidate()
     },
+    onError: (e) => toast.error(errorText(e, '回复失败，请重试')),
   })
 
   const remove = useMutation({
@@ -151,7 +154,12 @@ export function CommentThread({ characterId, authorId, variant = 'page', classNa
       {comments.isLoading && (
         <div className="flex items-center gap-2 py-3 text-sm text-cv-fg-muted"><Loader2 className="size-4 animate-spin" />加载评论…</div>
       )}
-      {comments.isError && <p className="py-3 text-sm text-cv-danger">评论加载失败，请刷新重试。</p>}
+      {comments.isError && (
+        <p className="py-3 text-sm text-cv-danger">
+          评论加载失败：{errorText(comments.error, '请刷新重试')}
+          <button type="button" className="ml-2 font-semibold text-cv-accent hover:underline" onClick={() => void comments.refetch()}>重试</button>
+        </p>
+      )}
       {comments.data?.length === 0 && (
         <p className={cn('text-center text-sm text-cv-fg-muted', panel ? 'py-8' : 'py-6')}>还没有评论，来说第一句吧。</p>
       )}
@@ -395,6 +403,7 @@ function TopLevelComposer({ characterId, compact, onPosted }: { characterId: num
       setImages([])
       onPosted()
     },
+    onError: (e) => toast.error(errorText(e, '发布失败，请重试')),
   })
 
   const pickFiles = async (files: FileList | null) => {

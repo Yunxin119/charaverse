@@ -10,6 +10,9 @@
 alter table public.character_comments
   add column if not exists parent_id bigint references public.character_comments(id) on delete cascade;
 create index if not exists character_comments_parent_idx on public.character_comments(parent_id);
+-- image attachments (string[] of public storage URLs); the v1 script that added it was never applied on some DBs
+alter table public.character_comments
+  add column if not exists images jsonb not null default '[]'::jsonb;
 
 drop policy if exists "character_author_can_delete_comments" on public.character_comments;
 create policy "character_author_can_delete_comments" on public.character_comments

@@ -61,7 +61,7 @@ npm install
 8. `supabase/migrations/0008_lorebooks.sql` — `characters.lorebook` 列 + `lorebooks` 表
 9. `supabase/migrations/0009_task_prompts.sql` — `user_task_prompts` 表（可编辑的摘要 / 记忆提取 prompt）
 10. `supabase/migrations/0010_drop_diaries.sql` — 可选，删除已下线的日记表和列
-11. `supabase/migrations/0011_social_stats.sql` — 评论回复、`character_stats` 表与触发器、`get_my_stats` / `get_author_stats`
+11. `supabase/migrations/0011_social_stats.sql` — 评论回复、补 `character_comments.images` 列、`character_stats` 表与触发器、`get_my_stats` / `get_author_stats`（已经跑过旧版 0011 的库只需再跑 `supabase/hotfix/comments_images_column.sql`）
 
 跑 hotfix 前建议先导出一份现有策略对照：`select * from pg_policies order by schemaname, tablename, policyname;`
 

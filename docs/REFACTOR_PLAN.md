@@ -325,6 +325,7 @@ docs/                       # 本文件 + design/
 - [x] Vercel 构建修复：lockfile 补齐 Linux 平台二进制，`.npmrc` 固定 legacy-peer-deps
 - [x] 注册邮箱验证流程（`/auth/callback`）、找回密码（`/auth/reset`）
 - [x] 社交：聊天页右侧评论区（楼中楼、作者标识、作者可删），`character_stats` 公开聚合统计 + 触发器，探索 / 角色页 / 作者页 / 「我的」页统计（0011）
+- [x] 修评论区「发出去没反应」：线上库缺 `character_comments.images` 列（v1 的脚本没跑过），列表查询 400 但插入成功；0011 补列 + `hotfix/comments_images_column.sql`，评论区加载 / 发布 / 回复失败都显示真实错误并可重试
 - [ ] 下一步候选：收藏角色 + 收藏夹、复制分享链接、评论点赞、评论回复通知
 
 ### 迭代 3（2026-10-21）
