@@ -9,7 +9,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/app/lib/supabase'
 import { useAuth } from '@/providers/AuthProvider'
 import { useForkCharacter, usePublicCharacter, useToggleLike } from '@/queries/usePublic'
-import { useCharacterStats } from '@/queries'
+import { useCharacterStats, useCharacters } from '@/queries'
 import { useMyFavoriteIds, useToggleFavorite } from '@/queries/useFavorites'
 import { StatTiles } from '@/components/stats/StatTiles'
 import { describeTemplate, type SnapshotModule } from '@/components/character/snapshot'
@@ -33,6 +33,8 @@ export default function PublicCharacterPage() {
   const favIds = useMyFavoriteIds(user?.id)
   const toggleFav = useToggleFavorite(user?.id)
   const favorited = favIds.data?.has(characterId) ?? false
+  const mineQ = useCharacters(user?.id)
+  const myCopy = useMemo(() => (mineQ.data ?? []).find((x) => x.source_character_id === characterId), [mineQ.data, characterId])
   // `?comment=<id>` (notification links) → scroll to that comment once loaded
   const [targetComment, setTargetComment] = useState<number | null>(null)
   useEffect(() => {
@@ -74,7 +76,9 @@ export default function PublicCharacterPage() {
   }
   const onFork = () => {
     if (!user || !c?.snapshot) return
-    fork.mutate({ userId: user.id, snapshot: c.snapshot }, { onSuccess: (newId) => router.push(`/characters/${newId}/edit`) })
+    fork.mutate({ userId: user.id, snapshot: c.snapshot, source: { id: c.id, published_at: c.published_at } }, {
+      onSuccess: (newId) => { toast.success('已复制成你的角色；原角色的评论和更新会同步到它的聊天页'); router.push(`/characters/${newId}`) },
+    })
   }
 
   return (
@@ -116,9 +120,13 @@ export default function PublicCharacterPage() {
 
             <div className="flex flex-wrap gap-2">
               <Button variant="accent" onClick={() => router.push(`/chat/new?characterId=${c.id}`)} disabled={!user}><MessageSquare />开始聊天</Button>
-              <Button variant="neu" onClick={onFork} disabled={!user || fork.isPending}>
-                {fork.isPending ? <Loader2 className="animate-spin" /> : <Copy />}复制到我的角色
-              </Button>
+              {myCopy ? (
+                <Button variant="neu" asChild><Link href={`/characters/${myCopy.id}`}><Copy />去我的副本</Link></Button>
+              ) : (
+                <Button variant="neu" onClick={onFork} disabled={!user || fork.isPending || isOwner}>
+                  {fork.isPending ? <Loader2 className="animate-spin" /> : <Copy />}复制成我的角色
+                </Button>
+              )}
               <Button variant="glass" onClick={onLike} disabled={!user || like.isPending} aria-label="点赞">
                 <Heart className={cn(optimistic !== null && 'fill-current text-cv-accent')} />{likes}
               </Button>

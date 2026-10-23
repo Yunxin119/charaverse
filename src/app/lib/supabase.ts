@@ -22,6 +22,11 @@ export type Character = {
   /** what the public sees (plan A12); the live row is the author's private draft */
   published_snapshot?: Record<string, unknown> | null
   published_at?: string | null
+  /** author's note for the latest publish, shown to people who copied / favorited it */
+  release_note?: string | null
+  /** set on copies: the public character this was copied from, and the version it is based on */
+  source_character_id?: number | null
+  source_published_at?: string | null
   likes_count?: number
   is_public: boolean
   created_at: string

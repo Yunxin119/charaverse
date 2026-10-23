@@ -331,7 +331,10 @@ docs/                       # 本文件 + design/
 - [x] 评论点赞：`character_comments.likes_count` + `comment_likes`，`toggle_comment_like` RPC（0013），评论项心形按钮，乐观更新
 - [x] 站内通知：`notifications` 表（owner-only RLS，只由触发器写入）；`notify_on_comment` 触发器：回复 → 被回复者，新评论 / 回复 → 角色作者；`/settings/notifications` 收件箱（打开即标已读，可删）；导航「我的」未读角标（60s 轮询 + 聚焦刷新）
 - [x] 评论定位：通知链接带 `?comment=<id>`，角色页加载完评论后滚动到那条并高亮 3 秒；每条评论有 `#comment-<id>` 锚点；评论已删则提示
-- [ ] 下一步候选：评论按热度排序、角色更新提醒（收藏的角色重新发布时）
+- [x] 评论排序：最新 / 最热（赞数 → 回复数 → 时间），楼中楼保持时间序
+- [x] 副本联动（0014）：`characters.source_character_id` / `source_published_at`，复制时写入；副本的聊天页显示原角色的评论区（原角色撤回发布则隐藏）；公开页已有副本时按钮变「去我的副本」
+- [x] 作者更新：发布对话框加「更新说明」（`release_note`）；`notify_on_character_publish` 触发器通知复制过的人（带 `payload.copy_id`）和收藏的人；副本的聊天页 / 角色主页出现「作者更新了这个角色」横幅，更新前二次确认（覆盖名字 / 头像 / 人设 / 皮肤 / 世界书，对话与记忆不动），聊天页可「暂不更新」按版本记住
+- [ ] 下一步候选：更新前 diff 预览、角色主页显示「落后 N 个版本」
 
 ### 迭代 3（2026-10-21）
 - [x] 角色卡导入导出：`lib/cards`（PNG tEXt 块读写、通用卡 v1/v2/v3 ↔ 我们的格式，`extensions.charaverse` 无损往返）；导出 JSON / PNG 卡，导入 JSON / PNG 含世界书与头像

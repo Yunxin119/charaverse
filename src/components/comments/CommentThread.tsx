@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
-import { CornerDownRight, Heart, ImagePlus, Loader2, MessageCircle, Send, Trash2, X } from 'lucide-react'
+import { CornerDownRight, Flame, Heart, ImagePlus, Loader2, MessageCircle, Send, Sparkles, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/app/lib/supabase'
 import { compressImage, uploadCommentImages, validateImageFile, type CompressedImage } from '@/app/lib/imageUtils'
@@ -78,8 +78,11 @@ function useComments(characterId: number, viewerId: string | undefined) {
   })
 }
 
-/** Group replies under their top-level parent. Roots newest-first, replies oldest-first (rows arrive ascending). */
-function buildThreads(rows: CharacterComment[]): Thread[] {
+export type CommentSort = 'new' | 'hot'
+
+/** Group replies under their top-level parent. Replies stay oldest-first (rows arrive ascending);
+ *  roots are newest-first, or by likes (then reply count, then recency) for 「最热」. */
+function buildThreads(rows: CharacterComment[], sort: CommentSort = 'new'): Thread[] {
   const byRoot = new Map<number, Thread>()
   const orphans: CharacterComment[] = []
   for (const r of rows) if (r.parent_id == null) byRoot.set(r.id, { root: r, replies: [] })
@@ -90,7 +93,12 @@ function buildThreads(rows: CharacterComment[]): Thread[] {
     else orphans.push(r)
   }
   const threads = [...byRoot.values(), ...orphans.map((root) => ({ root, replies: [] }))]
-  return threads.sort((a, b) => b.root.created_at.localeCompare(a.root.created_at))
+  const recency = (a: Thread, b: Thread) => b.root.created_at.localeCompare(a.root.created_at)
+  if (sort === 'hot') {
+    return threads.sort((a, b) =>
+      (b.root.likes_count ?? 0) - (a.root.likes_count ?? 0) || b.replies.length - a.replies.length || recency(a, b))
+  }
+  return threads.sort(recency)
 }
 
 /** PostgrestError is a plain object in some supabase-js builds, so don't rely on `instanceof Error`. */
@@ -122,7 +130,8 @@ export function CommentThread({ characterId, authorId, variant = 'page', classNa
   const [replyTo, setReplyTo] = useState<{ rootId: number; prefill: string } | null>(null)
   const [viewer, setViewer] = useState<{ images: string[]; index: number } | null>(null)
 
-  const threads = useMemo(() => buildThreads(comments.data ?? []), [comments.data])
+  const [sort, setSort] = useState<CommentSort>('new')
+  const threads = useMemo(() => buildThreads(comments.data ?? [], sort), [comments.data, sort])
   const total = comments.data?.length ?? 0
 
   // deep link: scroll the target comment into view and flash it once the list has rendered
@@ -209,6 +218,22 @@ export function CommentThread({ characterId, authorId, variant = 'page', classNa
   }
 
   const countLabel = comments.data ? `${total} 条评论` : null
+  const sortToggle = total > 1 && (
+    <div role="tablist" aria-label="评论排序" className="neu-in inline-flex rounded-full p-0.5">
+      {([['new', '最新', Sparkles], ['hot', '最热', Flame]] as const).map(([id, label, Icon]) => (
+        <button
+          key={id}
+          type="button"
+          role="tab"
+          aria-selected={sort === id}
+          onClick={() => setSort(id)}
+          className={cn('flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-colors', sort === id ? 'bg-cv-bg-elevated text-cv-fg shadow-neu-sm' : 'text-cv-fg-muted hover:text-cv-fg')}
+        >
+          <Icon className="size-3" aria-hidden />{label}
+        </button>
+      ))}
+    </div>
+  )
 
   const list = (
     <>
@@ -287,16 +312,22 @@ export function CommentThread({ characterId, authorId, variant = 'page', classNa
     >
       {panel ? (
         <>
-          <p className="shrink-0 px-4 pb-1 text-xs text-cv-fg-subtle">{countLabel ?? ' '}</p>
+          <div className="flex shrink-0 items-center justify-between gap-2 px-4 pb-1.5">
+            <p className="text-xs text-cv-fg-subtle">{countLabel ?? ' '}</p>
+            {sortToggle}
+          </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">{list}</div>
           <div className="shrink-0 border-t border-cv-border p-3">{composer}</div>
         </>
       ) : (
         <>
-          <h2 className="flex items-center gap-2 font-display text-xl font-semibold">
-            <MessageCircle className="size-5 text-cv-accent" />评论
-            {countLabel && <span className="text-sm font-normal text-cv-fg-muted">{countLabel}</span>}
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-display text-xl font-semibold">
+              <MessageCircle className="size-5 text-cv-accent" />评论
+              {countLabel && <span className="text-sm font-normal text-cv-fg-muted">{countLabel}</span>}
+            </h2>
+            {sortToggle}
+          </div>
           {composer}
           {list}
         </>

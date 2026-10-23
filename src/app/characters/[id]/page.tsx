@@ -3,9 +3,10 @@
 import { useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Loader2, MessageSquarePlus, Play, Pencil, Palette, Globe, ArrowLeft, MoreHorizontal, FileJson, ImageDown, Upload, MessagesSquare, Repeat } from 'lucide-react'
+import { Loader2, MessageSquarePlus, Play, Pencil, Palette, Globe, ArrowLeft, MoreHorizontal, FileJson, ImageDown, Upload, MessagesSquare, Repeat, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/providers/AuthProvider'
+import { CharacterUpdateBanner } from '@/components/character/UpdateBanner'
 import { useCharacter, useCharacterSessions, useChatImport, useCharacterStats } from '@/queries'
 import { formatCount } from '@/components/stats/StatTiles'
 import { useStartSession } from '@/queries/useChatMutations'
@@ -93,6 +94,11 @@ export default function CharacterHubPage() {
             {card.introduction && <p className="mt-2 max-w-xl text-sm opacity-85">{card.introduction}</p>}
             <div className="mt-3 flex flex-wrap gap-2">
               {c.is_public ? <Chip tone="success"><Globe className="size-3" />已发布</Chip> : <Chip tone="outline" className="border-white/25 text-white/85">私人</Chip>}
+              {c.source_character_id && (
+                <Chip tone="outline" className="border-white/25 text-white/85" interactive onClick={() => router.push(`/character/public/${c.source_character_id}`)} title="看原角色">
+                  <Copy className="size-3" />复制自公开角色
+                </Chip>
+              )}
               <Chip tone="outline" className="border-white/25 text-white/85">{sessions.length} 个对话</Chip>
               {stats && (stats.session_count > 0 || stats.turn_count > 0) && (
                 <>
@@ -136,6 +142,8 @@ export default function CharacterHubPage() {
           />
         </div>
       </PosterCard>
+
+      {c.source_character_id && <CharacterUpdateBanner copy={c} userId={user.id} className="mb-6" />}
 
       <GlassPanel>
         <div className="mb-3 flex items-center justify-between">

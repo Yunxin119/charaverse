@@ -10,6 +10,7 @@ import { qk } from '@/queries/keys'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Textarea } from '@/components/ui/textarea'
 import { GlassPanel, Chip, StatusDot } from '@/components/glass'
 import { buildSnapshot, describeTemplate, parseSnapshot, snapshotsEqual, type Snapshot } from './snapshot'
 
@@ -35,6 +36,7 @@ export function PublishSection({ character, draft }: { character: Character; dra
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [note, setNote] = useState('')
 
   const published = useMemo(() => parseSnapshot(row.published_snapshot), [row.published_snapshot])
   const next = useMemo<Snapshot>(
@@ -60,13 +62,14 @@ export function PublishSection({ character, draft }: { character: Character; dra
     mutationFn: async (snapshot: Snapshot) => {
       const { error } = await supabase
         .from('characters')
-        .update({ is_public: true, published_snapshot: snapshot, published_at: new Date().toISOString() })
+        .update({ is_public: true, published_snapshot: snapshot, published_at: new Date().toISOString(), release_note: note.trim() || null })
         .eq('id', row.id)
       if (error) throw error
     },
     onSuccess: () => {
       setOpen(false)
       setError(null)
+      setNote('')
       invalidate()
     },
     onError: (e: Error) => setError(e.message || '发布失败，请重试'),
@@ -118,7 +121,7 @@ export function PublishSection({ character, draft }: { character: Character; dra
       </p>
       {error && <p className="text-xs text-cv-danger">{error}</p>}
 
-      <PublishDialog open={open} onOpenChange={setOpen} snapshot={next} first={!row.is_public} pending={publish.isPending} onConfirm={() => publish.mutate(next)} />
+      <PublishDialog open={open} onOpenChange={setOpen} snapshot={next} first={!row.is_public} pending={publish.isPending} note={note} onNoteChange={setNote} onConfirm={() => publish.mutate(next)} />
     </GlassPanel>
   )
 }
@@ -129,6 +132,8 @@ function PublishDialog({
   snapshot,
   first,
   pending,
+  note,
+  onNoteChange,
   onConfirm,
 }: {
   open: boolean
@@ -136,6 +141,8 @@ function PublishDialog({
   snapshot: Snapshot
   first: boolean
   pending: boolean
+  note: string
+  onNoteChange: (v: string) => void
   onConfirm: () => void
 }) {
   const d = useMemo(() => describeTemplate(snapshot.prompt_template), [snapshot])
@@ -173,6 +180,17 @@ function PublishDialog({
           <Row label="开场白">{d.initialMessage ? '包含' : '无'}</Row>
           <Row label="皮肤">{skinBits.length ? skinBits.join(' · ') : '无'}</Row>
         </dl>
+
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="font-semibold">更新说明<span className="ml-1 text-xs font-normal text-cv-fg-subtle">{first ? '可选' : '复制或收藏过这个角色的人会收到这条'}</span></span>
+          <Textarea
+            value={note}
+            onChange={(e) => onNoteChange(e.target.value)}
+            maxLength={500}
+            placeholder={first ? '比如：第一版，欢迎反馈' : '比如：补了第三章的世界书，调整了开场白'}
+            className="min-h-16 resize-none text-sm"
+          />
+        </label>
 
         <div className="flex gap-2 rounded-cv-md bg-[color-mix(in_oklab,var(--cv-warning)_14%,transparent)] p-3 text-xs leading-relaxed text-cv-fg">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-cv-warning" />

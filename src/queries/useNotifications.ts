@@ -8,7 +8,7 @@ import { supabase } from '@/app/lib/supabase'
  * `useUnreadNotificationCount` powers the nav badge; `useNotifications` the inbox page.
  */
 
-export type NotificationKind = 'reply' | 'comment'
+export type NotificationKind = 'reply' | 'comment' | 'character_update'
 
 export interface NotificationRow {
   id: number
@@ -18,6 +18,8 @@ export interface NotificationRow {
   comment_id: number | null
   read_at: string | null
   created_at: string
+  /** character_update: { copy_id?: number; note?: string | null } */
+  payload: Record<string, unknown> | null
 }
 
 export interface NotificationItem extends NotificationRow {
@@ -56,7 +58,7 @@ export function useNotifications(userId: string | undefined, limit = 60) {
     queryFn: async (): Promise<NotificationItem[]> => {
       const { data, error } = await supabase
         .from('notifications')
-        .select('id, kind, actor_id, character_id, comment_id, read_at, created_at')
+        .select('id, kind, actor_id, character_id, comment_id, read_at, created_at, payload')
         .eq('user_id', userId!)
         .order('created_at', { ascending: false })
         .limit(limit)

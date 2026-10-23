@@ -106,7 +106,7 @@ export function usePublicCharacter(id: number | string | undefined) {
 export function useForkCharacter() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ userId, snapshot }: { userId: string; snapshot: Snapshot }) => {
+    mutationFn: async ({ userId, snapshot, source }: { userId: string; snapshot: Snapshot; source?: { id: number; published_at: string | null } }) => {
       const { data, error } = await supabase
         .from('characters')
         .insert({
@@ -118,6 +118,9 @@ export function useForkCharacter() {
           lorebook: snapshot.lorebook ?? {},
           is_public: false,
           likes_count: 0,
+          // keep the link to the original: comments show up in the copy's chat, and re-publishes offer an upgrade
+          source_character_id: source?.id ?? null,
+          source_published_at: source?.published_at ?? null,
         })
         .select('id')
         .single()

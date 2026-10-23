@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Bell, CornerDownRight, MessageCircle, Trash2 } from 'lucide-react'
+import { ArrowLeft, Bell, CornerDownRight, MessageCircle, Sparkles, Trash2 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { useAuth } from '@/providers/AuthProvider'
@@ -31,7 +31,7 @@ export default function NotificationsPage() {
         <IconButton label="返回" variant="glass" onClick={() => (history.length > 1 ? router.back() : router.push('/settings'))}><ArrowLeft /></IconButton>
         <div>
           <h1 className="font-display text-3xl font-semibold">通知</h1>
-          <p className="mt-1 text-sm text-cv-fg-muted">别人回复你的评论、评论你的角色时会出现在这里。</p>
+          <p className="mt-1 text-sm text-cv-fg-muted">别人回复你的评论、评论你的角色，或者你复制 / 收藏的角色有更新时会出现在这里。</p>
         </div>
       </header>
 
@@ -56,11 +56,21 @@ export default function NotificationsPage() {
 function Row({ n, onDelete }: { n: NotificationItem; onDelete: () => void }) {
   const name = n.actor?.username?.trim() || '有人'
   const unread = !n.read_at
-  const href = n.character_id != null
-    ? `/character/public/${n.character_id}${n.comment ? `?comment=${n.comment_id}` : ''}`
-    : '/explore'
-  const verb = n.kind === 'reply' ? '回复了你的评论' : (n.comment?.parent_id != null ? '在你的角色下回复了评论' : '评论了你的角色')
-  const Icon = n.kind === 'reply' ? CornerDownRight : MessageCircle
+  const isUpdate = n.kind === 'character_update'
+  const copyId = typeof n.payload?.copy_id === 'number' ? n.payload.copy_id : null
+  const note = typeof n.payload?.note === 'string' ? n.payload.note.trim() : ''
+  const href = isUpdate && copyId != null
+    ? `/characters/${copyId}`
+    : n.character_id != null
+      ? `/character/public/${n.character_id}${n.comment ? `?comment=${n.comment_id}` : ''}`
+      : '/explore'
+  const verb = isUpdate
+    ? (copyId != null ? '更新了你复制的角色' : '更新了你收藏的角色')
+    : n.kind === 'reply' ? '回复了你的评论' : (n.comment?.parent_id != null ? '在你的角色下回复了评论' : '评论了你的角色')
+  const Icon = isUpdate ? Sparkles : n.kind === 'reply' ? CornerDownRight : MessageCircle
+  const body = isUpdate
+    ? (note || <span className="text-cv-fg-subtle">（作者没有写更新说明）{copyId != null ? '，去角色主页可以选择是否更新你的副本' : ''}</span>)
+    : (n.comment ? n.comment.content : <span className="text-cv-fg-subtle">（这条评论已被删除）</span>)
   return (
     <li className={cn('glass flex items-start gap-3 rounded-cv-lg p-4', unread && 'ring-1 ring-cv-accent/40')}>
       <Avatar className="size-9 shrink-0">
@@ -75,7 +85,7 @@ function Row({ n, onDelete }: { n: NotificationItem; onDelete: () => void }) {
           {n.character_name && <span className="font-semibold">「{n.character_name}」</span>}
           <Icon className="size-3.5 text-cv-fg-subtle" aria-hidden />
         </p>
-        <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm text-cv-fg">{n.comment ? n.comment.content : <span className="text-cv-fg-subtle">（这条评论已被删除）</span>}</p>
+        <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm text-cv-fg">{body}</p>
         <time className="mt-1 block text-xs text-cv-fg-subtle" dateTime={n.created_at}>{formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: zhCN })}</time>
       </Link>
       <IconButton label="删除通知" size="sm" className="size-7 shrink-0 text-cv-fg-subtle hover:text-cv-danger" onClick={onDelete}><Trash2 className="size-3.5" /></IconButton>
