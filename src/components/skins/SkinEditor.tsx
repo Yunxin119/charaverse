@@ -180,7 +180,7 @@ export function SkinEditor({ character }: Props) {
 
           <TabsContent value="options" className="space-y-4 pt-3">
             <div className="flex items-center justify-between rounded-cv-md neu px-4 py-3">
-              <div><div className="text-sm font-semibold">渲染 AI 回复里的原生 HTML</div><div className="text-xs text-cv-fg-muted">让模型直接输出的 &lt;div&gt;/&lt;style&gt; 块在沙箱里显示（状态栏、手机壳这类美化卡需要开启）</div></div>
+              <div><div className="text-sm font-semibold">渲染 AI 回复里的原生 HTML</div><div className="text-xs text-cv-fg-muted">默认开启：模型输出的 &lt;div&gt;/&lt;style&gt; 块在沙箱 iframe 里显示（状态栏、手机壳这类美化卡靠它）。关掉则按纯文本 / Markdown 显示。</div></div>
               <Switch checked={skin.renderHtml} onCheckedChange={(v) => set('renderHtml', v)} />
             </div>
             <div className="space-y-1.5">

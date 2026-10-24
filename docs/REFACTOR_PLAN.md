@@ -336,6 +336,7 @@ docs/                       # 本文件 + design/
 - [x] 作者更新：发布对话框加「更新说明」（`release_note`）；`notify_on_character_publish` 触发器通知复制过的人（带 `payload.copy_id`）和收藏的人；副本的聊天页 / 角色主页出现「作者更新了这个角色」横幅，更新前二次确认（覆盖名字 / 头像 / 人设 / 皮肤 / 世界书，对话与记忆不动），聊天页可「暂不更新」按版本记住
 - [x] 沉浸式聊天：`settings.background.useAvatar`（默认开）→ 没有自定义背景时用头像当背景，对话流 0.5 透明 + 16px 模糊，视觉小说铺满；`settings.layout: flow | novel`，顶栏一键切换 + 会话设置里的分段控件
 - [x] 视觉小说模式：`VisualNovelStage`（底部对话框：名牌、用户上一句、最新回复流式打字、框内滚动 / 展开、swipe / 重新生成 / 续写、内嵌 Composer），顶栏浮动悬停显示（触屏点舞台切换），完整消息列表放进右侧「对话记录」抽屉；皮肤新增 `#cv_vn_*` 与 `data-layout` / `data-source` 钩子
+- [x] AI 回复里的 HTML 默认渲染（`skin.renderHtml` 默认 true，皮肤里可关）；之前保存过皮肤的角色若存了 false 需在皮肤设置里手动打开
 - [ ] 下一步候选：视觉小说模式的打字机节奏 / 点击推进分段、对话框主题色跟随皮肤
 - [ ] 待修：直接删除 auth 用户会 500（有表的 `user_id` 外键没有 `on delete cascade`，清掉 `chat_sessions` 后才能删）；做「注销账号」前先补一遍级联
 
