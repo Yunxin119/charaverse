@@ -67,3 +67,45 @@ describe('card conversion', () => {
     expect(importCardJson({ hello: 'world' })).toBeNull()
   })
 })
+
+
+describe('regex scripts on common cards', () => {
+  const card = {
+    spec: 'chara_card_v2',
+    spec_version: '2.0',
+    data: {
+      name: 'Rx',
+      description: 'd',
+      first_mes: 'hi',
+      extensions: {
+        regex_scripts: [
+          { scriptName: 'status bar', findRegex: '/<status>([\\s\\S]*?)<\\/status>/g', replaceString: '<div class="bar">$1</div>', placement: [2], disabled: false },
+          { scriptName: 'strip', findRegex: '/\\*\\*/g', replaceString: '', placement: [1, 2] },
+        ],
+      },
+    },
+  }
+
+  it('imports extensions.regex_scripts into the skin, flagging HTML replacements', () => {
+    const imported = cardFromCommon(card)
+    expect(imported).not.toBeNull()
+    const scripts = imported!.skin.regexScripts
+    expect(scripts).toHaveLength(2)
+    expect(scripts[0].find).toBe('<status>([\\s\\S]*?)<\\/status>')
+    expect(scripts[0].renderAsHtml).toBe(true)
+    expect(scripts[0].target).toBe('ai')
+    expect(scripts[1].renderAsHtml).toBe(false)
+    expect(scripts[1].target).toBe('both')
+    expect(imported!.skin.renderHtml).toBe(true)
+  })
+
+  it('exports them back as extensions.regex_scripts', () => {
+    const imported = cardFromCommon(card)!
+    const out = toCommonCardV2({ name: imported.name, prompt_template: imported.prompt_template, skin: imported.skin, lorebook: imported.lorebook })
+    const rx = (out.data as { extensions: { regex_scripts: { findRegex: string; replaceString: string; placement: number[] }[] } }).extensions.regex_scripts
+    expect(rx).toHaveLength(2)
+    expect(rx[0].findRegex.startsWith('/<status>')).toBe(true)
+    expect(rx[0].replaceString).toContain('<div')
+    expect(rx[1].placement).toEqual([1, 2])
+  })
+})

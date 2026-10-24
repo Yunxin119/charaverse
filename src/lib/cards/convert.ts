@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { parseCharacterCard } from '@/lib/chat/characterCard'
 import { parseSkin, type Skin } from '@/lib/skins/schema'
+import { importExternalRegex } from '@/lib/skins/regexScripts'
 import { importExternalLorebook, lorebookSchema, parseLorebook, type Lorebook } from '@/lib/lorebook/schema'
 
 /**
@@ -98,6 +99,15 @@ export function cardFromCommon(raw: unknown): ImportedCard | null {
     else warnings.push(`内嵌世界书未能导入：${r.error}`)
   }
 
+  // regex scripts travel in `extensions.regex_scripts` on common cards → our skin
+  let skin = parseSkin({})
+  const regexRaw = Array.isArray(ext.regex_scripts) ? ext.regex_scripts : Array.isArray(data.regex_scripts) ? data.regex_scripts : null
+  if (regexRaw && regexRaw.length > 0) {
+    const r = importExternalRegex(regexRaw)
+    if (r.ok) skin = parseSkin({ regexScripts: r.scripts })
+    else warnings.push(`内嵌正则脚本未能导入：${r.error}`)
+  }
+
   const prompt_template: AnyRec = {
     basic_info: {
       name,
@@ -113,7 +123,7 @@ export function cardFromCommon(raw: unknown): ImportedCard | null {
     },
     modules,
   }
-  return { name, prompt_template, skin: parseSkin({}), lorebook, source, warnings }
+  return { name, prompt_template, skin, lorebook, source, warnings }
 }
 
 /** Try every format we know. */
@@ -196,6 +206,22 @@ export function toCommonCardV2(c: ExportSource): AnyRec {
           }
         : undefined,
       extensions: {
+        // regex scripts in the common shape so other front-ends pick them up too
+        regex_scripts: parseSkin(c.skin).regexScripts.map((r) => ({
+          id: r.id,
+          scriptName: r.name,
+          findRegex: `/${r.find}/${r.flags}`,
+          replaceString: r.replace,
+          trimStrings: r.trimStrings,
+          placement: r.target === 'both' ? [1, 2] : r.target === 'user' ? [1] : [2],
+          disabled: !r.enabled,
+          markdownOnly: true,
+          promptOnly: false,
+          runOnEdit: true,
+          substituteRegex: 0,
+          minDepth: null,
+          maxDepth: null,
+        })),
         charaverse: {
           version: 1,
           prompt_template: tpl,

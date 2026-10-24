@@ -133,6 +133,12 @@ function mapPlacement(placement: unknown): RegexScript['target'] {
   return 'ai'
 }
 
+/** Replacement text that is itself a block of HTML (status bars, panels): render it in the sandbox. */
+const HTML_REPLACE_RE = /<\s*(div|section|article|details|table|figure|center|style|aside|header|footer|nav|main|svg|font|template|span|img|p|ul|ol|br|hr)\b/i
+export function replaceLooksLikeHtml(replace: string): boolean {
+  return HTML_REPLACE_RE.test(replace)
+}
+
 /** Import external regex script JSON (single object, array, or `{ scripts }`). */
 export function importExternalRegex(raw: unknown): ParseResult {
   const list = toList(raw)
@@ -163,16 +169,18 @@ export function importExternalRegex(raw: unknown): ParseResult {
       ? item.trimStrings.filter((t): t is string => typeof t === 'string' && t.length > 0)
       : []
 
+    const replace = translateReplace(typeof item.replaceString === 'string' ? item.replaceString : '')
     converted.push({
       id,
       name: name.slice(0, 120),
       enabled: !promptOnly && item.disabled !== true,
       find,
       flags,
-      replace: translateReplace(typeof item.replaceString === 'string' ? item.replaceString : ''),
+      replace,
       trimStrings,
       target: mapPlacement(item.placement),
-      renderAsHtml: false,
+      // external scripts have no such flag; HTML-looking replacements are what beautification cards rely on
+      renderAsHtml: replaceLooksLikeHtml(replace),
     })
   }
 

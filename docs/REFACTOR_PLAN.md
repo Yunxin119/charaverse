@@ -339,6 +339,7 @@ docs/                       # 本文件 + design/
 - [x] AI 回复里的 HTML 默认渲染（`skin.renderHtml` 默认 true，皮肤里可关）；之前保存过皮肤的角色若存了 false 需在皮肤设置里手动打开
 - [x] 去掉「复制到我的角色」（版权）：删除 fork 与副本升级链路，0015 删 `source_*` 列；重新发布的通知改发给聊过的人 + 收藏的人（`notify_on_character_publish`），玩家的聊天页出现一次性「作者更新了这个角色」说明条（新快照自动生效，按版本记在本机）
 - [x] 「我的角色」分栏：我创作的 / 我聊过的（别人的角色按对话聚合，继续 / 新对话）；`/characters/[id]` 对非作者变成「我和它的对话」页（只读快照信息、我的对话、导入记录、去公开页）
+- [x] 角色卡导入正则：通用卡 `extensions.regex_scripts` → `skin.regexScripts`（替换文本含 HTML 的脚本自动 `renderAsHtml`，输出进沙箱），导出也写回 `extensions.regex_scripts`
 - [ ] 下一步候选：视觉小说模式的打字机节奏 / 点击推进分段、对话框主题色跟随皮肤
 - [ ] 待修：直接删除 auth 用户会 500（有表的 `user_id` 外键没有 `on delete cascade`，清掉 `chat_sessions` 后才能删）；做「注销账号」前先补一遍级联
 
