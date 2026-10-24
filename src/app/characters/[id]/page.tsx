@@ -3,14 +3,14 @@
 import { useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Loader2, MessageSquarePlus, Play, Pencil, Palette, Globe, ArrowLeft, MoreHorizontal, FileJson, ImageDown, Upload, MessagesSquare, Repeat, Copy } from 'lucide-react'
+import { Loader2, MessageSquarePlus, Play, Pencil, Palette, Globe, ArrowLeft, MoreHorizontal, FileJson, ImageDown, Upload, MessagesSquare, Repeat, ExternalLink, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/providers/AuthProvider'
-import { CharacterUpdateBanner } from '@/components/character/UpdateBanner'
 import { useCharacter, useCharacterSessions, useChatImport, useCharacterStats } from '@/queries'
 import { formatCount } from '@/components/stats/StatTiles'
 import { useStartSession } from '@/queries/useChatMutations'
 import { parseCharacterCard } from '@/lib/chat/characterCard'
+import { parseSnapshot } from '@/components/character/snapshot'
 import { importChatText } from '@/lib/chatlog/format'
 import { downloadCharacterJson, downloadCharacterPng } from '@/lib/cards/exportBrowser'
 import { Button } from '@/components/ui/button'
@@ -34,9 +34,22 @@ export default function CharacterHubPage() {
   const statsQ = useCharacterStats(characterQ.data ? [characterQ.data.id] : [])
 
   if (characterQ.isLoading || !user) return <div className="flex h-dvh items-center justify-center text-cv-fg-muted"><Loader2 className="mr-2 size-5 animate-spin" />加载角色…</div>
-  const c = characterQ.data
-  if (!c) return <div className="p-6 text-cv-fg-muted">找不到这个角色</div>
-  if (c.user_id !== user.id) { router.replace(`/character/public/${c.id}`); return null }
+  const row = characterQ.data
+  if (!row) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+        <PosterCard tone="ink" className="min-h-48">
+          <PosterTitle>找不到这个角色</PosterTitle>
+          <p className="mt-2 text-sm opacity-80">它可能已被删除，或者作者撤回了发布。你和它的对话仍然在「聊天」列表里。</p>
+          <Button className="mt-5 self-start" variant="accent" onClick={() => router.push('/chat')}>去聊天列表</Button>
+        </PosterCard>
+      </div>
+    )
+  }
+  // Someone else's character: this page is 「我和它的对话」. Show what was published, never the author's draft.
+  const isOwner = row.user_id === user.id
+  const snap = isOwner ? null : parseSnapshot(row.published_snapshot)
+  const c = snap ? { ...row, name: snap.name, avatar_url: snap.avatar_url ?? row.avatar_url, prompt_template: snap.prompt_template } : row
 
   const card = parseCharacterCard(c)
   const stats = statsQ.data?.get(c.id)
@@ -80,7 +93,7 @@ export default function CharacterHubPage() {
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
       <div className="mb-4 flex items-center gap-2">
         <IconButton label="返回角色列表" variant="ghost" onClick={() => router.push('/characters')}><ArrowLeft /></IconButton>
-        <span className="text-xs uppercase tracking-[0.14em] text-cv-fg-subtle">角色主页</span>
+        <span className="text-xs uppercase tracking-[0.14em] text-cv-fg-subtle">{isOwner ? '角色主页' : '我和它的对话'}</span>
       </div>
 
       <PosterCard tone="ink" image={c.avatar_url ?? undefined} className="mb-6 min-h-56 p-6 sm:p-8">
@@ -93,12 +106,9 @@ export default function CharacterHubPage() {
             <PosterTitle className="text-3xl">{card.name}</PosterTitle>
             {card.introduction && <p className="mt-2 max-w-xl text-sm opacity-85">{card.introduction}</p>}
             <div className="mt-3 flex flex-wrap gap-2">
-              {c.is_public ? <Chip tone="success"><Globe className="size-3" />已发布</Chip> : <Chip tone="outline" className="border-white/25 text-white/85">私人</Chip>}
-              {c.source_character_id && (
-                <Chip tone="outline" className="border-white/25 text-white/85" interactive onClick={() => router.push(`/character/public/${c.source_character_id}`)} title="看原角色">
-                  <Copy className="size-3" />复制自公开角色
-                </Chip>
-              )}
+              {isOwner
+                ? (c.is_public ? <Chip tone="success"><Globe className="size-3" />已发布</Chip> : <Chip tone="outline" className="border-white/25 text-white/85">私人</Chip>)
+                : <Chip tone="outline" className="border-white/25 text-white/85" interactive onClick={() => router.push(`/user/${c.user_id}`)} title="看作者主页"><UserRound className="size-3" />别人的角色</Chip>}
               <Chip tone="outline" className="border-white/25 text-white/85">{sessions.length} 个对话</Chip>
               {stats && (stats.session_count > 0 || stats.turn_count > 0) && (
                 <>
@@ -114,8 +124,14 @@ export default function CharacterHubPage() {
           <Button variant={latest ? 'glass' : 'accent'} className={latest ? 'text-white' : ''} onClick={() => open(true)} disabled={start.isPending}>
             {start.isPending ? <Loader2 className="animate-spin" /> : <MessageSquarePlus />} 开新对话
           </Button>
-          <Button variant="glass" className="text-white" asChild><Link href={`/characters/${c.id}/edit`}><Pencil /> 编辑</Link></Button>
-          <Button variant="glass" className="text-white" asChild><Link href={`/characters/${c.id}/skin`}><Palette /> 皮肤</Link></Button>
+          {isOwner ? (
+            <>
+              <Button variant="glass" className="text-white" asChild><Link href={`/characters/${c.id}/edit`}><Pencil /> 编辑</Link></Button>
+              <Button variant="glass" className="text-white" asChild><Link href={`/characters/${c.id}/skin`}><Palette /> 皮肤</Link></Button>
+            </>
+          ) : (
+            <Button variant="glass" className="text-white" asChild><Link href={`/character/public/${c.id}`}><ExternalLink /> 公开页 · 评论</Link></Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <IconButton label="更多操作" variant="glass" className="text-white" disabled={chatImport.isPending}>
@@ -123,9 +139,13 @@ export default function CharacterHubPage() {
               </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-44">
-              <DropdownMenuItem onClick={exportJson}><FileJson />导出 JSON</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => void exportPng()}><ImageDown />导出 PNG 卡</DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {isOwner && (
+                <>
+                  <DropdownMenuItem onClick={exportJson}><FileJson />导出 JSON</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => void exportPng()}><ImageDown />导出 PNG 卡</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem onClick={() => chatFileRef.current?.click()}><Upload />导入对话记录</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -142,8 +162,6 @@ export default function CharacterHubPage() {
           />
         </div>
       </PosterCard>
-
-      {c.source_character_id && <CharacterUpdateBanner copy={c} userId={user.id} className="mb-6" />}
 
       <GlassPanel>
         <div className="mb-3 flex items-center justify-between">

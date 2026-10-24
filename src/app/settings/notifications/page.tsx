@@ -31,7 +31,7 @@ export default function NotificationsPage() {
         <IconButton label="返回" variant="glass" onClick={() => (history.length > 1 ? router.back() : router.push('/settings'))}><ArrowLeft /></IconButton>
         <div>
           <h1 className="font-display text-3xl font-semibold">通知</h1>
-          <p className="mt-1 text-sm text-cv-fg-muted">别人回复你的评论、评论你的角色，或者你复制 / 收藏的角色有更新时会出现在这里。</p>
+          <p className="mt-1 text-sm text-cv-fg-muted">别人回复你的评论、评论你的角色，或者你聊过 / 收藏的角色有更新时会出现在这里。</p>
         </div>
       </header>
 
@@ -57,19 +57,18 @@ function Row({ n, onDelete }: { n: NotificationItem; onDelete: () => void }) {
   const name = n.actor?.username?.trim() || '有人'
   const unread = !n.read_at
   const isUpdate = n.kind === 'character_update'
-  const copyId = typeof n.payload?.copy_id === 'number' ? n.payload.copy_id : null
   const note = typeof n.payload?.note === 'string' ? n.payload.note.trim() : ''
-  const href = isUpdate && copyId != null
-    ? `/characters/${copyId}`
+  const href = isUpdate && n.character_id != null
+    ? `/characters/${n.character_id}`
     : n.character_id != null
       ? `/character/public/${n.character_id}${n.comment ? `?comment=${n.comment_id}` : ''}`
       : '/explore'
   const verb = isUpdate
-    ? (copyId != null ? '更新了你复制的角色' : '更新了你收藏的角色')
+    ? '更新了角色'
     : n.kind === 'reply' ? '回复了你的评论' : (n.comment?.parent_id != null ? '在你的角色下回复了评论' : '评论了你的角色')
   const Icon = isUpdate ? Sparkles : n.kind === 'reply' ? CornerDownRight : MessageCircle
   const body = isUpdate
-    ? (note || <span className="text-cv-fg-subtle">（作者没有写更新说明）{copyId != null ? '，去角色主页可以选择是否更新你的副本' : ''}</span>)
+    ? (note || <span className="text-cv-fg-subtle">（作者没有写更新说明）新内容已经在你的对话里生效</span>)
     : (n.comment ? n.comment.content : <span className="text-cv-fg-subtle">（这条评论已被删除）</span>)
   return (
     <li className={cn('glass flex items-start gap-3 rounded-cv-lg p-4', unread && 'ring-1 ring-cv-accent/40')}>

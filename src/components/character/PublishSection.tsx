@@ -182,7 +182,7 @@ function PublishDialog({
         </dl>
 
         <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-semibold">更新说明<span className="ml-1 text-xs font-normal text-cv-fg-subtle">{first ? '可选' : '复制或收藏过这个角色的人会收到这条'}</span></span>
+          <span className="font-semibold">更新说明<span className="ml-1 text-xs font-normal text-cv-fg-subtle">{first ? '可选' : '聊过或收藏过这个角色的人会收到这条'}</span></span>
           <Textarea
             value={note}
             onChange={(e) => onNoteChange(e.target.value)}
@@ -194,7 +194,7 @@ function PublishDialog({
 
         <div className="flex gap-2 rounded-cv-md bg-[color-mix(in_oklab,var(--cv-warning)_14%,transparent)] p-3 text-xs leading-relaxed text-cv-fg">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-cv-warning" />
-          <span>发布后<b>完整的人设提示词、开场白和皮肤</b>都会对其他用户可见，并且可以被复制到他们自己的角色库。请确认里面没有你不想公开的内容。</span>
+          <span>发布后<b>完整的人设提示词、开场白和皮肤</b>都会对其他用户可见（他们可以和它聊天，但不能复制或改写你的角色）。请确认里面没有你不想公开的内容。</span>
         </div>
 
         <DialogFooter>

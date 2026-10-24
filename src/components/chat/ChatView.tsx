@@ -23,8 +23,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { GlassSheet, GlassSheetContent, IconButton, PosterCard, PosterTitle } from '@/components/glass'
 import { CommentThread } from '@/components/comments/CommentThread'
-import { CharacterUpdateBanner } from '@/components/character/UpdateBanner'
-import { useCharacterSource } from '@/queries/useCharacterUpdates'
+import { PublishNoteBanner } from './PublishNoteBanner'
 import type { ChatMessage } from '@/app/lib/supabase'
 import { ChatHeader } from './ChatHeader'
 import { MessageList } from './MessageList'
@@ -65,8 +64,6 @@ export function ChatView({ sessionId }: { sessionId: string }) {
     const snap = parseSnapshot(row.published_snapshot)
     return snap ? { ...row, name: snap.name, avatar_url: snap.avatar_url ?? row.avatar_url, prompt_template: snap.prompt_template, skin: snap.skin ?? {} } : row
   }, [characterQ.data, userId])
-  // copies keep a link to the public original: its comments show up here too
-  const sourceQ = useCharacterSource(characterQ.data)
   const profileQ = useProfile(userId)
   const presetsQ = usePresets(userId)
   const messagesQ = useMessages(sessionId)
@@ -224,11 +221,9 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const bgUrl = bg.url ?? (avatarFallback ? character.avatar_url! : undefined)
   const bgOpacity = avatarFallback ? (novel ? 1 : 0.5) : bg.opacity
   const bgBlur = avatarFallback ? (novel ? 0 : 16) : bg.blur
-  const commentTarget = character.is_public
-    ? { id: character.id, authorId: character.user_id }
-    : sourceQ.data?.is_public ? { id: sourceQ.data.id, authorId: sourceQ.data.user_id } : null
+  const commentTarget = character.is_public ? { id: character.id, authorId: character.user_id } : null
   const commentsAvailable = !!commentTarget
-  const isOwnCopy = !!userId && character.user_id === userId && !!character.source_character_id
+  const isPlayer = character.user_id !== userId
   const presetLabel = settings.presetId ? presetsQ.data?.find((p) => p.id === settings.presetId)?.name : (presetsQ.data?.find((p) => p.is_default)?.name ?? BUILTIN_DEFAULT_PRESET.name)
 
   // --- pieces shared by both layouts ---
@@ -312,7 +307,9 @@ export function ChatView({ sessionId }: { sessionId: string }) {
             revealed={headerPeek}
             onNewBranchFromEnd={messages.length ? () => branch.mutate({ sessionId, messageId: messages[messages.length - 1].id }, { onSuccess: (id) => router.push(`/chat/${id}`) }) : undefined}
           />
-          {isOwnCopy && <CharacterUpdateBanner copy={character} userId={userId} dismissible className={cn('mx-3 shrink-0 sm:mx-4', novel ? 'mt-20' : 'mt-2')} />}
+          {isPlayer && character.is_public && character.published_at && (
+            <PublishNoteBanner characterId={character.id} publishedAt={character.published_at} note={character.release_note ?? null} className={cn('mx-3 shrink-0 sm:mx-4', novel ? 'mt-20' : 'mt-2')} />
+          )}
 
           {novel ? (
             <VisualNovelStage

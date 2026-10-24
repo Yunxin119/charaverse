@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Plus, Search, MessageCircle, Pencil, Palette, MoreHorizontal, Trash2, Globe, Lock, Sparkles, Upload, FileJson, ImageDown } from 'lucide-react'
+import { Plus, Search, MessageCircle, Pencil, Palette, MoreHorizontal, Trash2, Globe, Lock, Sparkles, Upload, FileJson, ImageDown, Compass, Play } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,10 +16,39 @@ import { ImportCardDialog } from '@/components/cards/ImportCardDialog'
 import { downloadCharacterJson, downloadCharacterPng } from '@/lib/cards/exportBrowser'
 import { useAuth } from '@/providers/AuthProvider'
 import type { Character } from '@/app/lib/supabase'
-import { useCharacters, useDeleteCharacter } from '@/queries'
+import { useCharacters, useDeleteCharacter, useSessions, type SessionWithCharacter } from '@/queries'
 import { cn } from '@/lib/utils'
 
 type Visibility = 'all' | 'public' | 'private'
+type Shelf = 'mine' | 'played'
+const SHELVES: { id: Shelf; label: string; desc: string }[] = [
+  { id: 'mine', label: '我创作的', desc: '你写的角色，可编辑、发布、导出' },
+  { id: 'played', label: '我聊过的', desc: '别人发布的角色，内容属于作者；这里只是你的对话' },
+]
+
+/** Others' characters I have sessions with, grouped, most recent first. */
+interface PlayedCharacter {
+  id: number
+  name: string
+  avatar_url: string | null
+  authorId: string
+  isPublic: boolean
+  sessions: number
+  latestSessionId: string
+  lastAt: string
+}
+function groupPlayed(sessions: SessionWithCharacter[] | undefined, userId: string | undefined): PlayedCharacter[] {
+  const by = new Map<number, PlayedCharacter>()
+  for (const s of sessions ?? []) {
+    const ch = s.character
+    if (!ch || !userId || ch.user_id === userId) continue
+    const at = s.updated_at ?? s.created_at
+    const cur = by.get(ch.id)
+    if (cur) { cur.sessions += 1; if (at > cur.lastAt) { cur.lastAt = at; cur.latestSessionId = s.id } }
+    else by.set(ch.id, { id: ch.id, name: ch.name, avatar_url: ch.avatar_url ?? null, authorId: ch.user_id, isPublic: !!ch.is_public, sessions: 1, latestSessionId: s.id, lastAt: at })
+  }
+  return [...by.values()].sort((a, b) => b.lastAt.localeCompare(a.lastAt))
+}
 type SortKey = 'updated_at' | 'created_at' | 'name'
 
 const VISIBILITY: { id: Visibility; label: string }[] = [
@@ -36,6 +65,9 @@ export default function CharactersPage() {
   const router = useRouter()
   const characters = useCharacters(user?.id)
   const del = useDeleteCharacter(user?.id)
+  const [shelf, setShelf] = useState<Shelf>('mine')
+  const sessionsQ = useSessions(user?.id)
+  const played = useMemo(() => groupPlayed(sessionsQ.data, user?.id), [sessionsQ.data, user?.id])
 
   const [query, setQuery] = useState('')
   const [visibility, setVisibility] = useState<Visibility>('all')
@@ -93,16 +125,79 @@ export default function CharactersPage() {
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-semibold">我的角色</h1>
-          <p className="mt-1 text-sm text-cv-fg-muted">{total > 0 ? `${total} 个角色 · 点卡片上的「聊天」继续最近的对话` : '创建你的第一个角色，开始属于它的宇宙。'}</p>
+          <p className="mt-1 text-sm text-cv-fg-muted">
+            {shelf === 'mine'
+              ? (total > 0 ? `${total} 个角色 · 点卡片上的「聊天」继续最近的对话` : '创建你的第一个角色，开始属于它的宇宙。')
+              : `${played.length} 个别人的角色 · 角色内容属于作者，这里只有你自己的对话`}
+          </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="neu" onClick={() => setImportOpen(true)} disabled={!user}><Upload />导入角色</Button>
-          <Button asChild variant="accent">
-            <Link href="/characters/new"><Plus />新建角色</Link>
-          </Button>
-        </div>
+        {shelf === 'mine' && (
+          <div className="flex flex-wrap gap-2">
+            <Button variant="neu" onClick={() => setImportOpen(true)} disabled={!user}><Upload />导入角色</Button>
+            <Button asChild variant="accent">
+              <Link href="/characters/new"><Plus />新建角色</Link>
+            </Button>
+          </div>
+        )}
       </header>
       {user && <ImportCardDialog open={importOpen} onOpenChange={setImportOpen} userId={user.id} />}
+
+      <div className="neu-in mb-6 inline-flex rounded-full p-1" role="tablist" aria-label="角色分区">
+        {SHELVES.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={shelf === t.id}
+            title={t.desc}
+            onClick={() => setShelf(t.id)}
+            className={cn('rounded-full px-4 py-1.5 text-sm font-semibold transition-colors', shelf === t.id ? 'bg-cv-bg-elevated text-cv-fg shadow-neu-sm' : 'text-cv-fg-muted hover:text-cv-fg')}
+          >
+            {t.label}{t.id === 'played' && played.length > 0 && <span className="ml-1.5 text-xs font-normal text-cv-fg-subtle">{played.length}</span>}
+          </button>
+        ))}
+      </div>
+
+      {shelf === 'played' && (
+        <>
+          {sessionsQ.isLoading && <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{Array.from({ length: 3 }).map((_, i) => <CardSkeleton key={i} />)}</div>}
+          {sessionsQ.isSuccess && played.length === 0 && (
+            <PosterCard tone="secondary" className="flex min-h-56 flex-col items-start justify-between p-6 sm:p-8">
+              <Compass className="size-8 opacity-80" />
+              <div className="mt-6">
+                <PosterTitle className="text-2xl">还没有和别人的角色聊过</PosterTitle>
+                <p className="mt-2 max-w-sm text-sm opacity-80">去「探索」找一个喜欢的角色，点「开始聊天」。对话是你的，角色归作者。</p>
+                <Button asChild variant="accent" className="mt-5"><Link href="/explore">去探索</Link></Button>
+              </div>
+            </PosterCard>
+          )}
+          {played.length > 0 && (
+            <motion.div variants={listVariants} initial="hidden" animate="visible" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {played.map((pc) => (
+                <motion.div key={pc.id} variants={itemVariants} layout>
+                  <CharacterCard
+                    data={{ id: pc.id, name: pc.name, avatarUrl: pc.avatar_url, intro: `${pc.sessions} 个对话 · 最近 ${new Date(pc.lastAt).toLocaleDateString('zh-CN')}` }}
+                    variant="poster"
+                    href={`/characters/${pc.id}`}
+                    className="h-full"
+                    chips={pc.isPublic
+                      ? <Chip tone="outline" className="border-white/25 bg-white/15 text-white">别人的角色</Chip>
+                      : <Chip tone="outline" className="border-white/25 bg-white/15 text-white"><Lock className="size-3" />作者已撤回</Chip>}
+                    footer={
+                      <>
+                        <Button size="sm" variant="accent" onClick={() => router.push(`/chat/${pc.latestSessionId}`)}><Play />继续</Button>
+                        {pc.isPublic && <Button size="sm" variant="glass" className="text-white" onClick={() => router.push(`/chat/new?characterId=${pc.id}`)}><MessageCircle />新对话</Button>}
+                      </>
+                    }
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
+        </>
+      )}
+
+      {shelf === 'mine' && (<>
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
@@ -154,7 +249,7 @@ export default function CharactersPage() {
           <span className="flex size-10 items-center justify-center rounded-cv-sm bg-cv-accent text-white shadow-[0_10px_24px_-10px_var(--cv-accent)]"><Sparkles className="size-5" /></span>
           <div className="mt-8">
             <PosterTitle className="text-3xl sm:text-4xl">还没有角色。</PosterTitle>
-            <p className="mt-2 max-w-sm text-sm opacity-80">写一段人设、挑一张封面，几分钟就能开始第一段对话。也可以去「探索」把别人的角色复制过来改。</p>
+            <p className="mt-2 max-w-sm text-sm opacity-80">写一段人设、挑一张封面，几分钟就能开始第一段对话。想先玩玩别人的角色，去「探索」。</p>
             <div className="mt-5 flex flex-wrap gap-2">
               <Button asChild variant="accent"><Link href="/characters/new"><Plus />新建角色</Link></Button>
               <Button asChild variant="glass"><Link href="/explore">去探索</Link></Button>
@@ -206,6 +301,7 @@ export default function CharactersPage() {
           ))}
         </motion.div>
       )}
+      </>)}
     </div>
   )
 }

@@ -44,7 +44,7 @@ export default function ExplorePage() {
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-semibold">探索</h1>
-          <p className="mt-1 text-sm text-cv-fg-muted">别人发布的角色。看到喜欢的，直接开聊、收藏，或者复制一份到自己的角色库里改。</p>
+          <p className="mt-1 text-sm text-cv-fg-muted">别人发布的角色。看到喜欢的，直接开聊或收藏；角色始终属于作者，作者更新后你的对话会自动用上新版本。</p>
         </div>
         <ExploreTabs />
       </header>

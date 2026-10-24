@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Bookmark, ChevronDown, Copy, Heart, Link2, Loader2, MessageSquare, MessageCircle, Pencil, Repeat, Users } from 'lucide-react'
+import { ArrowLeft, Bookmark, ChevronDown, Heart, Link2, MessageSquare, MessagesSquare, MessageCircle, Pencil, Repeat, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/app/lib/supabase'
 import { useAuth } from '@/providers/AuthProvider'
-import { useForkCharacter, usePublicCharacter, useToggleLike } from '@/queries/usePublic'
-import { useCharacterStats, useCharacters } from '@/queries'
+import { usePublicCharacter, useToggleLike } from '@/queries/usePublic'
+import { useCharacterStats } from '@/queries'
 import { useMyFavoriteIds, useToggleFavorite } from '@/queries/useFavorites'
 import { StatTiles } from '@/components/stats/StatTiles'
 import { describeTemplate, type SnapshotModule } from '@/components/character/snapshot'
@@ -25,7 +25,6 @@ export default function PublicCharacterPage() {
   const { user } = useAuth()
   const characterId = Number(id)
   const q = usePublicCharacter(characterId)
-  const fork = useForkCharacter()
   const like = useToggleLike()
   const [optimistic, setOptimistic] = useState<number | null>(null)
   const statsQ = useCharacterStats(Number.isFinite(characterId) ? [characterId] : [])
@@ -33,8 +32,6 @@ export default function PublicCharacterPage() {
   const favIds = useMyFavoriteIds(user?.id)
   const toggleFav = useToggleFavorite(user?.id)
   const favorited = favIds.data?.has(characterId) ?? false
-  const mineQ = useCharacters(user?.id)
-  const myCopy = useMemo(() => (mineQ.data ?? []).find((x) => x.source_character_id === characterId), [mineQ.data, characterId])
   // `?comment=<id>` (notification links) → scroll to that comment once loaded
   const [targetComment, setTargetComment] = useState<number | null>(null)
   useEffect(() => {
@@ -73,12 +70,6 @@ export default function PublicCharacterPage() {
     } catch {
       toast.error('复制失败，请手动复制地址栏里的链接')
     }
-  }
-  const onFork = () => {
-    if (!user || !c?.snapshot) return
-    fork.mutate({ userId: user.id, snapshot: c.snapshot, source: { id: c.id, published_at: c.published_at } }, {
-      onSuccess: (newId) => { toast.success('已复制成你的角色；原角色的评论和更新会同步到它的聊天页'); router.push(`/characters/${newId}`) },
-    })
   }
 
   return (
@@ -120,12 +111,8 @@ export default function PublicCharacterPage() {
 
             <div className="flex flex-wrap gap-2">
               <Button variant="accent" onClick={() => router.push(`/chat/new?characterId=${c.id}`)} disabled={!user}><MessageSquare />开始聊天</Button>
-              {myCopy ? (
-                <Button variant="neu" asChild><Link href={`/characters/${myCopy.id}`}><Copy />去我的副本</Link></Button>
-              ) : (
-                <Button variant="neu" onClick={onFork} disabled={!user || fork.isPending || isOwner}>
-                  {fork.isPending ? <Loader2 className="animate-spin" /> : <Copy />}复制成我的角色
-                </Button>
+              {user && !isOwner && (
+                <Button variant="neu" asChild><Link href={`/characters/${c.id}`}><MessagesSquare />我的对话</Link></Button>
               )}
               <Button variant="glass" onClick={onLike} disabled={!user || like.isPending} aria-label="点赞">
                 <Heart className={cn(optimistic !== null && 'fill-current text-cv-accent')} />{likes}
@@ -140,10 +127,9 @@ export default function PublicCharacterPage() {
                 <Button variant="outline" asChild><Link href={`/characters/${c.id}/edit`}><Pencil />编辑</Link></Button>
               )}
             </div>
-            {fork.isError && <p className="text-xs text-cv-danger">复制失败：{(fork.error as Error).message}</p>}
             {!user && (
               <p className="text-sm text-cv-fg-muted">
-                <Link href={`/login?next=/character/public/${c.id}`} className="font-semibold text-cv-accent hover:underline">登录</Link> 后就可以和它聊天、点赞和收藏。
+                <Link href={`/login?next=/character/public/${c.id}`} className="font-semibold text-cv-accent hover:underline">登录</Link> 后就可以和它聊天、点赞和收藏。聊天不会复制角色，内容始终属于作者。
               </p>
             )}
 

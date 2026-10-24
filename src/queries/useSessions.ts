@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase, type ChatSession, type Character } from '@/app/lib/supabase'
 import { qk } from './keys'
 
-export type SessionWithCharacter = ChatSession & { character: Pick<Character, 'id' | 'name' | 'avatar_url'> | null }
+export type SessionWithCharacter = ChatSession & { character: Pick<Character, 'id' | 'name' | 'avatar_url' | 'user_id' | 'is_public'> | null }
 
 export function useSessions(userId: string | undefined) {
   return useQuery({
@@ -13,7 +13,7 @@ export function useSessions(userId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('chat_sessions')
-        .select('*, character:characters(id, name, avatar_url)')
+        .select('*, character:characters(id, name, avatar_url, user_id, is_public)')
         .eq('user_id', userId!)
         .order('updated_at', { ascending: false })
       if (error) throw error
@@ -41,7 +41,7 @@ export function useCharacterSessions(userId: string | undefined, characterId: nu
     queryFn: async () => {
       const { data, error } = await supabase
         .from('chat_sessions')
-        .select('*, character:characters(id, name, avatar_url)')
+        .select('*, character:characters(id, name, avatar_url, user_id, is_public)')
         .eq('user_id', userId!)
         .eq('character_id', characterId!)
         .order('updated_at', { ascending: false })

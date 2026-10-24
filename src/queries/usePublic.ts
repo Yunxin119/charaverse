@@ -102,37 +102,6 @@ export function usePublicCharacter(id: number | string | undefined) {
   })
 }
 
-/** Copy a published snapshot into the current user's library. Resolves with the new character id. */
-export function useForkCharacter() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ userId, snapshot, source }: { userId: string; snapshot: Snapshot; source?: { id: number; published_at: string | null } }) => {
-      const { data, error } = await supabase
-        .from('characters')
-        .insert({
-          user_id: userId,
-          name: snapshot.name,
-          avatar_url: snapshot.avatar_url,
-          prompt_template: snapshot.prompt_template,
-          skin: snapshot.skin ?? {},
-          lorebook: snapshot.lorebook ?? {},
-          is_public: false,
-          likes_count: 0,
-          // keep the link to the original: comments show up in the copy's chat, and re-publishes offer an upgrade
-          source_character_id: source?.id ?? null,
-          source_published_at: source?.published_at ?? null,
-        })
-        .select('id')
-        .single()
-      if (error) throw error
-      return (data as { id: number }).id
-    },
-    onSuccess: (_id, { userId }) => {
-      qc.invalidateQueries({ queryKey: qk.characters(userId) })
-    },
-  })
-}
-
 /** Like / unlike via RPC (clients cannot update other users' rows). Resolves with the new count. */
 export function useToggleLike() {
   const qc = useQueryClient()
