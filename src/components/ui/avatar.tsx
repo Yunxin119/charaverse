@@ -28,7 +28,8 @@ function AvatarImage({
   return (
     <AvatarPrimitive.Image
       data-slot="avatar-image"
-      className={cn("aspect-square size-full", className)}
+      // cover + crop toward the upper part: a 9:16 portrait keeps its proportions and the face
+      className={cn("aspect-square size-full object-cover object-[center_22%]", className)}
       {...props}
     />
   )

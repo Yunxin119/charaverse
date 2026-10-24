@@ -40,7 +40,7 @@ export function AvatarField({ value, name, onChange }: Props) {
         className="group relative shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-cv-ring"
       >
         <Avatar className="size-24 shadow-neu">
-          <AvatarImage src={value || undefined} alt="" className="object-cover" />
+          <AvatarImage src={value || undefined} alt="" />
           <AvatarFallback className="bg-cv-primary font-display text-3xl text-cv-primary-fg">{name.trim() ? name.trim()[0].toUpperCase() : '?'}</AvatarFallback>
         </Avatar>
         <span className="absolute inset-0 flex items-center justify-center rounded-full bg-cv-primary/0 text-cv-primary-fg opacity-0 transition-[opacity,background-color] group-hover:bg-cv-primary/55 group-hover:opacity-100">
