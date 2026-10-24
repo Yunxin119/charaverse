@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Brain, History, MoreHorizontal, Settings2, GitBranch, ChevronDown, Palette, MessagesSquare, Download, MessageSquareText } from 'lucide-react'
+import { ArrowLeft, Brain, History, MoreHorizontal, Settings2, GitBranch, ChevronDown, Palette, MessagesSquare, Download, MessageSquareText, BookOpenText, Rows3 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { IconButton } from '@/components/glass'
@@ -22,12 +23,27 @@ interface Props {
   commentsAvailable?: boolean
   commentsOpen?: boolean
   onToggleComments?: () => void
+  /** current layout + switch (saved per session by ChatView) */
+  layout?: 'flow' | 'novel'
+  onToggleLayout?: () => void
+  /** visual-novel mode: overlay the stage, fade in on hover / focus, or when `revealed` */
+  floating?: boolean
+  revealed?: boolean
 }
 
-export function ChatHeader({ sessionId, character, title, modelLabel, presetLabel, onOpenSettings, onNewBranchFromEnd, onExport, commentsAvailable, commentsOpen, onToggleComments }: Props) {
+export function ChatHeader({ sessionId, character, title, modelLabel, presetLabel, onOpenSettings, onNewBranchFromEnd, onExport, commentsAvailable, commentsOpen, onToggleComments, layout, onToggleLayout, floating, revealed }: Props) {
   const router = useRouter()
   return (
-    <header id="cv_chat_header" className="sticky top-0 z-20 px-3 pt-3 sm:px-5 sm:pt-4">
+    <header
+      id="cv_chat_header"
+      data-floating={floating ? '' : undefined}
+      className={cn(
+        'z-20 px-3 pt-3 sm:px-5 sm:pt-4',
+        floating
+          ? cn('absolute inset-x-0 top-0 transition-opacity duration-(--cv-dur) hover:opacity-100 focus-within:opacity-100', revealed ? 'opacity-100' : 'opacity-0')
+          : 'sticky top-0'
+      )}
+    >
       <div className="glass mx-auto flex max-w-3xl items-center gap-2 rounded-full py-1.5 pl-1.5 pr-1.5">
         <IconButton id="cv_back_button" label="返回" variant="ghost" size="sm" onClick={() => router.push(`/characters/${character.id}`)}>
           <ArrowLeft />
@@ -57,6 +73,19 @@ export function ChatHeader({ sessionId, character, title, modelLabel, presetLabe
             className="aria-pressed:bg-[color-mix(in_oklab,var(--cv-accent)_14%,transparent)] aria-pressed:text-cv-accent"
           >
             <MessageSquareText />
+          </IconButton>
+        )}
+        {onToggleLayout && (
+          <IconButton
+            id="cv_layout_button"
+            label={layout === 'novel' ? '切换到对话流' : '切换到视觉小说'}
+            variant="ghost"
+            size="sm"
+            aria-pressed={layout === 'novel'}
+            onClick={onToggleLayout}
+            className="aria-pressed:bg-[color-mix(in_oklab,var(--cv-accent)_14%,transparent)] aria-pressed:text-cv-accent"
+          >
+            {layout === 'novel' ? <Rows3 /> : <BookOpenText />}
           </IconButton>
         )}
         <IconButton label="会话设置" variant="ghost" size="sm" onClick={onOpenSettings}>

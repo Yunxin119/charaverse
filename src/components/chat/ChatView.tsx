@@ -19,6 +19,7 @@ import { BUILTIN_DEFAULT_PRESET } from '@/lib/prompt/presets'
 import { parseSkin } from '@/lib/skins/schema'
 import { parseSnapshot } from '@/components/character/snapshot'
 import { SkinStyle } from './SkinStyle'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { GlassSheet, GlassSheetContent, IconButton, PosterCard, PosterTitle } from '@/components/glass'
 import { CommentThread } from '@/components/comments/CommentThread'
@@ -29,6 +30,7 @@ import { ChatHeader } from './ChatHeader'
 import { MessageList } from './MessageList'
 import { Composer } from './Composer'
 import { ChatSettingsSheet } from './ChatSettingsSheet'
+import { VisualNovelStage } from './VisualNovelStage'
 import { ExportChatDialog } from './ExportChatDialog'
 import type { MessageActionHandlers } from './MessageActions'
 
@@ -96,6 +98,9 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  // visual-novel layout: full message log lives in a sheet; the header floats and is revealed by a stage tap
+  const [logOpen, setLogOpen] = useState(false)
+  const [headerPeek, setHeaderPeek] = useState(false)
   // comments side column (public characters only): lg+ aside persisted in localStorage, < lg a transient sheet
   const isLarge = useIsLarge()
   // lazy read is hydration-safe: the aside only mounts once `isLarge` flips after mount
@@ -211,7 +216,14 @@ export function ChatView({ sessionId }: { sessionId: string }) {
 
   const characterSpeaker = { name: card.name, avatarUrl: character.avatar_url }
   const userSpeaker = { name: settings.userName || profileQ.data?.username || card.userName, avatarUrl: profileQ.data?.avatar_url }
+  const novel = settings.layout === 'novel'
+  const toggleLayout = () => updateSettings.mutate({ layout: novel ? 'flow' : 'novel' })
+  // backdrop: the session's own image, else the character's avatar (dimmed + blurred in flow mode, full in novel mode)
   const bg = settings.background
+  const avatarFallback = !bg.url && bg.useAvatar && !!character.avatar_url
+  const bgUrl = bg.url ?? (avatarFallback ? character.avatar_url! : undefined)
+  const bgOpacity = avatarFallback ? (novel ? 1 : 0.5) : bg.opacity
+  const bgBlur = avatarFallback ? (novel ? 0 : 16) : bg.blur
   const commentTarget = character.is_public
     ? { id: character.id, authorId: character.user_id }
     : sourceQ.data?.is_public ? { id: sourceQ.data.id, authorId: sourceQ.data.user_id } : null
@@ -219,19 +231,70 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const isOwnCopy = !!userId && character.user_id === userId && !!character.source_character_id
   const presetLabel = settings.presetId ? presetsQ.data?.find((p) => p.id === settings.presetId)?.name : (presetsQ.data?.find((p) => p.is_default)?.name ?? BUILTIN_DEFAULT_PRESET.name)
 
+  // --- pieces shared by both layouts ---
+  const lastMessage = messages[messages.length - 1]
+  const renderSkin = { regexScripts: skin.regexScripts, renderHtml: skin.renderHtml, char: card.name, user: userSpeaker.name }
+  const streamingText = stream.isStreaming && stream.streamingAction !== 'inspire' ? stream.streamingText : null
+  const composerProps = {
+    value: input, onChange: setInput, onSend: send, onStop: stream.stop, onInspire: inspire,
+    streaming: stream.isStreaming && stream.streamingAction !== 'inspire', inspiring, placeholder: `对 ${card.name} 说点什么…`,
+  }
+  const emptyState = (
+    <div className="mx-auto mt-10 max-w-sm text-center">
+      <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-cv-md bg-cv-accent text-white shadow-[0_10px_24px_-10px_var(--cv-accent)]"><Sparkles className="size-5" /></div>
+      <h2 className="font-display text-xl font-semibold">和 {card.name} 的故事还没开始</h2>
+      <p className="mt-1 text-sm text-cv-fg-muted">{card.introduction || '发一句话，或者让角色先开口。'}</p>
+      {headers && <Button className="mt-4" variant="neu" size="sm" onClick={() => void runSafe({ action: 'opening', headers, render: settings.streaming })}>让 {card.name} 先说</Button>}
+    </div>
+  )
+  const noticeEl = (stream.error || notice) ? (
+    <div className="mx-auto mb-1 flex w-[min(100%-1.5rem,48rem)] items-center gap-2 rounded-cv-md border border-cv-danger/30 bg-[color-mix(in_oklab,var(--cv-danger)_10%,var(--cv-bg-elevated))] px-3 py-2 text-sm text-cv-danger">
+      <AlertCircle className="size-4 shrink-0" />
+      <span className="flex-1">{stream.error ?? notice}</span>
+      <button type="button" aria-label="关闭" onClick={() => { stream.clearError(); setNotice(null) }} className="rounded-full p-1 hover:bg-cv-danger/10"><X className="size-4" /></button>
+    </div>
+  ) : null
+  const messageList = (
+    <MessageList
+      messages={messages}
+      character={characterSpeaker}
+      user={userSpeaker}
+      skin={renderSkin}
+      streamingText={streamingText}
+      busy={busy}
+      selectedId={selectedId}
+      editingId={editingId}
+      onSelect={setSelectedId}
+      handlersFor={handlersFor}
+      onEditSave={(m, content) => editMessage.mutate({ message: m, content }, { onSuccess: () => setEditingId(null) })}
+      onEditCancel={() => setEditingId(null)}
+      onSwipe={(m, index) => selectSwipe.mutate({ messageId: m.id, index })}
+      hasOlder={!!messagesQ.hasNextPage}
+      loadingOlder={messagesQ.isFetchingNextPage}
+      onLoadOlder={() => void messagesQ.fetchNextPage()}
+      emptyState={emptyState}
+    />
+  )
+
   return (
     <div id="cv_chat_root" className="relative flex h-dvh flex-col overflow-hidden">
       <SkinStyle css={skin.css || card.customCss || ''} allowedUrlHosts={skin.allowedUrlHosts} />
-      {bg.url && (
+      {bgUrl && (
         <>
-          <div id="cv_background_image" aria-hidden className="pointer-events-none absolute inset-0 -z-20 bg-cover bg-center" style={{ backgroundImage: `url(${bg.url})`, opacity: bg.opacity, filter: bg.blur ? `blur(${bg.blur}px)` : undefined, transform: bg.blur ? 'scale(1.05)' : undefined }} />
-          <div id="cv_background_overlay" aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-cv-bg/40 via-transparent to-cv-bg/60" />
+          <div
+            id="cv_background_image"
+            aria-hidden
+            data-source={bg.url ? 'custom' : 'avatar'}
+            className="pointer-events-none absolute inset-0 -z-20 bg-cover"
+            style={{ backgroundImage: `url(${bgUrl})`, backgroundPosition: novel ? 'center 18%' : 'center', opacity: bgOpacity, filter: bgBlur ? `blur(${bgBlur}px)` : undefined, transform: bgBlur ? 'scale(1.06)' : undefined }}
+          />
+          <div id="cv_background_overlay" aria-hidden className={cn('pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b', novel ? 'from-cv-bg/35 via-transparent to-transparent' : 'from-cv-bg/40 via-transparent to-cv-bg/60')} />
         </>
       )}
 
       {/* row: chat column + optional comments aside. #cv_chat_root keeps `flex h-dvh flex-col` for skins. */}
       <div id="cv_chat_row" className="flex min-h-0 flex-1">
-        <div id="cv_chat_column" className="flex min-w-0 flex-1 flex-col">
+        <div id="cv_chat_column" data-layout={settings.layout} className="relative flex min-w-0 flex-1 flex-col">
           <ChatHeader
             sessionId={sessionId}
             character={{ id: character.id, ...characterSpeaker }}
@@ -243,55 +306,38 @@ export function ChatView({ sessionId }: { sessionId: string }) {
             commentsAvailable={commentsAvailable}
             commentsOpen={isLarge ? commentsOpen : commentsSheetOpen}
             onToggleComments={toggleComments}
+            layout={settings.layout}
+            onToggleLayout={toggleLayout}
+            floating={novel}
+            revealed={headerPeek}
             onNewBranchFromEnd={messages.length ? () => branch.mutate({ sessionId, messageId: messages[messages.length - 1].id }, { onSuccess: (id) => router.push(`/chat/${id}`) }) : undefined}
           />
-          {isOwnCopy && <CharacterUpdateBanner copy={character} userId={userId} dismissible className="mx-3 mt-2 shrink-0 sm:mx-4" />}
+          {isOwnCopy && <CharacterUpdateBanner copy={character} userId={userId} dismissible className={cn('mx-3 shrink-0 sm:mx-4', novel ? 'mt-20' : 'mt-2')} />}
 
-          <MessageList
-            messages={messages}
-            character={characterSpeaker}
-            user={userSpeaker}
-            skin={{ regexScripts: skin.regexScripts, renderHtml: skin.renderHtml, char: card.name, user: userSpeaker.name }}
-            streamingText={stream.isStreaming && stream.streamingAction !== 'inspire' ? stream.streamingText : null}
-            busy={busy}
-            selectedId={selectedId}
-            editingId={editingId}
-            onSelect={setSelectedId}
-            handlersFor={handlersFor}
-            onEditSave={(m, content) => editMessage.mutate({ message: m, content }, { onSuccess: () => setEditingId(null) })}
-            onEditCancel={() => setEditingId(null)}
-            onSwipe={(m, index) => selectSwipe.mutate({ messageId: m.id, index })}
-            hasOlder={!!messagesQ.hasNextPage}
-            loadingOlder={messagesQ.isFetchingNextPage}
-            onLoadOlder={() => void messagesQ.fetchNextPage()}
-            emptyState={
-              <div className="mx-auto mt-10 max-w-sm text-center">
-                <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-cv-md bg-cv-accent text-white shadow-[0_10px_24px_-10px_var(--cv-accent)]"><Sparkles className="size-5" /></div>
-                <h2 className="font-display text-xl font-semibold">和 {card.name} 的故事还没开始</h2>
-                <p className="mt-1 text-sm text-cv-fg-muted">{card.introduction || '发一句话，或者让角色先开口。'}</p>
-                {headers && <Button className="mt-4" variant="neu" size="sm" onClick={() => void runSafe({ action: 'opening', headers, render: settings.streaming })}>让 {card.name} 先说</Button>}
-              </div>
-            }
-          />
-
-          {(stream.error || notice) && (
-            <div className="mx-auto mb-1 flex w-[min(100%-1.5rem,48rem)] items-center gap-2 rounded-cv-md border border-cv-danger/30 bg-[color-mix(in_oklab,var(--cv-danger)_10%,var(--cv-bg-elevated))] px-3 py-2 text-sm text-cv-danger">
-              <AlertCircle className="size-4 shrink-0" />
-              <span className="flex-1">{stream.error ?? notice}</span>
-              <button type="button" aria-label="关闭" onClick={() => { stream.clearError(); setNotice(null) }} className="rounded-full p-1 hover:bg-cv-danger/10"><X className="size-4" /></button>
-            </div>
+          {novel ? (
+            <VisualNovelStage
+              messages={messages}
+              character={characterSpeaker}
+              user={userSpeaker}
+              skin={renderSkin}
+              streamingText={streamingText}
+              busy={busy}
+              onSwipe={(m, index) => selectSwipe.mutate({ messageId: m.id, index })}
+              onRegenerate={lastMessage?.role === 'assistant' ? handlersFor(lastMessage, true).onRegenerate : undefined}
+              onContinue={lastMessage?.role === 'assistant' ? handlersFor(lastMessage, true).onContinue : undefined}
+              onOpenLog={() => setLogOpen(true)}
+              onStageTap={() => setHeaderPeek((v) => !v)}
+              notice={noticeEl}
+              emptyState={emptyState}
+              composer={composerProps}
+            />
+          ) : (
+            <>
+              {messageList}
+              {noticeEl}
+              <Composer {...composerProps} />
+            </>
           )}
-
-          <Composer
-            value={input}
-            onChange={setInput}
-            onSend={send}
-            onStop={stream.stop}
-            onInspire={inspire}
-            streaming={stream.isStreaming && stream.streamingAction !== 'inspire'}
-            inspiring={inspiring}
-            placeholder={`对 ${card.name} 说点什么…`}
-          />
         </div>
 
         {commentsAvailable && isLarge && commentsOpen && (
@@ -304,6 +350,14 @@ export function ChatView({ sessionId }: { sessionId: string }) {
           </aside>
         )}
       </div>
+
+      {novel && (
+        <GlassSheet open={logOpen} onOpenChange={setLogOpen}>
+          <GlassSheetContent side="right" title="对话记录" className="sm:max-w-2xl [&>div:last-child]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-1 [&>div:last-child]:flex-col">
+            {messageList}
+          </GlassSheetContent>
+        </GlassSheet>
+      )}
 
       {commentsAvailable && !isLarge && (
         <GlassSheet open={commentsSheetOpen} onOpenChange={setCommentsSheetOpen}>

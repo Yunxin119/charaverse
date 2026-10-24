@@ -21,8 +21,12 @@ export const sessionSettingsSchema = z.object({
       url: z.string().max(1024).optional(),
       opacity: z.number().min(0).max(1).default(0.85),
       blur: z.number().min(0).max(40).default(0),
+      /** no custom image → fall back to the character's avatar as the backdrop */
+      useAvatar: z.boolean().default(true),
     })
     .prefault({}),
+  /** 'flow' = classic message list; 'novel' = full-bleed character image + bottom dialogue box */
+  layout: z.enum(['flow', 'novel']).default('flow'),
   /** override the persona name used for {{user}} */
   userName: z.string().max(60).optional(),
   /** per-session sampling overrides; undefined = follow the preset */

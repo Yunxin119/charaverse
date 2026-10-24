@@ -27,6 +27,17 @@ export const SELECTOR_GROUPS: { label: string; items: { selector: string; desc: 
     { selector: '#cv_send_button', desc: '发送 / 停止按钮' },
   ] },
   { label: '消息操作', items: [{ selector: '.cv_message_actions_box', desc: '消息操作按钮组' }] },
+  { label: '视觉小说模式', items: [
+    { selector: '#cv_chat_column[data-layout="novel"]', desc: '视觉小说模式下的聊天主列（用它限定只在该模式生效的规则）' },
+    { selector: '#cv_background_image[data-source="avatar"]', desc: '用角色头像充当的背景（没有自定义背景时）' },
+    { selector: '#cv_vn_stage', desc: '舞台（图片之上、对话框之下的整块区域）' },
+    { selector: '#cv_vn_textbox', desc: '底部对话框' },
+    { selector: '#cv_vn_nametag', desc: '对话框左上角的角色名牌' },
+    { selector: '#cv_vn_user_line', desc: '对话框上方的用户台词' },
+    { selector: '#cv_vn_text', desc: '对话框正文（角色回复）' },
+    { selector: '#cv_vn_controls', desc: '对话框底部的操作行（切换候选 / 重新生成 / 续写 / 记录）' },
+    { selector: '#cv_layout_button', desc: '顶部栏的布局切换按钮' },
+  ] },
   { label: '评论区（电脑版）', items: [
     { selector: '#cv_chat_row', desc: '聊天列 + 评论栏的横向容器' },
     { selector: '#cv_chat_column', desc: '聊天主列' },

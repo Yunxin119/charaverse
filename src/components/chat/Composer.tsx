@@ -14,9 +14,11 @@ interface Props {
   inspiring?: boolean
   disabled?: boolean
   placeholder?: string
+  /** inside the visual-novel dialogue box: no outer padding, flat row instead of the inset pill */
+  embedded?: boolean
 }
 
-export function Composer({ value, onChange, onSend, onStop, onInspire, streaming, inspiring, disabled, placeholder }: Props) {
+export function Composer({ value, onChange, onSend, onStop, onInspire, streaming, inspiring, disabled, placeholder, embedded }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null)
 
   // auto-grow
@@ -39,8 +41,8 @@ export function Composer({ value, onChange, onSend, onStop, onInspire, streaming
   }
 
   return (
-    <div id="cv_chat_input_container" className="px-3 pb-3 pt-1 sm:px-5 sm:pb-5">
-      <div id="cv_chat_input_box" className="neu-in mx-auto flex max-w-3xl items-end gap-2 rounded-cv-xl py-2 pl-4 pr-2">
+    <div id="cv_chat_input_container" className={embedded ? 'pt-1' : 'px-3 pb-3 pt-1 sm:px-5 sm:pb-5'}>
+      <div id="cv_chat_input_box" className={cn('mx-auto flex items-end gap-2', embedded ? 'rounded-cv-lg border-t border-cv-border/60 pt-2 pl-1 pr-0' : 'neu-in max-w-3xl rounded-cv-xl py-2 pl-4 pr-2')}>
         {onInspire && (
           <button
             type="button"

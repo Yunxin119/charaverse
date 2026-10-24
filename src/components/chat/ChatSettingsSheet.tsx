@@ -164,6 +164,25 @@ export function ChatSettingsSheet({ open, onOpenChange, sessionId, userId, title
           </section>
 
           <section className="space-y-2">
+            <Label>布局</Label>
+            <div className="neu-in inline-flex w-full rounded-full p-1" role="tablist" aria-label="聊天布局">
+              {([['flow', '对话流', '经典的消息列表'], ['novel', '视觉小说', '角色图铺满，底部对话框']] as const).map(([id, label, desc]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={draft.layout === id}
+                  onClick={() => set('layout', id)}
+                  className={draft.layout === id ? 'flex-1 rounded-full bg-cv-bg-elevated px-3 py-1.5 text-left shadow-neu-sm' : 'flex-1 rounded-full px-3 py-1.5 text-left text-cv-fg-muted hover:text-cv-fg'}
+                >
+                  <span className="block text-sm font-semibold">{label}</span>
+                  <span className="block text-[11px] opacity-70">{desc}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="space-y-2">
             <Label htmlFor="cv-username">你在对话里的名字</Label>
             <Input id="cv-username" placeholder="留空则用角色卡里的用户设定" value={draft.userName ?? ''} onChange={(e) => set('userName', e.target.value || undefined)} />
           </section>
@@ -178,12 +197,16 @@ export function ChatSettingsSheet({ open, onOpenChange, sessionId, userId, title
               </Button>
               {draft.background.url && <Button variant="ghost" size="sm" onClick={clearBackground}><Trash2 /> 移除</Button>}
             </div>
+            <div className="flex items-center justify-between rounded-cv-md neu px-4 py-3">
+              <div><div className="text-sm">没有上传图片时用角色头像当背景</div><div className="text-xs text-cv-fg-subtle">对话流里会压暗模糊，视觉小说里铺满显示</div></div>
+              <Switch checked={draft.background.useAvatar} onCheckedChange={(v) => set('background', { ...draft.background, useAvatar: v })} />
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              <label className="space-y-1 text-xs text-cv-fg-muted">不透明度 {Math.round(draft.background.opacity * 100)}%
+              <label className={draft.background.url ? 'space-y-1 text-xs text-cv-fg-muted' : 'space-y-1 text-xs text-cv-fg-muted opacity-50'}>不透明度 {Math.round(draft.background.opacity * 100)}%
                 <input type="range" min={0.1} max={1} step={0.05} value={draft.background.opacity} className="w-full accent-[var(--cv-accent)]"
                   onChange={(e) => set('background', { ...draft.background, opacity: Number(e.target.value) })} />
               </label>
-              <label className="space-y-1 text-xs text-cv-fg-muted">模糊 {draft.background.blur}px
+              <label className={draft.background.url ? 'space-y-1 text-xs text-cv-fg-muted' : 'space-y-1 text-xs text-cv-fg-muted opacity-50'}>模糊 {draft.background.blur}px
                 <input type="range" min={0} max={40} step={1} value={draft.background.blur} className="w-full accent-[var(--cv-accent)]"
                   onChange={(e) => set('background', { ...draft.background, blur: Number(e.target.value) })} />
               </label>

@@ -334,7 +334,9 @@ docs/                       # 本文件 + design/
 - [x] 评论排序：最新 / 最热（赞数 → 回复数 → 时间），楼中楼保持时间序
 - [x] 副本联动（0014）：`characters.source_character_id` / `source_published_at`，复制时写入；副本的聊天页显示原角色的评论区（原角色撤回发布则隐藏）；公开页已有副本时按钮变「去我的副本」
 - [x] 作者更新：发布对话框加「更新说明」（`release_note`）；`notify_on_character_publish` 触发器通知复制过的人（带 `payload.copy_id`）和收藏的人；副本的聊天页 / 角色主页出现「作者更新了这个角色」横幅，更新前二次确认（覆盖名字 / 头像 / 人设 / 皮肤 / 世界书，对话与记忆不动），聊天页可「暂不更新」按版本记住
-- [ ] 下一步候选：更新前 diff 预览、角色主页显示「落后 N 个版本」
+- [x] 沉浸式聊天：`settings.background.useAvatar`（默认开）→ 没有自定义背景时用头像当背景，对话流 0.5 透明 + 16px 模糊，视觉小说铺满；`settings.layout: flow | novel`，顶栏一键切换 + 会话设置里的分段控件
+- [x] 视觉小说模式：`VisualNovelStage`（底部对话框：名牌、用户上一句、最新回复流式打字、框内滚动 / 展开、swipe / 重新生成 / 续写、内嵌 Composer），顶栏浮动悬停显示（触屏点舞台切换），完整消息列表放进右侧「对话记录」抽屉；皮肤新增 `#cv_vn_*` 与 `data-layout` / `data-source` 钩子
+- [ ] 下一步候选：视觉小说模式的打字机节奏 / 点击推进分段、对话框主题色跟随皮肤
 
 ### 迭代 3（2026-10-21）
 - [x] 角色卡导入导出：`lib/cards`（PNG tEXt 块读写、通用卡 v1/v2/v3 ↔ 我们的格式，`extensions.charaverse` 无损往返）；导出 JSON / PNG 卡，导入 JSON / PNG 含世界书与头像
