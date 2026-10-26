@@ -17,6 +17,7 @@ import { parseSessionSettings, type SessionSettings } from '@/lib/chat/settings'
 import { parseCharacterCard } from '@/lib/chat/characterCard'
 import { BUILTIN_DEFAULT_PRESET } from '@/lib/prompt/presets'
 import { parseSkin } from '@/lib/skins/schema'
+import { composeSkinCss } from '@/lib/skins/knobs'
 import { parseSnapshot } from '@/components/character/snapshot'
 import { SkinStyle } from './SkinStyle'
 import { cn } from '@/lib/utils'
@@ -273,7 +274,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
 
   return (
     <div id="cv_chat_root" className="relative flex h-dvh flex-col overflow-hidden">
-      <SkinStyle css={skin.css || card.customCss || ''} allowedUrlHosts={skin.allowedUrlHosts} />
+      <SkinStyle css={composeSkinCss(skin.knobs, skin.css || card.customCss)} allowedUrlHosts={skin.allowedUrlHosts} />
       {bgUrl && (
         <>
           <div

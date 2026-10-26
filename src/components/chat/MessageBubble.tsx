@@ -70,7 +70,7 @@ export function MessageBubble({ message, speaker, skin, isLast, selected, onSele
           )}
         </motion.div>
 
-        <div className={cn('flex min-h-7 items-center gap-2 px-1 text-[11px] text-cv-fg-subtle', isUser && 'flex-row-reverse')}>
+        <div className={cn('cv_message_meta flex min-h-7 items-center gap-2 px-1 text-[11px] text-cv-fg-subtle', isUser && 'flex-row-reverse')}>
           <span>{speaker.name} · {formatTime(message.created_at)}</span>
           {showSwipes && (
             <span className="inline-flex items-center gap-0.5 rounded-full glass-strong px-1 py-0.5 text-[11px] font-semibold text-cv-fg-muted">
@@ -122,7 +122,7 @@ export function StreamingBubble({ text, speaker, skin }: { text: string; speaker
         <div className="cv_message_bubble cv_ai_message_bubble glass-strong min-w-0 max-w-full break-words [overflow-wrap:anywhere] rounded-cv-lg rounded-bl-md px-4 py-2.5 text-cv-fg">
           {text ? <MessageContent text={text} role="assistant" skin={skin} /> : <TypingIndicator />}
         </div>
-        <div className="px-1 text-[11px] text-cv-fg-subtle">{speaker.name} · 正在输入…</div>
+        <div className="cv_message_meta px-1 text-[11px] text-cv-fg-subtle">{speaker.name} · 正在输入…</div>
       </div>
     </div>
   )

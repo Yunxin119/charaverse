@@ -18,6 +18,7 @@ export const SELECTOR_GROUPS: { label: string; items: { selector: string; desc: 
     { selector: '.cv_message_avatar', desc: '消息头像' },
     { selector: '.cv_ai_avatar / .cv_user_avatar', desc: 'AI / 用户头像' },
     { selector: '.cv_message_selected', desc: '被选中的消息气泡' },
+    { selector: '.cv_message_meta', desc: '气泡下方的名字 / 时间行' },
     { selector: '.cv-markdown', desc: '气泡内的 Markdown 内容' },
   ] },
   { label: '输入框', items: [

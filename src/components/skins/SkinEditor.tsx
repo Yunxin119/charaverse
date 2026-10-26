@@ -8,6 +8,8 @@ import { parseSkin, skinSchema, type Skin } from '@/lib/skins/schema'
 import { sanitizeCss } from '@/lib/skins/sanitizeCss'
 import { importRegexJson, regexScriptSchema, type RegexScript } from '@/lib/skins/regexScripts'
 import { REGEX_TEMPLATES } from '@/lib/skins/regexTest'
+import { composeSkinCss } from '@/lib/skins/knobs'
+import { KnobsPanel } from './KnobsPanel'
 import { RegexTester } from './RegexTester'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { SELECTOR_GROUPS, CSS_PRESETS, SAMPLE_AI_MESSAGE } from '@/lib/skins/docs'
@@ -47,7 +49,8 @@ export function SkinEditor({ character }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const dirty = JSON.stringify(skin) !== JSON.stringify(initial)
-  const sanitized = useMemo(() => sanitizeCss(skin.css, { allowedUrlHosts: skin.allowedUrlHosts }), [skin.css, skin.allowedUrlHosts])
+  const composedCss = useMemo(() => composeSkinCss(skin.knobs, skin.css), [skin.knobs, skin.css])
+  const sanitized = useMemo(() => sanitizeCss(composedCss, { allowedUrlHosts: skin.allowedUrlHosts }), [composedCss, skin.allowedUrlHosts])
 
   useEffect(() => {
     if (!dirty) return
@@ -126,7 +129,11 @@ export function SkinEditor({ character }: Props) {
           <TabsList className="w-full"><TabsTrigger value="css">CSS</TabsTrigger><TabsTrigger value="regex">正则脚本 {skin.regexScripts.length ? `(${skin.regexScripts.length})` : ''}</TabsTrigger><TabsTrigger value="options">选项</TabsTrigger></TabsList>
 
           <TabsContent value="css" className="space-y-4 pt-3">
-            <Textarea value={skin.css} onChange={(e) => set('css', e.target.value)} spellCheck={false} placeholder={'#cv_chat_root { background: #0c0c0e; }\n.cv_ai_message_bubble { border-radius: 14px; }'} className="min-h-[320px] font-mono text-xs leading-5" />
+            <KnobsPanel value={skin.knobs} onChange={(v) => set('knobs', v)} />
+            <div className="space-y-1.5">
+              <Label htmlFor="skin-css">高级 CSS</Label>
+              <Textarea id="skin-css" value={skin.css} onChange={(e) => set('css', e.target.value)} spellCheck={false} placeholder={'#cv_chat_root { background: #0c0c0e; }\n.cv_ai_message_bubble { border-radius: 14px; }'} className="min-h-[260px] font-mono text-xs leading-5" />
+            </div>
             {sanitized.warnings.length > 0 && (
               <div className="rounded-cv-md border border-cv-warning/30 bg-[color-mix(in_oklab,var(--cv-warning)_10%,transparent)] px-3 py-2 text-xs text-cv-warning">
                 <div className="mb-1 flex items-center gap-1 font-semibold"><AlertTriangle className="size-3.5" />清洗时做了这些处理</div>
@@ -224,7 +231,7 @@ export function SkinEditor({ character }: Props) {
         {/* ---------------- preview ---------------- */}
         <div className="min-w-0 space-y-3">
           <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cv-fg-subtle">实时预览</div>
-          <SkinStyle css={skin.css} allowedUrlHosts={skin.allowedUrlHosts} />
+          <SkinStyle css={composedCss} allowedUrlHosts={skin.allowedUrlHosts} />
           <div id="cv_chat_root" className="relative flex h-[560px] flex-col overflow-hidden rounded-cv-lg border border-cv-border bg-cv-bg">
             <div id="cv_background_overlay" aria-hidden className="pointer-events-none absolute inset-0 -z-10" />
             <div id="cv_chat_header" className="px-3 pt-3"><div className="glass flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold"><span id="cv_back_button" className="text-cv-fg-muted">←</span>{card.name}</div></div>
