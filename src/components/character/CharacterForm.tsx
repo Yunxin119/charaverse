@@ -1,24 +1,28 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, BookOpen, Check, Globe, LayoutList, Loader2, MessageSquareQuote, Palette, Save, UserRound } from 'lucide-react'
+import { ArrowLeft, BookOpen, Check, Eye, Globe, Layers, Loader2, MessageSquareQuote, Palette, Save, ScrollText, Sparkles, UserRound, Users } from 'lucide-react'
 import { supabase, type Character } from '@/app/lib/supabase'
 import { deleteAvatar } from '@/app/lib/avatarUpload'
 import { useAuth } from '@/providers/AuthProvider'
 import { qk } from '@/queries/keys'
 import { Button } from '@/components/ui/button'
-import { Chip, GlassPanel, IconButton } from '@/components/glass'
+import { Chip, GlassPanel, GlassSheet, GlassSheetContent, IconButton } from '@/components/glass'
 import { PublishSection } from '@/components/character/PublishSection'
-import { SectionNav, type NavSection, type SectionId } from './form/SectionNav'
+import { DocumentNav, type DocSection } from './form/DocumentNav'
 import { SectionHeader } from './form/Field'
-import { BasicInfoSection } from './form/BasicInfoSection'
-import { ModulesSection } from './form/ModulesSection'
+import { IdentitySection } from './form/IdentitySection'
+import { CoreSection } from './form/CoreSection'
 import { OpeningSection } from './form/OpeningSection'
+import { RulesSection } from './form/RulesSection'
+import { PersonaSection } from './form/PersonaSection'
+import { ExtrasSection } from './form/ExtrasSection'
 import { LorebookSection } from './form/LorebookSection'
 import { SkinSection } from './form/SkinSection'
-import { buildPromptTemplate, draftFromCharacter, emptyDraft, validateDraft, type CharacterDraft, type DraftErrors } from './form/types'
+import { PreviewDock } from './preview/PreviewDock'
+import { buildPromptTemplate, draftFromCharacter, emptyDraft, personaHasContent, validateDraft, type CharacterDraft, type DraftErrors } from './form/types'
 
 export type { CharacterDraft } from './form/types'
 
@@ -28,9 +32,14 @@ interface Props {
 }
 
 const NO_ERRORS: DraftErrors = {}
+const SECTION_IDS = ['identity', 'core', 'opening', 'rules', 'persona', 'extras', 'lorebook', 'skin', 'publish'] as const
+type SectionId = (typeof SECTION_IDS)[number]
+const LEGACY_SECTION: Record<string, SectionId> = { basic: 'identity', modules: 'extras' }
 
 /**
- * Create / edit a character card. One draft object, sectioned UI, explicit 保存.
+ * Create / edit a character card as one scrolling document: anchor rail on the left,
+ * the card's sections in writing order, and a dock on the right that shows the assembled
+ * prompt (with token estimates) or a scratch 「试聊」 against the unsaved draft.
  * Mount with `key={character.id}` in edit mode so a different character resets the draft.
  */
 export function CharacterForm({ mode, character }: Props) {
@@ -42,20 +51,41 @@ export function CharacterForm({ mode, character }: Props) {
   const initial = useMemo(() => (character ? draftFromCharacter(character) : emptyDraft()), [character])
   const [draft, setDraft] = useState<CharacterDraft>(initial)
   const [baseline, setBaseline] = useState<CharacterDraft>(initial)
-  const [active, setActive] = useState<SectionId>(() => {
-    if (typeof window === 'undefined' || mode !== 'edit') return 'basic'
-    const q = new URLSearchParams(window.location.search).get('section')
-    return q === 'modules' || q === 'opening' || q === 'lorebook' || q === 'skin' || q === 'publish' ? q : 'basic'
-  })
   const [submitted, setSubmitted] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [active, setActive] = useState<SectionId>('identity')
+  const [dockOpen, setDockOpen] = useState(false)
 
   const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(baseline), [draft, baseline])
   const errors = useMemo(() => validateDraft(draft), [draft])
   const shown = submitted ? errors : NO_ERRORS
 
   const set = <K extends keyof CharacterDraft>(key: K, value: CharacterDraft[K]) => setDraft((d) => ({ ...d, [key]: value }))
+
+  // --- anchor navigation: the rail follows the scroll position; `?section=` deep-links ---
+  const scrollTo = (id: SectionId) => {
+    document.getElementById(`sec-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setActive(id)
+  }
+  const deepLinked = useRef(false)
+  useEffect(() => {
+    if (deepLinked.current || mode !== 'edit') return
+    deepLinked.current = true
+    const q = new URLSearchParams(window.location.search).get('section')
+    const id = q && (SECTION_IDS as readonly string[]).includes(q) ? (q as SectionId) : q ? LEGACY_SECTION[q] : undefined
+    if (id) setTimeout(() => scrollTo(id), 50)
+  }, [mode])
+  useEffect(() => {
+    const els = SECTION_IDS.map((id) => document.getElementById(`sec-${id}`)).filter((el): el is HTMLElement => !!el)
+    if (els.length === 0) return
+    const io = new IntersectionObserver((entries) => {
+      const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+      if (visible[0]) setActive(visible[0].target.id.replace('sec-', '') as SectionId)
+    }, { rootMargin: '-25% 0px -60% 0px', threshold: 0 })
+    els.forEach((el) => io.observe(el))
+    return () => io.disconnect()
+  }, [editing])
 
   useEffect(() => {
     if (!dirty) return
@@ -98,13 +128,11 @@ export function CharacterForm({ mode, character }: Props) {
   const submit = () => {
     setSubmitted(true)
     setError(null)
-    if (Object.keys(errors).length) { setActive('basic'); return }
+    if (errors.name) { scrollTo('identity'); return }
+    if (errors.content) { scrollTo('core'); return }
     save.mutate(draft)
   }
-
-  const back = () => {
-    if (!dirty || confirm('有未保存的修改，确定离开？')) router.back()
-  }
+  const back = () => { if (!dirty || confirm('有未保存的修改，确定离开？')) router.back() }
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -117,12 +145,15 @@ export function CharacterForm({ mode, character }: Props) {
     return () => window.removeEventListener('keydown', h)
   })
 
-  const sections: NavSection[] = [
-    { id: 'basic', label: '基本信息', icon: UserRound, error: !!(shown.name || shown.content) },
-    { id: 'modules', label: '人设模块', icon: LayoutList, error: !!shown.content, meta: draft.modules.length ? String(draft.modules.length) : undefined },
-    { id: 'opening', label: '开场白', icon: MessageSquareQuote, meta: draft.initialMessage.trim() ? '✓' : undefined },
+  const sections: DocSection[] = [
+    { id: 'identity', label: '身份', icon: UserRound, error: !!shown.name },
+    { id: 'core', label: '设定', icon: Sparkles, error: !!shown.content },
+    { id: 'opening', label: '开场', icon: MessageSquareQuote, meta: draft.initialMessage.trim() ? '✓' : undefined },
+    { id: 'rules', label: '规则', icon: ScrollText, meta: draft.systemPrompt.trim() || draft.postHistory.trim() ? '✓' : undefined },
+    { id: 'persona', label: '用户人设', icon: Users, meta: personaHasContent(draft.persona) ? '✓' : undefined },
+    { id: 'extras', label: '补充设定', icon: Layers, meta: draft.extras.length ? String(draft.extras.length) : undefined },
     { id: 'lorebook', label: '世界书', icon: BookOpen, meta: draft.lorebook.entries.length ? String(draft.lorebook.entries.length) : undefined },
-    { id: 'skin', label: '外观皮肤', icon: Palette },
+    { id: 'skin', label: '皮肤', icon: Palette },
     { id: 'publish', label: '发布', icon: Globe, meta: editing && character?.is_public ? '公开' : undefined },
   ]
 
@@ -130,11 +161,7 @@ export function CharacterForm({ mode, character }: Props) {
   const canSave = dirty && !save.isPending
 
   return (
-    <form
-      className="mx-auto max-w-4xl px-4 py-6 sm:px-6"
-      onSubmit={(e) => { e.preventDefault(); submit() }}
-      noValidate
-    >
+    <form className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6" onSubmit={(e) => { e.preventDefault(); submit() }} noValidate>
       {/* sticky bar: actions, and on small screens the section tabs */}
       <div className="sticky top-0 z-20 -mt-2 pt-2 pb-3">
         <GlassPanel strength="strong" padding="none" className="space-y-2 px-3 py-2 sm:px-4">
@@ -142,47 +169,83 @@ export function CharacterForm({ mode, character }: Props) {
             <IconButton label="返回" variant="ghost" size="sm" onClick={back}><ArrowLeft /></IconButton>
             <div className="min-w-0 flex-1">
               <h1 className="truncate font-display text-lg font-semibold leading-tight sm:text-xl">{title}</h1>
-              <p className="hidden text-[11px] text-cv-fg-muted sm:block">{editing ? '修改只在你按「保存」后生效' : '保存后可以继续编辑皮肤和发布'}</p>
+              <p className="hidden text-[11px] text-cv-fg-muted sm:block">{editing ? '修改只在你按「保存」后生效 · ⌘S' : '保存后可以编辑皮肤和发布'}</p>
             </div>
             {dirty ? <Chip tone="warning">未保存</Chip> : saved ? <Chip tone="success">已保存</Chip> : null}
+            <Button type="button" variant="neu" size="sm" className="xl:hidden" onClick={() => setDockOpen(true)}><Eye />预览</Button>
             <Button type="submit" size="sm" disabled={!canSave}>
               {save.isPending ? <Loader2 className="animate-spin" /> : saved && !dirty ? <Check /> : <Save />}
               {save.isPending ? '保存中' : '保存'}
             </Button>
           </div>
           <div className="lg:hidden">
-            <SectionNav variant="tabs" sections={sections} active={active} onSelect={setActive} />
+            <DocumentNav variant="tabs" sections={sections} active={active} onSelect={(id) => scrollTo(id as SectionId)} />
           </div>
         </GlassPanel>
         {error && <p role="alert" className="mt-2 rounded-cv-md bg-[color-mix(in_oklab,var(--cv-danger)_12%,transparent)] px-3 py-2 text-sm text-cv-danger">{error}</p>}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)]">
+      <div className="grid gap-6 lg:grid-cols-[160px_minmax(0,1fr)] xl:grid-cols-[160px_minmax(0,1fr)_minmax(340px,400px)]">
         <aside className="hidden lg:block">
-          <SectionNav variant="rail" sections={sections} active={active} onSelect={setActive} />
+          <DocumentNav variant="rail" sections={sections} active={active} onSelect={(id) => scrollTo(id as SectionId)} />
         </aside>
 
-        <div className="min-w-0">
-          {active === 'basic' && <BasicInfoSection draft={draft} errors={shown} onChange={set} />}
-          {active === 'modules' && <ModulesSection modules={draft.modules} error={shown.content} onChange={(m) => set('modules', m)} />}
-          {active === 'opening' && <OpeningSection value={draft.initialMessage} onChange={(v) => set('initialMessage', v)} alternates={draft.alternateGreetings} onAlternatesChange={(v) => set('alternateGreetings', v)} exampleDialogue={draft.exampleDialogue} onExampleDialogueChange={(v) => set('exampleDialogue', v)} />}
-          {active === 'lorebook' && <LorebookSection value={draft.lorebook} onChange={(v) => set('lorebook', v)} characterName={draft.name.trim() || undefined} />}
-          {active === 'skin' && <SkinSection characterId={editing ? character?.id : undefined} />}
-          {active === 'publish' && (
-            <section aria-labelledby="sec-publish">
-              <SectionHeader title="发布" description="发布会冻结一份当前内容给其他人看；之后的修改要再次发布才会公开。" />
-              {editing && character ? (
-                <PublishSection
-                  character={character}
-                  draft={{ name: draft.name, avatar_url: draft.avatar_url || null, prompt_template: buildPromptTemplate(draft, character.prompt_template) }}
-                />
-              ) : (
-                <GlassPanel className="text-sm text-cv-fg-muted">保存角色后就可以在这里发布到探索页。</GlassPanel>
-              )}
-            </section>
-          )}
+        <div className="min-w-0 space-y-10 pb-24">
+          <Section id="identity" title="身份" description="名字、形象、标签和公开简介。发布后别人在探索页看到的就是这些。">
+            <IdentitySection draft={draft} errors={shown} onChange={set} />
+          </Section>
+          <Section id="core" title="设定" description="描述、性格、场景：提示词的主体，每一块都会以独立标签注入。">
+            <CoreSection draft={draft} errors={shown} onChange={set} />
+          </Section>
+          <Section id="opening" title="开场" description="角色的第一句话，以及教模型说话方式的示例。">
+            <OpeningSection value={draft.initialMessage} onChange={(v) => set('initialMessage', v)} alternates={draft.alternateGreetings} onAlternatesChange={(v) => set('alternateGreetings', v)} exampleDialogue={draft.exampleDialogue} onExampleDialogueChange={(v) => set('exampleDialogue', v)} />
+          </Section>
+          <Section id="rules" title="规则" description="希望模型遵守的东西。前者一直在，后者贴在历史后面、更有力。">
+            <RulesSection draft={draft} onChange={set} />
+          </Section>
+          <Section id="persona" title="用户人设" description="故事里的「你」是谁。玩家可以在会话里改称呼。">
+            <PersonaSection value={draft.persona} onChange={(v) => set('persona', v)} />
+          </Section>
+          <Section id="extras" title="补充设定" description="固定字段放不下的，起个名字放这里，按顺序注入。">
+            <ExtrasSection value={draft.extras} onChange={(v) => set('extras', v)} />
+          </Section>
+          <Section id="lorebook" title="世界书" description="随角色一起保存的背景设定。关键词出现在最近几条消息里时，对应条目会注入到提示词；常驻条目总是注入。">
+            <LorebookSection value={draft.lorebook} onChange={(v) => set('lorebook', v)} characterName={draft.name.trim() || undefined} />
+          </Section>
+          <Section id="skin" title="皮肤" description="给聊天页换一套样子：CSS、正则脚本和沙箱 HTML。">
+            <SkinSection characterId={editing ? character?.id : undefined} />
+          </Section>
+          <Section id="publish" title="发布" description="发布会冻结一份当前内容给其他人看；之后的修改要再次发布才会公开。">
+            {editing && character ? (
+              <PublishSection character={character} draft={{ name: draft.name, avatar_url: draft.avatar_url || null, prompt_template: buildPromptTemplate(draft, character.prompt_template) }} />
+            ) : (
+              <GlassPanel className="text-sm text-cv-fg-muted">保存角色后就可以在这里发布到探索页。</GlassPanel>
+            )}
+          </Section>
         </div>
+
+        <aside className="hidden xl:block">
+          <GlassPanel className="sticky top-24 flex max-h-[calc(100dvh-7rem)] flex-col">
+            <PreviewDock draft={draft} className="min-h-0 flex-1" />
+          </GlassPanel>
+        </aside>
       </div>
+
+      <GlassSheet open={dockOpen} onOpenChange={setDockOpen}>
+        <GlassSheetContent side="right" title="预览" className="sm:w-[min(520px,calc(100%-1.5rem))] [&>div:last-child]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-1 [&>div:last-child]:flex-col">
+          <PreviewDock draft={draft} className="min-h-0 flex-1" />
+        </GlassSheetContent>
+      </GlassSheet>
     </form>
+  )
+}
+
+/** Stable component (defined outside the form) so typing never remounts a section. */
+function Section({ id, title, description, children }: { id: SectionId; title: string; description?: string; children: ReactNode }) {
+  return (
+    <section id={`sec-${id}`} aria-labelledby={`sec-${id}-title`} className="scroll-mt-28">
+      <SectionHeader title={title} description={description} />
+      {children}
+    </section>
   )
 }

@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { authedFetch } from '@/lib/authedFetch'
 import { qk } from '@/queries/keys'
+import { readUiTextStream } from '@/lib/llm/readStream'
 
 export type ChatAction = 'send' | 'opening' | 'regenerate' | 'continue' | 'inspire'
 
@@ -64,29 +65,9 @@ export function useChatStream(sessionId: string | undefined) {
         // user message is persisted before streaming starts: show it right away
         if (opts.action === 'send') void qc.invalidateQueries({ queryKey: qk.messages(sessionId) })
 
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buf = ''
-        for (;;) {
-          const { value, done } = await reader.read()
-          if (done) break
-          buf += decoder.decode(value, { stream: true })
-          const lines = buf.split('\n')
-          buf = lines.pop() ?? ''
-          for (const line of lines) {
-            if (!line.startsWith('data:')) continue
-            const payload = line.slice(5).trim()
-            if (!payload || payload === '[DONE]') continue
-            let chunk: { type: string; delta?: string; errorText?: string }
-            try { chunk = JSON.parse(payload) } catch { continue }
-            if (chunk.type === 'text-delta' && chunk.delta) {
-              full += chunk.delta
-              if (render) setStreamingText(full)
-            } else if (chunk.type === 'error') {
-              streamError = chunk.errorText || 'AI 调用失败'
-            }
-          }
-        }
+        const r = await readUiTextStream(res.body, (text) => { full = text; if (render) setStreamingText(text) })
+        full = r.text
+        if (r.error) streamError = r.error
       } catch (e) {
         if ((e as Error)?.name !== 'AbortError') streamError = (e as Error)?.message || '网络错误'
       } finally {

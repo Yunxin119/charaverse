@@ -108,7 +108,8 @@ export async function loadChatContext(supabase: SupabaseClient, sessionId: strin
   }
 }
 
-async function loadPreset(supabase: SupabaseClient, userId: string, presetId: string | null): Promise<PresetFile> {
+/** The user's chosen preset (by id, else their default), falling back to the builtin one. */
+export async function loadPreset(supabase: SupabaseClient, userId: string, presetId: string | null): Promise<PresetFile> {
   let q = supabase.from('user_presets').select('data').eq('user_id', userId)
   q = presetId ? q.eq('id', presetId) : q.eq('is_default', true)
   const { data } = await q.limit(1).maybeSingle()
