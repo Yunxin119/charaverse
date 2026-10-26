@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, Loader2, Plus, Trash2, Upload, Copy, Check, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Save, Loader2, Plus, Trash2, Upload, Copy, Check, AlertTriangle, LayoutTemplate, FlaskConical } from 'lucide-react'
 import { supabase, type Character } from '@/app/lib/supabase'
 import { parseSkin, skinSchema, type Skin } from '@/lib/skins/schema'
 import { sanitizeCss } from '@/lib/skins/sanitizeCss'
 import { importRegexJson, regexScriptSchema, type RegexScript } from '@/lib/skins/regexScripts'
+import { REGEX_TEMPLATES } from '@/lib/skins/regexTest'
+import { RegexTester } from './RegexTester'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { SELECTOR_GROUPS, CSS_PRESETS, SAMPLE_AI_MESSAGE } from '@/lib/skins/docs'
 import { parseCharacterCard } from '@/lib/chat/characterCard'
 import { Button } from '@/components/ui/button'
@@ -88,6 +91,15 @@ export function SkinEditor({ character }: Props) {
   }
 
   const renderSkin = { regexScripts: skin.regexScripts, renderHtml: skin.renderHtml, char: card.name, user: card.userName }
+  const testCtx = useMemo(() => ({ role: 'assistant' as const, char: card.name, user: card.userName }), [card.name, card.userName])
+  const addTemplate = (id: string) => {
+    const t = REGEX_TEMPLATES.find((x) => x.id === id)
+    if (!t) return
+    const script = regexScriptSchema.parse({ id: `${t.id}_${Date.now().toString(36)}`, ...t.script })
+    set('regexScripts', [...skin.regexScripts, script].slice(0, 100))
+    // give the tester something to bite on when the sample is still the default
+    if (sample === SAMPLE_AI_MESSAGE || !sample.trim()) setSample(`${sample.trim()}\n\n${t.sample}`.trim())
+  }
   const noop = () => {}
   const now = new Date().toISOString()
   const previewMsgs = [
@@ -165,11 +177,29 @@ export function SkinEditor({ character }: Props) {
                     <label className="flex items-center gap-1.5"><Switch checked={r.renderAsHtml} onCheckedChange={(v) => setScript(i, { renderAsHtml: v })} />输出为 HTML（沙箱渲染）</label>
                     <Input value={r.trimStrings.join('\n')} onChange={(e) => setScript(i, { trimStrings: e.target.value.split('\n').filter(Boolean) })} placeholder="trim 字符串（每行一个）" className="h-8 flex-1 font-mono text-xs" />
                   </div>
+                  <RegexTester scripts={skin.regexScripts} index={i} sample={sample} ctx={testCtx} />
                 </GlassPanel>
               ))}
             </div>
+            {skin.regexScripts.length === 0 && (
+              <GlassPanel padding="sm" className="flex items-center gap-3 text-xs text-cv-fg-muted">
+                <FlaskConical className="size-4 shrink-0 text-cv-accent" />
+                还没有脚本。从模板加一个试试：每条脚本下面都有测试台，用右侧「测试用的 AI 回复」看命中和结果。
+              </GlassPanel>
+            )}
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="neu" onClick={() => set('regexScripts', [...skin.regexScripts, emptyScript(skin.regexScripts.length)])}><Plus /> 新建脚本</Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild><Button size="sm" variant="accent"><LayoutTemplate /> 从模板添加</Button></DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-72">
+                  {REGEX_TEMPLATES.map((t) => (
+                    <DropdownMenuItem key={t.id} onSelect={() => addTemplate(t.id)} className="flex-col items-start gap-0.5 py-2">
+                      <span className="font-semibold">{t.name}</span>
+                      <span className="text-xs text-cv-fg-muted">{t.desc}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button size="sm" variant="neu" onClick={() => set('regexScripts', [...skin.regexScripts, emptyScript(skin.regexScripts.length)])}><Plus /> 空白脚本</Button>
               <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) importRegex(await f.text()); e.target.value = '' }} />
               <Button size="sm" variant="neu" onClick={() => fileRef.current?.click()}><Upload /> 导入正则脚本 JSON</Button>
             </div>
