@@ -70,7 +70,19 @@ export function toJsonl(input: ExportInput): string {
   return [JSON.stringify(header), ...lines].join('\n') + '\n'
 }
 
-export function toMarkdown(input: ExportInput): string {
+export interface TextExportOptions {
+  /** also write the other rerolls of a message (not just the chosen one) */
+  includeSwipes?: boolean
+}
+
+/** Alternate replies other than the chosen one, in their original order (empty when there is nothing to show). */
+function otherSwipes(m: ExportInput['messages'][number]): { index: number; text: string }[] {
+  if (!m.swipes || m.swipes.length < 2) return []
+  const chosen = m.swipe_index ?? 0
+  return m.swipes.map((text, index) => ({ index, text })).filter((s) => s.index !== chosen)
+}
+
+export function toMarkdown(input: ExportInput, opts: TextExportOptions = {}): string {
   const title = input.title?.trim() || `与 ${input.characterName} 的对话`
   const out: string[] = [`# ${title}`, '', `角色：${input.characterName}　用户：${input.userName ?? '用户'}`, '']
   for (const m of input.messages) {
@@ -78,6 +90,26 @@ export function toMarkdown(input: ExportInput): string {
     const who = m.role === 'user' ? (input.userName ?? '用户') : input.characterName
     const when = m.created_at ? ` · ${new Date(m.created_at).toLocaleString('zh-CN')}` : ''
     out.push(`## ${who}${when}`, '', m.content.trim(), '')
+    if (opts.includeSwipes) {
+      for (const s of otherSwipes(m)) {
+        out.push(`<details><summary>备选回复 ${s.index + 1}/${m.swipes!.length}</summary>`, '', s.text.trim(), '', '</details>', '')
+      }
+    }
+  }
+  return out.join('\n')
+}
+
+/** Plain text: `名字：内容` blocks separated by blank lines; easy to paste anywhere. */
+export function toPlainText(input: ExportInput, opts: TextExportOptions = {}): string {
+  const title = input.title?.trim() || `与 ${input.characterName} 的对话`
+  const out: string[] = [title, '']
+  for (const m of input.messages) {
+    if (m.role === 'system') continue
+    const who = m.role === 'user' ? (input.userName ?? '用户') : input.characterName
+    out.push(`${who}：`, m.content.trim(), '')
+    if (opts.includeSwipes) {
+      for (const s of otherSwipes(m)) out.push(`（备选回复 ${s.index + 1}/${m.swipes!.length}）`, s.text.trim(), '')
+    }
   }
   return out.join('\n')
 }

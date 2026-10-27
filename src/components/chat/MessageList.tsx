@@ -21,6 +21,7 @@ interface Props {
   onEditSave: (m: ChatMessage, content: string) => void
   onEditCancel: () => void
   onSwipe: (m: ChatMessage, index: number) => void
+  onOpenSwipes?: (m: ChatMessage) => void
   hasOlder: boolean
   loadingOlder: boolean
   onLoadOlder: () => void
@@ -31,7 +32,7 @@ const NEAR_BOTTOM = 160
 
 export function MessageList({
   messages, character, user, skin, streamingText, busy, selectedId, editingId, onSelect, handlersFor,
-  onEditSave, onEditCancel, onSwipe, hasOlder, loadingOlder, onLoadOlder, emptyState,
+  onEditSave, onEditCancel, onSwipe, onOpenSwipes, hasOlder, loadingOlder, onLoadOlder, emptyState,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const topRef = useRef<HTMLDivElement>(null)
@@ -118,6 +119,7 @@ export function MessageList({
               onEditSave={(c) => onEditSave(m, c)}
               onEditCancel={onEditCancel}
               onSwipe={(i) => onSwipe(m, i)}
+              onOpenSwipes={onOpenSwipes ? () => onOpenSwipes(m) : undefined}
               {...handlersFor(m, isLast)}
             />
           )

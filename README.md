@@ -5,7 +5,8 @@ AI 角色扮演聊天 Web 应用：自带 API key、流式回复、可导入通�
 ## 核心特性
 
 - **BYOK（自带 key）**：API key 只存在浏览器 localStorage，每次请求随 `x-cv-connection` 请求头发给本站 `/api/*` 代理，服务端只做鉴权、校验、转发、限流，不落库、不打日志。
-- **流式聊天**：基于 Vercel AI SDK `streamText`，支持发送 / 角色开场 / 重新生成（多候选 swipe）/ 续写 / 灵感 / 分支会话。
+- **流式聊天**：基于 Vercel AI SDK `streamText`，支持发送 / 角色开场 / 重新生成（每次的结果都留着，点计数打开「备选回复」抽屉可对比 / 选用 / 删除）/ 续写 / 灵感 / 分支会话。
+- **聊天记录导出**：JSON（无损）/ JSONL / Markdown / 纯文本，可选带上备选回复；入口在聊天页「更多」、角色主页的对话列表和完整历史页。
 - **Prompt 预设**：Prompt 条目可排序、开关、占位条目；直接导入通用预设格式的 chat-completion 预设 JSON；用户级默认 + 会话级覆盖。
 - **主题导入**：整站颜色、圆角、字体、玻璃参数都是 `--cv-*` token，一份 JSON 即可换肤；内置 Warm Glass Light / Dark、Carbon Neon、Sage Paper。
 - **角色皮肤**：作者 CSS 经真正的 CSS 解析器清洗并限定在 `#cv_chat_root`；正则脚本（兼容通用格式）改写显示层，编辑器里有模板和逐条测试台；不会写 CSS 也能用「旋钮」调气泡颜色 / 圆角 / 字体 / 背景压暗；HTML 块在沙箱 iframe 里渲染（状态栏、手机壳这类美化卡可直接跑）。

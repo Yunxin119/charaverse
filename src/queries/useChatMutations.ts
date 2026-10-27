@@ -64,6 +64,30 @@ export function useSelectSwipe(sessionId: string) {
   })
 }
 
+/**
+ * Drop one alternate reply of a message. The chosen one follows the surviving list;
+ * when a single reply remains, `swipes` goes back to `[]` (the "no alternates" shape
+ * `append_message_swipe` expects).
+ */
+export function useDeleteSwipe(sessionId: string) {
+  const invalidate = useInvalidateMessages(sessionId)
+  return useMutation({
+    mutationFn: async ({ message, index }: { message: ChatMessage; index: number }) => {
+      const swipes = message.swipes ?? []
+      if (swipes.length < 2 || index < 0 || index >= swipes.length) throw new Error('没有可删除的备选回复')
+      const rest = swipes.filter((_, i) => i !== index)
+      const current = message.swipe_index ?? 0
+      const nextIndex = Math.min(rest.length - 1, current > index ? current - 1 : current === index ? Math.min(index, rest.length - 1) : current)
+      const patch = rest.length > 1
+        ? { swipes: rest, swipe_index: nextIndex, content: rest[nextIndex] }
+        : { swipes: [], swipe_index: 0, content: rest[0] }
+      const { error } = await supabase.from('chat_messages').update(patch).eq('id', message.id)
+      if (error) throw error
+    },
+    onSuccess: invalidate,
+  })
+}
+
 export function useUpdateSessionSettings(sessionId: string) {
   const qc = useQueryClient()
   return useMutation({

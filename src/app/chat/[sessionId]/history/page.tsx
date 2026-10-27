@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Download, Loader2 } from 'lucide-react'
 import type { ChatMessage } from '@/app/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { CardSkeleton, IconButton, PosterCard, PosterTitle } from '@/components/glass'
@@ -10,6 +10,7 @@ import { EditMessageDialog, HistoryMessageRow, HistoryToolbar, InlineNotice, use
 import { useCharacter, useSession, useMessages, useEditMessage, useDeleteMessages } from '@/queries'
 import { parseSessionSettings } from '@/lib/chat/settings'
 import { parseCharacterCard } from '@/lib/chat/characterCard'
+import { ExportChatDialog } from '@/components/chat/ExportChatDialog'
 
 const MAX_JUMP_PAGES = 60
 
@@ -31,6 +32,7 @@ export default function ChatHistoryPage() {
   const [highlight, setHighlight] = useState<number | null>(null)
   const [jumping, setJumping] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
 
   const characterLabel = character.data?.name ?? '角色'
   const userLabel = useMemo(
@@ -100,7 +102,21 @@ export default function ChatHistoryPage() {
             {loaded.length > 0 && ` · 已加载 ${loaded.length} 条`}
           </p>
         </div>
+        <Button variant="glass" size="sm" onClick={() => setExportOpen(true)} disabled={!session.data}><Download />导出</Button>
       </header>
+
+      {session.data && (
+        <ExportChatDialog
+          open={exportOpen}
+          onOpenChange={setExportOpen}
+          sessionId={sessionId}
+          title={session.data.title}
+          characterName={characterLabel}
+          characterId={session.data.character_id}
+          userName={userLabel}
+          settings={(session.data.settings ?? undefined) as Record<string, unknown> | undefined}
+        />
+      )}
 
       <HistoryToolbar
         query={query}

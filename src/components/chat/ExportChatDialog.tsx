@@ -1,13 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { FileJson, FileText, Loader2, ScrollText } from 'lucide-react'
+import { FileJson, FileText, Loader2, ScrollText, AlignLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { Chip } from '@/components/glass'
 import { fetchAllMessages, type ExportMessageRow } from '@/queries/chatExport'
-import { toChatLog, toJsonl, toMarkdown, type ExportInput } from '@/lib/chatlog/format'
+import { toChatLog, toJsonl, toMarkdown, toPlainText, type ExportInput } from '@/lib/chatlog/format'
 import { downloadText } from '@/lib/cards/exportBrowser'
 
 interface Props {
@@ -21,12 +23,13 @@ interface Props {
   settings?: Record<string, unknown>
 }
 
-type Format = 'json' | 'jsonl' | 'md'
+type Format = 'json' | 'jsonl' | 'md' | 'txt'
 
 const FORMATS: { id: Format; label: string; hint: string; ext: string; mime: string; icon: typeof FileJson }[] = [
   { id: 'json', label: 'JSON（无损）', hint: '保留标题、设置、备选回复与时间戳，可重新导入 CharaVerse。', ext: 'json', mime: 'application/json', icon: FileJson },
   { id: 'jsonl', label: 'JSONL（通用）', hint: '通用 JSONL 格式，可被其他角色扮演前端读取。', ext: 'jsonl', mime: 'application/x-ndjson', icon: ScrollText },
-  { id: 'md', label: 'Markdown', hint: '纯文本阅读版，适合存档或分享。', ext: 'md', mime: 'text/markdown', icon: FileText },
+  { id: 'md', label: 'Markdown', hint: '阅读版，每条消息一个标题，适合存档或分享。', ext: 'md', mime: 'text/markdown', icon: FileText },
+  { id: 'txt', label: '纯文本', hint: '「名字：内容」一段一段，直接贴到任何地方。', ext: 'txt', mime: 'text/plain', icon: AlignLeft },
 ]
 
 function safeFileName(name: string): string {
@@ -54,6 +57,7 @@ export function ExportChatDialog({ open, onOpenChange, ...rest }: Props) {
 function ExportBody({ sessionId, title, characterName, characterId, userName, settings }: Omit<Props, 'open' | 'onOpenChange'>) {
   const [rows, setRows] = useState<ExportMessageRow[] | null>(null)
   const [busy, setBusy] = useState<Format | null>(null)
+  const [includeSwipes, setIncludeSwipes] = useState(false)
 
   const load = async (): Promise<ExportMessageRow[]> => {
     if (rows) return rows
@@ -74,7 +78,10 @@ function ExportBody({ sessionId, title, characterName, characterId, userName, se
         settings,
         messages: messages.map((m) => ({ role: m.role, content: m.content, created_at: m.created_at, swipes: m.swipes, swipe_index: m.swipe_index })),
       }
-      const text = fmt.id === 'json' ? JSON.stringify(toChatLog(input), null, 2) : fmt.id === 'jsonl' ? toJsonl(input) : toMarkdown(input)
+      const text = fmt.id === 'json' ? JSON.stringify(toChatLog(input), null, 2)
+        : fmt.id === 'jsonl' ? toJsonl(input)
+        : fmt.id === 'md' ? toMarkdown(input, { includeSwipes })
+        : toPlainText(input, { includeSwipes })
       downloadText(`${safeFileName(title?.trim() || characterName)}.${fmt.ext}`, text, fmt.mime)
       toast.success(`已导出 ${messages.length} 条消息`)
     } catch (e) {
@@ -107,8 +114,12 @@ function ExportBody({ sessionId, title, characterName, characterId, userName, se
           )
         })}
       </div>
+      <div className="flex items-center justify-between gap-3 rounded-cv-md bg-cv-fg/5 px-3 py-2">
+        <Label htmlFor="cv_export_swipes" className="text-xs font-normal text-cv-fg-muted">Markdown / 纯文本里也带上没选中的备选回复</Label>
+        <Switch id="cv_export_swipes" checked={includeSwipes} onCheckedChange={setIncludeSwipes} />
+      </div>
       <div className="flex items-center justify-between text-xs text-cv-fg-subtle">
-        <span>系统消息只包含在 JSON 中。</span>
+        <span>JSON / JSONL 总是带备选回复；系统消息只在 JSON 里。</span>
         {rows && <Chip tone="outline">{rows.length} 条消息</Chip>}
       </div>
     </>

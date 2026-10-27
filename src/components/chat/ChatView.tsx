@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/providers/AuthProvider'
 import { useCharacter, useMessages, useProfile, useSession, usePresets } from '@/queries'
 import {
-  useBranchSession, useDeleteFrom, useDeleteMessages, useEditMessage, useSelectSwipe,
+  useBranchSession, useDeleteFrom, useDeleteMessages, useDeleteSwipe, useEditMessage, useSelectSwipe,
   useUpdateSessionSettings, useUpdateSessionTitle,
 } from '@/queries/useChatMutations'
 import { useChatStream } from '@/hooks/useChatStream'
@@ -32,6 +32,7 @@ import { Composer } from './Composer'
 import { ChatSettingsSheet } from './ChatSettingsSheet'
 import { VisualNovelStage } from './VisualNovelStage'
 import { ExportChatDialog } from './ExportChatDialog'
+import { SwipesSheet } from './SwipesSheet'
 import type { MessageActionHandlers } from './MessageActions'
 
 const COMMENTS_STORAGE_KEY = 'cv.chat.comments'
@@ -87,6 +88,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const deleteMessages = useDeleteMessages(sessionId)
   const deleteFrom = useDeleteFrom(sessionId)
   const selectSwipe = useSelectSwipe(sessionId)
+  const deleteSwipe = useDeleteSwipe(sessionId)
   const updateSettings = useUpdateSessionSettings(sessionId)
   const updateTitle = useUpdateSessionTitle(sessionId)
   const branch = useBranchSession()
@@ -98,6 +100,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const [exportOpen, setExportOpen] = useState(false)
   // visual-novel layout: full message log lives in a sheet; the header floats and is revealed by a stage tap
   const [logOpen, setLogOpen] = useState(false)
+  const [swipesId, setSwipesId] = useState<number | null>(null)
   const [headerPeek, setHeaderPeek] = useState(false)
   // comments side column (public characters only): lg+ aside persisted in localStorage, < lg a transient sheet
   const isLarge = useIsLarge()
@@ -265,6 +268,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
       onEditSave={(m, content) => editMessage.mutate({ message: m, content }, { onSuccess: () => setEditingId(null) })}
       onEditCancel={() => setEditingId(null)}
       onSwipe={(m, index) => selectSwipe.mutate({ messageId: m.id, index })}
+      onOpenSwipes={(m) => setSwipesId(m.id)}
       hasOlder={!!messagesQ.hasNextPage}
       loadingOlder={messagesQ.isFetchingNextPage}
       onLoadOlder={() => void messagesQ.fetchNextPage()}
@@ -321,6 +325,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
               streamingText={streamingText}
               busy={busy}
               onSwipe={(m, index) => selectSwipe.mutate({ messageId: m.id, index })}
+              onOpenSwipes={(m) => setSwipesId(m.id)}
               onRegenerate={lastMessage?.role === 'assistant' ? handlersFor(lastMessage, true).onRegenerate : undefined}
               onContinue={lastMessage?.role === 'assistant' ? handlersFor(lastMessage, true).onContinue : undefined}
               onOpenLog={() => setLogOpen(true)}
@@ -378,6 +383,17 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         saving={updateSettings.isPending || updateTitle.isPending}
         onSave={saveSettings}
         onClearMessages={clearMessages}
+      />
+
+      <SwipesSheet
+        message={swipesId === null ? null : (messages.find((m) => m.id === swipesId) ?? null)}
+        onClose={() => setSwipesId(null)}
+        characterName={characterSpeaker.name}
+        skin={renderSkin}
+        busy={busy || selectSwipe.isPending}
+        deleting={deleteSwipe.isPending}
+        onSelect={(m, index) => selectSwipe.mutate({ messageId: m.id, index })}
+        onDelete={(m, index) => deleteSwipe.mutate({ message: m, index }, { onError: (e) => toast.error(e instanceof Error ? e.message : '删除失败') })}
       />
 
       <ExportChatDialog

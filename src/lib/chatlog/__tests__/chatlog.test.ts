@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { importChatText, toChatLog, toJsonl, toMarkdown } from '../format'
+import { importChatText, toChatLog, toJsonl, toMarkdown, toPlainText } from '../format'
 
 const input = {
   title: '雨夜',
@@ -45,5 +45,20 @@ describe('chat log formats', () => {
     expect(md).not.toContain('hidden')
     expect(importChatText('nope').ok).toBe(false)
     expect(importChatText('').ok).toBe(false)
+  })
+  it('markdown / plain text leave rerolls out unless asked', () => {
+    const md = toMarkdown(input)
+    expect(md).toContain('## 冉澄')
+    expect(md).not.toContain('雨还没停')
+    const mdAll = toMarkdown(input, { includeSwipes: true })
+    expect(mdAll).toContain('<details><summary>备选回复 2/2</summary>')
+    expect(mdAll).toContain('雨还没停。')
+    expect(mdAll).not.toContain('hidden')
+    const txt = toPlainText(input, { includeSwipes: true })
+    expect(txt.startsWith('雨夜\n')).toBe(true)
+    expect(txt).toContain('冉澄：\n你来了。')
+    expect(txt).toContain('阿黎：\n不急。')
+    expect(txt).toContain('（备选回复 2/2）\n雨还没停。')
+    expect(toPlainText(input)).not.toContain('备选回复')
   })
 })

@@ -19,6 +19,8 @@ export const SELECTOR_GROUPS: { label: string; items: { selector: string; desc: 
     { selector: '.cv_ai_avatar / .cv_user_avatar', desc: 'AI / 用户头像' },
     { selector: '.cv_message_selected', desc: '被选中的消息气泡' },
     { selector: '.cv_message_meta', desc: '气泡下方的名字 / 时间行' },
+    { selector: '.cv_swipe_counter', desc: '备选回复计数（点开列出全部版本）' },
+    { selector: '#cv_swipes_sheet', desc: '备选回复抽屉；每个版本是 .cv_swipe_card，当前版本带 data-chosen' },
     { selector: '.cv-markdown', desc: '气泡内的 Markdown 内容' },
   ] },
   { label: '输入框', items: [

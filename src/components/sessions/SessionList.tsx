@@ -2,13 +2,15 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { GitBranch, MoreHorizontal, Pencil, Trash2, MessageSquare, Check, X } from 'lucide-react'
+import { GitBranch, MoreHorizontal, Pencil, Trash2, MessageSquare, Check, X, Download } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Chip, IconButton } from '@/components/glass'
 import { useDeleteSession, useRenameSession } from '@/queries/useChatMutations'
 import type { SessionWithCharacter } from '@/queries'
 import { cn } from '@/lib/utils'
+import { parseSessionSettings } from '@/lib/chat/settings'
+import { ExportChatDialog } from '@/components/chat/ExportChatDialog'
 
 export function relativeTime(iso: string | undefined, now = Date.now()): string {
   if (!iso) return ''
@@ -66,6 +68,7 @@ export function SessionList({ sessions, userId, currentId, limit, emptyText = '�
   const rename = useRenameSession(userId)
   const remove = useDeleteSession(userId)
   const [editing, setEditing] = useState<{ id: string; title: string } | null>(null)
+  const [exporting, setExporting] = useState<SessionWithCharacter | null>(null)
   const nodes = useMemo(() => toTree(sessions), [sessions])
   const shown = limit ? nodes.slice(0, limit) : nodes
 
@@ -101,6 +104,7 @@ export function SessionList({ sessions, userId, currentId, limit, emptyText = '�
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-36">
                   <DropdownMenuItem onClick={() => setEditing({ id: s.id, title: s.title ?? '' })}><Pencil />重命名</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setExporting(s)}><Download />导出对话</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem variant="destructive" onClick={() => { if (confirm(`删除「${sessionTitle(s)}」？消息会一并删除。`)) remove.mutate(s.id, { onSuccess: () => { if (active) router.push(`/characters/${s.character_id}`) } }) }}><Trash2 />删除对话</DropdownMenuItem>
                 </DropdownMenuContent>
@@ -109,6 +113,18 @@ export function SessionList({ sessions, userId, currentId, limit, emptyText = '�
           </li>
         )
       })}
+      {exporting && (
+        <ExportChatDialog
+          open
+          onOpenChange={(o) => { if (!o) setExporting(null) }}
+          sessionId={exporting.id}
+          title={exporting.title}
+          characterName={exporting.character?.name ?? '角色'}
+          characterId={exporting.character_id}
+          userName={parseSessionSettings(exporting.settings).userName || undefined}
+          settings={(exporting.settings ?? undefined) as Record<string, unknown> | undefined}
+        />
+      )}
     </ul>
   )
 }

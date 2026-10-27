@@ -29,13 +29,16 @@ interface Props extends MessageActionHandlers {
   onEditSave: (content: string) => void
   onEditCancel: () => void
   onSwipe?: (index: number) => void
+  /** opens the list of every reroll of this message */
+  onOpenSwipes?: () => void
 }
 
-export function MessageBubble({ message, speaker, skin, isLast, selected, onSelect, busy, editing, onEditSave, onEditCancel, onSwipe, ...handlers }: Props) {
+export function MessageBubble({ message, speaker, skin, isLast, selected, onSelect, busy, editing, onEditSave, onEditCancel, onSwipe, onOpenSwipes, ...handlers }: Props) {
   const isUser = message.role === 'user'
   const swipes = message.swipes ?? []
   const swipeIndex = message.swipe_index ?? 0
-  const showSwipes = !isUser && isLast && swipes.length > 1 && !!onSwipe
+  // every assistant message keeps its rerolls; switching an older one is just an edit of that turn
+  const showSwipes = !isUser && swipes.length > 1 && !!onSwipe
 
   return (
     <div
@@ -75,7 +78,9 @@ export function MessageBubble({ message, speaker, skin, isLast, selected, onSele
           {showSwipes && (
             <span className="inline-flex items-center gap-0.5 rounded-full glass-strong px-1 py-0.5 text-[11px] font-semibold text-cv-fg-muted">
               <button type="button" aria-label="上一个回复" disabled={busy || swipeIndex === 0} onClick={(e) => { e.stopPropagation(); onSwipe!(swipeIndex - 1) }} className="rounded-full p-0.5 hover:bg-cv-fg/10 disabled:opacity-30"><ChevronLeft className="size-3.5" /></button>
-              <span className="tabular-nums">{swipeIndex + 1}/{swipes.length}</span>
+              {onOpenSwipes
+                ? <button type="button" title="查看全部备选回复" onClick={(e) => { e.stopPropagation(); onOpenSwipes() }} className="cv_swipe_counter rounded-full px-1 tabular-nums hover:bg-cv-fg/10 hover:text-cv-accent">{swipeIndex + 1}/{swipes.length}</button>
+                : <span className="tabular-nums">{swipeIndex + 1}/{swipes.length}</span>}
               <button type="button" aria-label="下一个回复" disabled={busy || swipeIndex >= swipes.length - 1} onClick={(e) => { e.stopPropagation(); onSwipe!(swipeIndex + 1) }} className="rounded-full p-0.5 hover:bg-cv-fg/10 disabled:opacity-30"><ChevronRight className="size-3.5" /></button>
             </span>
           )}

@@ -30,6 +30,7 @@ interface Props {
   streamingText: string | null
   busy: boolean
   onSwipe: (m: ChatMessage, index: number) => void
+  onOpenSwipes?: (m: ChatMessage) => void
   onRegenerate?: () => void
   onContinue?: () => void
   /** opens the full message log (ChatView renders it in a sheet) */
@@ -48,7 +49,7 @@ interface Props {
  * Ids `#cv_vn_*` are stable hooks for author skins.
  */
 export function VisualNovelStage({
-  messages, character, user, skin, streamingText, busy, onSwipe, onRegenerate, onContinue, onOpenLog, onStageTap, notice, emptyState, composer,
+  messages, character, user, skin, streamingText, busy, onSwipe, onOpenSwipes, onRegenerate, onContinue, onOpenLog, onStageTap, notice, emptyState, composer,
 }: Props) {
   const [expanded, setExpanded] = useState(false)
   const textRef = useRef<HTMLDivElement>(null)
@@ -129,7 +130,9 @@ export function VisualNovelStage({
             {showSwipes && (
               <span className="mr-1 inline-flex items-center gap-0.5 rounded-full bg-cv-fg/8 px-1 py-0.5 font-semibold text-cv-fg-muted">
                 <button type="button" aria-label="上一个回复" disabled={busy || swipeIndex === 0} onClick={() => onSwipe(main!, swipeIndex - 1)} className="rounded-full p-0.5 hover:bg-cv-fg/10 disabled:opacity-30"><ChevronLeft className="size-3.5" /></button>
-                <span className="tabular-nums">{swipeIndex + 1}/{swipes.length}</span>
+                {onOpenSwipes
+                  ? <button type="button" title="查看全部备选回复" onClick={() => onOpenSwipes(main!)} className="cv_swipe_counter rounded-full px-1 tabular-nums hover:bg-cv-fg/10 hover:text-cv-accent">{swipeIndex + 1}/{swipes.length}</button>
+                  : <span className="tabular-nums">{swipeIndex + 1}/{swipes.length}</span>}
                 <button type="button" aria-label="下一个回复" disabled={busy || swipeIndex >= swipes.length - 1} onClick={() => onSwipe(main!, swipeIndex + 1)} className="rounded-full p-0.5 hover:bg-cv-fg/10 disabled:opacity-30"><ChevronRight className="size-3.5" /></button>
               </span>
             )}
