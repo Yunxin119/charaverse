@@ -9,6 +9,8 @@ import { useAuth } from '@/providers/AuthProvider'
 import { useCharacter, useCharacterSessions, useChatImport, useCharacterStats } from '@/queries'
 import { formatCount } from '@/components/stats/StatTiles'
 import { useStartSession } from '@/queries/useChatMutations'
+import { useBindPersona, usePersonaBindings } from '@/queries/usePersonas'
+import { PersonaPicker } from '@/components/personas/PersonaPicker'
 import { parseCharacterCard } from '@/lib/chat/characterCard'
 import { parseSnapshot } from '@/components/character/snapshot'
 import { importChatText } from '@/lib/chatlog/format'
@@ -29,6 +31,8 @@ export default function CharacterHubPage() {
   const characterQ = useCharacter(id)
   const sessionsQ = useCharacterSessions(user?.id, characterQ.data?.id)
   const start = useStartSession()
+  const bindingsQ = usePersonaBindings(user?.id)
+  const bindPersona = useBindPersona(user?.id)
   const chatImport = useChatImport()
   const chatFileRef = useRef<HTMLInputElement>(null)
   const statsQ = useCharacterStats(characterQ.data ? [characterQ.data.id] : [])
@@ -162,6 +166,22 @@ export default function CharacterHubPage() {
           />
         </div>
       </PosterCard>
+
+      <GlassPanel className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="font-display text-lg font-semibold">和它聊天用的人设</h2>
+          <p className="mt-0.5 text-xs text-cv-fg-muted">绑定后，这个角色的新对话默认用它；每个对话还能在会话设置里单独换。</p>
+        </div>
+        <PersonaPicker
+          id="cv_character_persona"
+          userId={user.id}
+          value={bindingsQ.data?.get(c.id)}
+          onChange={(v) => bindPersona.mutate({ characterId: c.id, personaId: v ?? null }, { onError: (e) => toast.error(e instanceof Error ? e.message : '保存失败') })}
+          inheritLabel="跟随默认人设"
+          disabled={bindPersona.isPending}
+          className="w-full sm:w-72"
+        />
+      </GlassPanel>
 
       <GlassPanel>
         <div className="mb-3 flex items-center justify-between">

@@ -346,6 +346,7 @@ docs/                       # 本文件 + design/
 - [x] CSS 旋钮：`skin.knobs`（气泡底色 / 文字色 / 不透明度 / 圆角、字体 / 字号 / 行高、名字时间色、聊天区底色、背景压暗），`lib/skins/knobs.ts` 编译成 CSS 排在高级 CSS 之前（手写优先），聊天页与编辑器预览都走 `composeSkinCss`；气泡下的名字行加 `.cv_message_meta`
 - [x] 备选回复抽屉：`SwipesSheet` 列出一条消息的全部 reroll（当前版本高亮、选用 / 复制 / 删除某个版本，`useDeleteSwipe` 直接改 `swipes` 列，剩一条时回到 `[]`）；计数 `n/m` 变成按钮，任何带备选的 AI 消息都能切换，不再限于最后一条；视觉小说框同款入口
 - [x] 导出补全：纯文本格式（`toPlainText`）、Markdown / 纯文本可选带备选回复（`<details>` / 括注），入口加到角色主页对话列表的菜单和完整历史页
+- [x] 用户人设独立（0016）：`user_personas`（默认唯一，`set_default_persona`）+ `persona_bindings(user, character → persona)`；`/settings/personas` 管理页，角色主页「和它聊天用的人设」绑定，会话设置里可选「跟随默认 / 某个人设 / 不用」（`settings.personaId`，`userName` 仍可只改名字）；`loadContext` 按 对话选择 → 绑定 → 默认 解析并替换角色卡旧的 用户角色设定 块；编辑器里卡内人设降级为「旧」段，只在非空时显示，可一键存为我的人设 / 清空
 - [ ] 下一步候选：视觉小说模式的打字机节奏
 - [ ] 待修：直接删除 auth 用户会 500（有表的 `user_id` 外键没有 `on delete cascade`，清掉 `chat_sessions` 后才能删）；做「注销账号」前先补一遍级联
 

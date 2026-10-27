@@ -27,8 +27,10 @@ export const sessionSettingsSchema = z.object({
     .prefault({}),
   /** 'flow' = classic message list; 'novel' = full-bleed character image + bottom dialogue box */
   layout: z.enum(['flow', 'novel']).default('flow'),
-  /** override the persona name used for {{user}} */
+  /** override the name used for {{user}} (wins over the chosen persona's name) */
   userName: z.string().max(60).optional(),
+  /** user_personas.id; null = no persona (use the card's own user block); undefined = bound-to-character, else default */
+  personaId: z.string().uuid().nullable().optional(),
   /** per-session sampling overrides; undefined = follow the preset */
   sampling: z
     .object({

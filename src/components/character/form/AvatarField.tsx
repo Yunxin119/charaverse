@@ -10,10 +10,13 @@ interface Props {
   value: string
   name: string
   onChange: (url: string) => void
+  /** storage folder inside the `avatars` bucket */
+  folder?: 'characters' | 'personas'
+  size?: 'md' | 'lg'
 }
 
 /** Round avatar preview with upload / remove. Uploads go to `avatars/characters`; the row is written on 保存. */
-export function AvatarField({ value, name, onChange }: Props) {
+export function AvatarField({ value, name, onChange, folder = 'characters', size = 'lg' }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -21,7 +24,7 @@ export function AvatarField({ value, name, onChange }: Props) {
   const pick = async (file: File) => {
     setUploading(true); setError(null)
     try {
-      onChange(await uploadAvatar(file, 'avatars', 'characters'))
+      onChange(await uploadAvatar(file, 'avatars', folder))
     } catch (e) {
       setError((e as Error).message || '上传失败，请重试')
     } finally {
@@ -39,7 +42,7 @@ export function AvatarField({ value, name, onChange }: Props) {
         aria-label={value ? '更换头像' : '上传头像'}
         className="group relative shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-cv-ring"
       >
-        <Avatar className="size-24 shadow-neu">
+        <Avatar className={size === 'lg' ? 'size-24 shadow-neu' : 'size-16 shadow-neu'}>
           <AvatarImage src={value || undefined} alt="" />
           <AvatarFallback className="bg-cv-primary font-display text-3xl text-cv-primary-fg">{name.trim() ? name.trim()[0].toUpperCase() : '?'}</AvatarFallback>
         </Avatar>

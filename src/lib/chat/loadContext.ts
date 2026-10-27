@@ -6,6 +6,7 @@ import { parseCharacterCard, type CharacterCard } from './characterCard'
 import { formatMemoryTable, type MemoryRow } from './memoryTable'
 import { parseSessionSettings, type SessionSettings } from './settings'
 import { parseLorebook, type Lorebook } from '@/lib/lorebook/schema'
+import { formatPersonaText, resolvePersonaId } from '@/lib/personas/format'
 
 export interface HistoryMessage {
   id: number
@@ -24,6 +25,8 @@ export interface ChatContext {
   memoryTable: string
   /** character-embedded book first, then the user's enabled library books */
   lorebooks: Lorebook[]
+  /** the user's chosen persona for this session (session pick → character binding → default); null = use the card's own user block */
+  persona: { id: string; name: string; text?: string } | null
 }
 
 export class ContextError extends Error {
@@ -61,7 +64,7 @@ export async function loadChatContext(supabase: SupabaseClient, sessionId: strin
     character = { ...row, name: snap.name, prompt_template: snap.prompt_template, skin: snap.skin, lorebook: snap.lorebook }
   }
 
-  const [preset, historyRows, summaries, memoryRows, libraryBooks] = await Promise.all([
+  const [preset, historyRows, summaries, memoryRows, libraryBooks, persona] = await Promise.all([
     loadPreset(supabase, userId, settings.presetId ?? null),
     supabase
       .from('chat_messages')
@@ -90,6 +93,7 @@ export async function loadChatContext(supabase: SupabaseClient, sessionId: strin
       .eq('user_id', userId)
       .eq('enabled', true)
       .then(({ data }) => (data ?? []).map((r) => { const p = parseLorebook(r.data); return p.ok ? p.book : null }).filter((b): b is Lorebook => !!b)),
+    loadPersona(supabase, userId, session.character_id, settings.personaId),
   ])
 
   const embeddedRaw = (character as { lorebook?: unknown }).lorebook
@@ -105,7 +109,24 @@ export async function loadChatContext(supabase: SupabaseClient, sessionId: strin
     summaries,
     memoryTable: formatMemoryTable(memoryRows),
     lorebooks: [embeddedBook, ...libraryBooks].filter((b): b is Lorebook => !!b && b.entries.length > 0),
+    persona,
   }
+}
+
+interface PersonaRowLite { id: string; name: string; age: string; gender: string; details: string; avatar_url: string | null; is_default: boolean }
+
+/** Session pick → the persona bound to this character → the user's default. `null` session pick means "no persona". */
+async function loadPersona(supabase: SupabaseClient, userId: string, characterId: number, sessionPersonaId: string | null | undefined): Promise<ChatContext['persona']> {
+  if (sessionPersonaId === null) return null
+  const [{ data: rows }, { data: binding }] = await Promise.all([
+    supabase.from('user_personas').select('id, name, age, gender, details, avatar_url, is_default').eq('user_id', userId),
+    supabase.from('persona_bindings').select('persona_id').eq('user_id', userId).eq('character_id', characterId).maybeSingle(),
+  ])
+  const list = (rows ?? []) as PersonaRowLite[]
+  if (!list.length) return null
+  const id = resolvePersonaId(sessionPersonaId, binding?.persona_id as string | undefined, list.find((p) => p.is_default)?.id, (x) => list.some((p) => p.id === x))
+  const p = id ? list.find((r) => r.id === id) : undefined
+  return p ? { id: p.id, name: p.name, text: formatPersonaText(p) } : null
 }
 
 /** The user's chosen preset (by id, else their default), falling back to the builtin one. */

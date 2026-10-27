@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, Sparkles, AlertCircle, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/providers/AuthProvider'
-import { useCharacter, useMessages, useProfile, useSession, usePresets } from '@/queries'
+import { useCharacter, useMessages, useProfile, useSession, usePresets, usePersonas, usePersonaBindings } from '@/queries'
+import { resolvePersonaId } from '@/lib/personas/format'
 import {
   useBranchSession, useDeleteFrom, useDeleteMessages, useDeleteSwipe, useEditMessage, useSelectSwipe,
   useUpdateSessionSettings, useUpdateSessionTitle,
@@ -68,6 +69,8 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   }, [characterQ.data, userId])
   const profileQ = useProfile(userId)
   const presetsQ = usePresets(userId)
+  const personasQ = usePersonas(userId)
+  const bindingsQ = usePersonaBindings(userId)
   const messagesQ = useMessages(sessionId)
 
   const settings: SessionSettings = useMemo(() => parseSessionSettings(session?.settings), [session?.settings])
@@ -216,7 +219,12 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   }
 
   const characterSpeaker = { name: card.name, avatarUrl: character.avatar_url }
-  const userSpeaker = { name: settings.userName || profileQ.data?.username || card.userName, avatarUrl: profileQ.data?.avatar_url }
+  // who 「你」 is: session pick → persona bound to this character → default persona (mirrors loadContext on the server)
+  const personas = personasQ.data ?? []
+  const inheritedPersonaId = resolvePersonaId(undefined, bindingsQ.data?.get(character.id), personas.find((p) => p.is_default)?.id, (x) => personas.some((p) => p.id === x))
+  const personaId = resolvePersonaId(settings.personaId, bindingsQ.data?.get(character.id), personas.find((p) => p.is_default)?.id, (x) => personas.some((p) => p.id === x))
+  const persona = personaId ? personas.find((p) => p.id === personaId) : undefined
+  const userSpeaker = { name: settings.userName || persona?.name || profileQ.data?.username || card.userName, avatarUrl: persona?.avatar_url || profileQ.data?.avatar_url }
   const novel = settings.layout === 'novel'
   const toggleLayout = () => updateSettings.mutate({ layout: novel ? 'flow' : 'novel' })
   // backdrop: the session's own image, else the character's avatar (dimmed + blurred in flow mode, full in novel mode)
@@ -383,6 +391,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         saving={updateSettings.isPending || updateTitle.isPending}
         onSave={saveSettings}
         onClearMessages={clearMessages}
+        inheritedPersonaName={inheritedPersonaId ? personas.find((p) => p.id === inheritedPersonaId)?.name ?? null : null}
       />
 
       <SwipesSheet

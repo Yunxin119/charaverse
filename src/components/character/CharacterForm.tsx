@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, BookOpen, Check, Eye, Globe, Layers, Loader2, MessageSquareQuote, Palette, Save, ScrollText, Sparkles, UserRound, Users } from 'lucide-react'
 import { supabase, type Character } from '@/app/lib/supabase'
@@ -22,7 +23,9 @@ import { ExtrasSection } from './form/ExtrasSection'
 import { LorebookSection } from './form/LorebookSection'
 import { SkinSection } from './form/SkinSection'
 import { PreviewDock } from './preview/PreviewDock'
-import { buildPromptTemplate, draftFromCharacter, emptyDraft, personaHasContent, validateDraft, type CharacterDraft, type DraftErrors } from './form/types'
+import { buildPromptTemplate, draftFromCharacter, emptyDraft, emptyPersona, personaHasContent, validateDraft, type CharacterDraft, type DraftErrors } from './form/types'
+import { useSavePersona } from '@/queries/usePersonas'
+import Link from 'next/link'
 
 export type { CharacterDraft } from './form/types'
 
@@ -45,6 +48,16 @@ const LEGACY_SECTION: Record<string, SectionId> = { basic: 'identity', modules: 
 export function CharacterForm({ mode, character }: Props) {
   const router = useRouter()
   const { user } = useAuth()
+  const savePersona = useSavePersona(user?.id)
+  const saveLegacyPersona = async () => {
+    const p = draft.persona
+    try {
+      await savePersona.mutateAsync({ name: p.name.trim() || '我', age: p.age, gender: p.gender, details: p.details })
+      toast.success('已存到「我的人设」，可以把卡里的这段清掉了')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '保存失败')
+    }
+  }
   const qc = useQueryClient()
   const editing = mode === 'edit' && !!character
 
@@ -150,7 +163,7 @@ export function CharacterForm({ mode, character }: Props) {
     { id: 'core', label: '设定', icon: Sparkles, error: !!shown.content },
     { id: 'opening', label: '开场', icon: MessageSquareQuote, meta: draft.initialMessage.trim() ? '✓' : undefined },
     { id: 'rules', label: '规则', icon: ScrollText, meta: draft.systemPrompt.trim() || draft.postHistory.trim() ? '✓' : undefined },
-    { id: 'persona', label: '用户人设', icon: Users, meta: personaHasContent(draft.persona) ? '✓' : undefined },
+    ...(personaHasContent(draft.persona) ? [{ id: 'persona' as const, label: '卡内人设（旧）', icon: Users, meta: '!' }] : []),
     { id: 'extras', label: '补充设定', icon: Layers, meta: draft.extras.length ? String(draft.extras.length) : undefined },
     { id: 'lorebook', label: '世界书', icon: BookOpen, meta: draft.lorebook.entries.length ? String(draft.lorebook.entries.length) : undefined },
     { id: 'skin', label: '皮肤', icon: Palette },
@@ -203,9 +216,18 @@ export function CharacterForm({ mode, character }: Props) {
           <Section id="rules" title="规则" description="希望模型遵守的东西。前者一直在，后者贴在历史后面、更有力。">
             <RulesSection draft={draft} onChange={set} />
           </Section>
-          <Section id="persona" title="用户人设" description="故事里的「你」是谁。玩家可以在会话里改称呼。">
-            <PersonaSection value={draft.persona} onChange={(v) => set('persona', v)} />
-          </Section>
+          {personaHasContent(draft.persona) && (
+            <Section id="persona" title="角色卡自带的用户人设（旧）" description="用户人设现在在「我的人设」里统一管理，跟着玩家走、不随卡分享。这张卡以前写在卡里的人设还在，只在玩家没选任何人设时兜底。">
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-cv-md bg-[color-mix(in_oklab,var(--cv-warning)_12%,transparent)] px-3 py-2 text-xs text-cv-fg-muted">
+                <span className="min-w-0 flex-1">建议把它存成你自己的人设，然后从卡里清掉。<Link href="/settings/personas" className="text-cv-accent underline-offset-4 hover:underline">打开「我的人设」</Link></span>
+                <Button type="button" size="sm" variant="neu" disabled={savePersona.isPending} onClick={() => void saveLegacyPersona()}>
+                  {savePersona.isPending ? <Loader2 className="animate-spin" /> : <UserRound />} 存为我的人设
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => set('persona', emptyPersona())}>清空</Button>
+              </div>
+              <PersonaSection value={draft.persona} onChange={(v) => set('persona', v)} />
+            </Section>
+          )}
           <Section id="extras" title="补充设定" description="固定字段放不下的，起个名字放这里，按顺序注入。">
             <ExtrasSection value={draft.extras} onChange={(v) => set('extras', v)} />
           </Section>

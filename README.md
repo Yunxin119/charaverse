@@ -6,6 +6,7 @@ AI 角色扮演聊天 Web 应用：自带 API key、流式回复、可导入通�
 
 - **BYOK（自带 key）**：API key 只存在浏览器 localStorage，每次请求随 `x-cv-connection` 请求头发给本站 `/api/*` 代理，服务端只做鉴权、校验、转发、限流，不落库、不打日志。
 - **流式聊天**：基于 Vercel AI SDK `streamText`，支持发送 / 角色开场 / 重新生成（每次的结果都留着，点计数打开「备选回复」抽屉可对比 / 选用 / 删除）/ 续写 / 灵感 / 分支会话。
+- **我的人设**：用户人设在 `/settings/personas` 统一管理（名字 / 头像 / 年龄 / 性别 / 设定），不写进角色卡；可设默认、按角色绑定（角色主页）、按对话临时换（会话设置），服务端拼装时按 对话选择 → 角色绑定 → 默认 取用。
 - **聊天记录导出**：JSON（无损）/ JSONL / Markdown / 纯文本，可选带上备选回复；入口在聊天页「更多」、角色主页的对话列表和完整历史页。
 - **Prompt 预设**：Prompt 条目可排序、开关、占位条目；直接导入通用预设格式的 chat-completion 预设 JSON；用户级默认 + 会话级覆盖。
 - **主题导入**：整站颜色、圆角、字体、玻璃参数都是 `--cv-*` token，一份 JSON 即可换肤；内置 Warm Glass Light / Dark、Carbon Neon、Sage Paper。
@@ -69,6 +70,7 @@ npm install
 13. `supabase/migrations/0013_comment_likes_notifications.sql` — 评论点赞（`comment_likes` + `toggle_comment_like`）、`notifications` 收件箱与评论触发器
 14. `supabase/migrations/0014_character_updates.sql` — 发布更新说明（`release_note`）、作者重新发布时的通知触发器（首版还含「复制角色」的来源列，已被 0015 移除）
 15. `supabase/migrations/0015_no_forks_notify_players.sql` — 删除「复制角色」相关列；重新发布时通知聊过 / 收藏过这个角色的人
+16. `supabase/migrations/0016_user_personas.sql` — `user_personas` / `persona_bindings`（owner-only RLS）、`set_default_persona` RPC
 
 跑 hotfix 前建议先导出一份现有策略对照：`select * from pg_policies order by schemaname, tablename, policyname;`
 

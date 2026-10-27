@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { SessionSettings } from '@/lib/chat/settings'
 import type { UserPreset } from '@/app/lib/supabase'
 import { uploadChatBackground, removeChatBackground } from '@/lib/chat/background'
+import { PersonaPicker } from '@/components/personas/PersonaPicker'
 
 interface Props {
   open: boolean
@@ -25,11 +26,13 @@ interface Props {
   saving?: boolean
   onSave: (patch: { title?: string; settings: Partial<SessionSettings> }) => Promise<void>
   onClearMessages: () => Promise<void>
+  /** what 「跟随默认」 resolves to for this character right now (name), for the hint line */
+  inheritedPersonaName?: string | null
 }
 
 const BUILTIN = '__builtin__'
 
-export function ChatSettingsSheet({ open, onOpenChange, sessionId, userId, title, settings, models, presets, builtinPresetName, saving, onSave, onClearMessages }: Props) {
+export function ChatSettingsSheet({ open, onOpenChange, sessionId, userId, title, settings, models, presets, builtinPresetName, saving, onSave, onClearMessages, inheritedPersonaName }: Props) {
   const [draft, setDraft] = useState<SessionSettings>(settings)
   const [draftTitle, setDraftTitle] = useState(title)
   const [uploading, setUploading] = useState(false)
@@ -183,8 +186,22 @@ export function ChatSettingsSheet({ open, onOpenChange, sessionId, userId, title
           </section>
 
           <section className="space-y-2">
-            <Label htmlFor="cv-username">你在对话里的名字</Label>
-            <Input id="cv-username" placeholder="留空则用角色卡里的用户设定" value={draft.userName ?? ''} onChange={(e) => set('userName', e.target.value || undefined)} />
+            <Label htmlFor="cv-persona">这个对话里的「你」</Label>
+            <PersonaPicker
+              id="cv-persona"
+              userId={userId}
+              value={draft.personaId}
+              onChange={(v) => set('personaId', v)}
+              inheritLabel="跟随默认（角色绑定的，否则默认人设）"
+              inheritHint={inheritedPersonaName ? `现在是：${inheritedPersonaName}` : '现在没有可用的人设'}
+              allowNone
+            />
+          </section>
+
+          <section className="space-y-2">
+            <Label htmlFor="cv-username">只改名字</Label>
+            <Input id="cv-username" placeholder="留空则用人设 / 角色卡里的名字" value={draft.userName ?? ''} onChange={(e) => set('userName', e.target.value || undefined)} />
+            <p className="text-[11px] text-cv-fg-subtle">只想换个称呼、不换人设时用这个；它优先于人设的名字。</p>
           </section>
 
           <section className="space-y-3">

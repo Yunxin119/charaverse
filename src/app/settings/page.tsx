@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plug, Palette, SlidersHorizontal, Users, LogOut, Loader2, Check, ChevronRight, BookOpen, Wand2, MessagesSquare, Repeat, Keyboard, Inbox, Heart, Brain, Bookmark, Bell } from 'lucide-react'
+import { Plug, Palette, SlidersHorizontal, Users, UserRound, LogOut, Loader2, Check, ChevronRight, BookOpen, Wand2, MessagesSquare, Repeat, Keyboard, Inbox, Heart, Brain, Bookmark, Bell } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/providers/AuthProvider'
 import { useUnreadNotificationCount } from '@/queries/useNotifications'
@@ -80,6 +80,7 @@ export default function SettingsHubPage() {
   const links = [
     { href: '/settings/notifications', icon: Bell, title: '通知', desc: unread > 0 ? `${unread} 条未读` : '评论回复、角色下的新评论' },
     { href: '/settings/connections', icon: Plug, title: 'API 连接', desc: `${connections.length} 个连接 · Key 只存在本机` },
+    { href: '/settings/personas', icon: UserRound, title: '我的人设', desc: '故事里的「你」：统一管理，按角色绑定或按对话选' },
     { href: '/settings/presets', icon: SlidersHorizontal, title: '预设', desc: 'Prompt 预设：导入 / 排序 / 采样' },
     { href: '/settings/lorebooks', icon: BookOpen, title: '世界书库', desc: '关键词触发的背景设定，启用后应用到所有对话' },
     { href: '/settings/appearance', icon: Palette, title: '主题与外观', desc: '明暗模式、内置主题、导入主题 JSON' },

@@ -62,7 +62,9 @@ export async function POST(request: NextRequest) {
     const { model, label } = resolveModel(conn)
     const ctx = await loadChatContext(supabase, body.sessionId, user.id)
     const { card, preset, session } = ctx
-    const userName = session.settings.userName || card.userName
+    const userName = session.settings.userName || ctx.persona?.name || card.userName
+    // a chosen persona replaces the card's legacy user block entirely (even when it has no details)
+    const personaText = ctx.persona ? ctx.persona.text ?? '' : card.persona
 
     // ---- figure out the history slice for this action ----
     let history = ctx.history.filter((m) => m.role !== 'system')
@@ -108,7 +110,7 @@ export async function POST(request: NextRequest) {
         name: card.name, description: card.description, personality: card.personality,
         age: card.age, gender: card.gender, scenario: card.scenario, modules: card.modules,
       },
-      user: { name: userName, persona: card.persona },
+      user: { name: userName, persona: personaText },
       memoryTable: ctx.memoryTable,
       summaries: ctx.summaries,
       worldInfo: lore ? { before: lore.before, after: lore.after } : undefined,
