@@ -1,5 +1,3 @@
-import { FOLIO_PAPER_CSS } from './folioPreset'
-
 /** Selector cheat-sheet and starter CSS presets for the skin editor. */
 export const SELECTOR_GROUPS: { label: string; items: { selector: string; desc: string }[] }[] = [
   { label: '整体布局', items: [
@@ -53,7 +51,6 @@ export const SELECTOR_GROUPS: { label: string; items: { selector: string; desc: 
 ]
 
 export const CSS_PRESETS: { name: string; css: string; desc?: string; /** regex template to add alongside (REGEX_TEMPLATES id) */ regexTemplateId?: string }[] = [
-  { name: 'Folio · 纸面阅读', desc: '不见气泡，像翻一本书；对白染成强调色（会一起加上「对白加粗」正则）', css: FOLIO_PAPER_CSS, regexTemplateId: 'bold-dialogue' },
   { name: '紫色梦幻', css: `/* 紫色梦幻 */
 #cv_chat_root { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%) !important; }
 #cv_background_overlay { background: linear-gradient(180deg, rgba(118,75,162,.1), rgba(102,126,234,.15)); }

@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, Loader2, Plus, Trash2, Upload, Copy, Check, AlertTriangle, LayoutTemplate, FlaskConical } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { qk } from '@/queries/keys'
+import { ArrowLeft, Save, Loader2, Plus, Trash2, Upload, Copy, Check, AlertTriangle, LayoutTemplate, FlaskConical, Eye, PencilLine } from 'lucide-react'
 import { supabase, type Character } from '@/app/lib/supabase'
 import { parseSkin, skinSchema, type Skin } from '@/lib/skins/schema'
 import { sanitizeCss } from '@/lib/skins/sanitizeCss'
@@ -21,9 +23,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Chip, GlassPanel, IconButton } from '@/components/glass'
-import { MessageBubble } from '@/components/chat/MessageBubble'
-import { MessageContent } from '@/components/chat/MessageContent'
-import { SkinStyle } from '@/components/chat/SkinStyle'
+import { SkinPreview } from './SkinPreview'
 import { cn } from '@/lib/utils'
 
 interface Props { character: Character }
@@ -32,6 +32,7 @@ const emptyScript = (i: number): RegexScript => regexScriptSchema.parse({ id: `s
 
 export function SkinEditor({ character }: Props) {
   const router = useRouter()
+  const qc = useQueryClient()
   const card = useMemo(() => parseCharacterCard(character), [character])
   const initial = useMemo(() => {
     const s = parseSkin(character.skin)
@@ -39,6 +40,8 @@ export function SkinEditor({ character }: Props) {
   }, [character.skin, card.customCss])
 
   const [skin, setSkin] = useState<Skin>(initial)
+  const [baseline, setBaseline] = useState<Skin>(initial)
+  const [pane, setPane] = useState<'edit' | 'preview'>('edit')
   const [sample, setSample] = useState(SAMPLE_AI_MESSAGE)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,7 +51,7 @@ export function SkinEditor({ character }: Props) {
   const [regexImportError, setRegexImportError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const dirty = JSON.stringify(skin) !== JSON.stringify(initial)
+  const dirty = JSON.stringify(skin) !== JSON.stringify(baseline)
   const composedCss = useMemo(() => composeSkinCss(skin.knobs, skin.css), [skin.knobs, skin.css])
   const sanitized = useMemo(() => sanitizeCss(composedCss, { allowedUrlHosts: skin.allowedUrlHosts }), [composedCss, skin.allowedUrlHosts])
 
@@ -76,8 +79,10 @@ export function SkinEditor({ character }: Props) {
       }
       const { error } = await supabase.from('characters').update(patch).eq('id', character.id)
       if (error) throw error
+      setBaseline(skin)
+      qc.setQueryData<Character>(qk.character(character.id), (old) => (old ? { ...old, ...patch } : old))
+      void qc.invalidateQueries({ queryKey: qk.characters(character.user_id) })
       setSaved(true); setTimeout(() => setSaved(false), 1500)
-      router.refresh()
     } catch (e) {
       setError((e as Error).message || '保存失败')
     } finally { setSaving(false) }
@@ -93,7 +98,6 @@ export function SkinEditor({ character }: Props) {
     setRegexImport('')
   }
 
-  const renderSkin = { regexScripts: skin.regexScripts, renderHtml: skin.renderHtml, char: card.name, user: card.userName }
   const testCtx = useMemo(() => ({ role: 'assistant' as const, char: card.name, user: card.userName }), [card.name, card.userName])
   const addTemplate = (id: string) => {
     const t = REGEX_TEMPLATES.find((x) => x.id === id)
@@ -110,29 +114,27 @@ export function SkinEditor({ character }: Props) {
     const t = p.regexTemplateId ? REGEX_TEMPLATES.find((x) => x.id === p.regexTemplateId) : undefined
     if (t && !skin.regexScripts.some((r) => r.name === t.script.name)) addTemplate(t.id)
   }
-  const noop = () => {}
-  const now = new Date().toISOString()
-  const previewMsgs = [
-    { id: 1, session_id: 'p', role: 'assistant' as const, content: '雨还没停。你要是不急着走，我这儿还有半壶热茶。', type: 'message' as const, created_at: now },
-    { id: 2, session_id: 'p', role: 'user' as const, content: '不急。茶就茶吧，反正也睡不着。', type: 'message' as const, created_at: now },
-  ]
-
   return (
-    <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
-      <header className="mb-4 flex flex-wrap items-center gap-3">
+    <div className="flex h-dvh flex-col px-3 pt-3 sm:px-5 sm:pt-4">
+      <header className="mb-3 flex flex-wrap items-center gap-3">
         <IconButton label="返回" variant="ghost" onClick={() => { if (!dirty || confirm('有未保存的修改，确定离开？')) router.back() }}><ArrowLeft /></IconButton>
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-2xl font-semibold">皮肤 · {card.name}</h1>
-          <p className="text-xs text-cv-fg-muted">CSS 只作用于聊天区域；HTML 与脚本在沙箱里运行，拿不到主站任何数据。</p>
+          <h1 className="truncate font-display text-xl font-semibold sm:text-2xl">皮肤 · {card.name}</h1>
+          <p className="hidden text-xs text-cv-fg-muted sm:block">CSS 只作用于聊天区域；HTML 与脚本在沙箱里运行，拿不到主站任何数据。右边就是玩家会看到的聊天页，改什么立刻能看见。</p>
         </div>
         {dirty && <Chip tone="warning">未保存</Chip>}
+        <div className="neu-in inline-flex rounded-full p-0.5 lg:hidden" role="tablist" aria-label="编辑或预览">
+          {([['edit', '编辑', PencilLine], ['preview', '预览', Eye]] as const).map(([id, label, Icon]) => (
+            <button key={id} type="button" role="tab" aria-selected={pane === id} onClick={() => setPane(id)} className={cn('flex items-center gap-1 rounded-full px-3 py-1 text-xs', pane === id ? 'bg-cv-bg-elevated shadow-neu-sm' : 'text-cv-fg-muted')}><Icon className="size-3.5" />{label}</button>
+          ))}
+        </div>
         <Button onClick={save} disabled={saving || !dirty}>{saving ? <Loader2 className="animate-spin" /> : saved ? <Check /> : <Save />}{saved ? '已保存' : '保存'}</Button>
       </header>
       {error && <p className="mb-3 text-sm text-cv-danger">{error}</p>}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
+      <div className="grid min-h-0 flex-1 gap-4 pb-3 lg:grid-cols-[minmax(360px,0.75fr)_minmax(0,1.25fr)] sm:pb-5">
         {/* ---------------- editor ---------------- */}
-        <Tabs defaultValue="css" className="min-w-0">
+        <Tabs defaultValue="css" className={cn('min-h-0 min-w-0 overflow-y-auto pr-1', pane === 'preview' && 'hidden lg:block')}>
           <TabsList className="w-full"><TabsTrigger value="css">CSS</TabsTrigger><TabsTrigger value="regex">正则脚本 {skin.regexScripts.length ? `(${skin.regexScripts.length})` : ''}</TabsTrigger><TabsTrigger value="options">选项</TabsTrigger></TabsList>
 
           <TabsContent value="css" className="space-y-4 pt-3">
@@ -200,7 +202,7 @@ export function SkinEditor({ character }: Props) {
             {skin.regexScripts.length === 0 && (
               <GlassPanel padding="sm" className="flex items-center gap-3 text-xs text-cv-fg-muted">
                 <FlaskConical className="size-4 shrink-0 text-cv-accent" />
-                还没有脚本。从模板加一个试试：每条脚本下面都有测试台，用右侧「测试用的 AI 回复」看命中和结果。
+                还没有脚本。从模板加一个试试：每条脚本下面都有测试台，用预览上方的「测试回复」改它要处理的文本。
               </GlassPanel>
             )}
             <div className="flex flex-wrap gap-2">
@@ -237,33 +239,8 @@ export function SkinEditor({ character }: Props) {
           </TabsContent>
         </Tabs>
 
-        {/* ---------------- preview ---------------- */}
-        <div className="min-w-0 space-y-3">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cv-fg-subtle">实时预览</div>
-          <SkinStyle css={composedCss} allowedUrlHosts={skin.allowedUrlHosts} />
-          <div id="cv_chat_root" className="relative flex h-[560px] flex-col overflow-hidden rounded-cv-lg border border-cv-border bg-cv-bg">
-            <div id="cv_background_overlay" aria-hidden className="pointer-events-none absolute inset-0 -z-10" />
-            <div id="cv_chat_header" className="px-3 pt-3"><div className="glass flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold"><span id="cv_back_button" className="text-cv-fg-muted">←</span>{card.name}</div></div>
-            <div id="cv_chat_body" className="min-h-0 flex-1 overflow-y-auto">
-              <div id="cv_messages_container" className="flex flex-col gap-4 px-3 py-4">
-                {previewMsgs.map((m) => (
-                  <MessageBubble key={m.id} message={m} speaker={m.role === 'user' ? { name: card.userName } : { name: card.name, avatarUrl: character.avatar_url }} skin={renderSkin} isLast={false} selected={false} onSelect={noop} editing={false} onEditSave={noop} onEditCancel={noop} />
-                ))}
-                <div className="cv_message_row cv_message_row_ai flex items-end gap-2.5">
-                  <div className="cv_message_avatar cv_ai_avatar flex size-9 items-center justify-center rounded-cv-sm bg-cv-secondary text-xs font-semibold">{card.name.slice(0, 1)}</div>
-                  <div className="cv_message_bubble cv_ai_message_bubble glass-strong max-w-[82%] rounded-cv-lg rounded-bl-md px-4 py-2.5 text-cv-fg">
-                    <MessageContent text={sample} role="assistant" skin={renderSkin} />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div id="cv_chat_input_container" className="px-3 pb-3"><div id="cv_chat_input_box" className="neu-in flex items-center gap-2 rounded-cv-xl py-2 pl-4 pr-2"><span id="cv_chat_input_textarea" className="flex-1 text-sm text-cv-fg-subtle">说点什么…</span><span id="cv_send_button" className="flex size-9 items-center justify-center rounded-full bg-cv-accent text-white">↑</span></div></div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="skin-sample">测试用的 AI 回复（可粘贴美化卡输出）</Label>
-            <Textarea id="skin-sample" value={sample} onChange={(e) => setSample(e.target.value)} className="min-h-28 font-mono text-xs" spellCheck={false} />
-          </div>
-        </div>
+        {/* ---------------- preview: the real chat page ---------------- */}
+        <SkinPreview character={character} skin={skin} sample={sample} onSampleChange={setSample} className={cn('min-h-[70dvh] lg:min-h-0', pane === 'edit' && 'hidden lg:flex')} />
       </div>
     </div>
   )

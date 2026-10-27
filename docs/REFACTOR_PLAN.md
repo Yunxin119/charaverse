@@ -347,7 +347,9 @@ docs/                       # 本文件 + design/
 - [x] 备选回复抽屉：`SwipesSheet` 列出一条消息的全部 reroll（当前版本高亮、选用 / 复制 / 删除某个版本，`useDeleteSwipe` 直接改 `swipes` 列，剩一条时回到 `[]`）；计数 `n/m` 变成按钮，任何带备选的 AI 消息都能切换，不再限于最后一条；视觉小说框同款入口
 - [x] 导出补全：纯文本格式（`toPlainText`）、Markdown / 纯文本可选带备选回复（`<details>` / 括注），入口加到角色主页对话列表的菜单和完整历史页
 - [x] 用户人设独立（0016）：`user_personas`（默认唯一，`set_default_persona`）+ `persona_bindings(user, character → persona)`；`/settings/personas` 管理页，角色主页「和它聊天用的人设」绑定，会话设置里可选「跟随默认 / 某个人设 / 不用」（`settings.personaId`，`userName` 仍可只改名字）；`loadContext` 按 对话选择 → 绑定 → 默认 解析并替换角色卡旧的 用户角色设定 块；编辑器里卡内人设降级为「旧」段，只在非空时显示，可一键存为我的人设 / 清空
-- [x] 皮肤起步模板「Folio · 纸面阅读」（`lib/skins/folioPreset.ts`）：无气泡、整页像书，头像 + 宋体名字做标题、日期眉题、短线，用户消息是便笺，输入框浮在纸上，`#cv_chat_root:is(.dark *, [data-theme="dark"] *)` 跟随明暗；选模板时自动带上「对白加粗」正则给对白上色；气泡名字行拆成 `.cv_message_byline / name / sep / time`
+- [x] 「Folio · 纸面阅读」皮肤样例改为自用文件 `docs/design/skins/folio-paper.css`（不内置到编辑器；头部注释写了配套的「对白加粗」正则），测试里读文件过清洗器；气泡名字行拆成 `.cv_message_byline / name / sep / time`
+- [x] 聊天 DOM 抽成 `ChatSurface`（`#cv_chat_root` / 背景层 / `#cv_chat_row` / `#cv_chat_column[data-layout]`，`backdropFor` 算背景），聊天页和皮肤编辑器的预览共用，选择器永远一致
+- [x] 皮肤编辑页重做：左编辑 / 右「真正的聊天页」预览（`SkinPreview`：真实 header、头像背景、开场白（多开场白带 1/n）、一句用户话、可编辑的测试回复，输入框打字会在预览里加一条用户消息，可切对话流 / 视觉小说），整页高度、大屏并排、小屏「编辑 / 预览」切换；修了保存后仍显示「未保存」（基线没更新 + 角色查询缓存没刷新）
 - [ ] 下一步候选：视觉小说模式的打字机节奏
 - [ ] 待修：直接删除 auth 用户会 500（有表的 `user_id` 外键没有 `on delete cascade`，清掉 `chat_sessions` 后才能删）；做「注销账号」前先补一遍级联
 

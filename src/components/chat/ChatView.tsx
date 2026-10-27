@@ -20,7 +20,6 @@ import { BUILTIN_DEFAULT_PRESET } from '@/lib/prompt/presets'
 import { parseSkin } from '@/lib/skins/schema'
 import { composeSkinCss } from '@/lib/skins/knobs'
 import { parseSnapshot } from '@/components/character/snapshot'
-import { SkinStyle } from './SkinStyle'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { GlassSheet, GlassSheetContent, IconButton, PosterCard, PosterTitle } from '@/components/glass'
@@ -33,6 +32,7 @@ import { Composer } from './Composer'
 import { ChatSettingsSheet } from './ChatSettingsSheet'
 import { VisualNovelStage } from './VisualNovelStage'
 import { ExportChatDialog } from './ExportChatDialog'
+import { ChatSurface, backdropFor } from './ChatSurface'
 import { SwipesSheet } from './SwipesSheet'
 import type { MessageActionHandlers } from './MessageActions'
 
@@ -227,12 +227,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   const userSpeaker = { name: settings.userName || persona?.name || profileQ.data?.username || card.userName, avatarUrl: persona?.avatar_url || profileQ.data?.avatar_url }
   const novel = settings.layout === 'novel'
   const toggleLayout = () => updateSettings.mutate({ layout: novel ? 'flow' : 'novel' })
-  // backdrop: the session's own image, else the character's avatar (dimmed + blurred in flow mode, full in novel mode)
-  const bg = settings.background
-  const avatarFallback = !bg.url && bg.useAvatar && !!character.avatar_url
-  const bgUrl = bg.url ?? (avatarFallback ? character.avatar_url! : undefined)
-  const bgOpacity = avatarFallback ? (novel ? 1 : 0.5) : bg.opacity
-  const bgBlur = avatarFallback ? (novel ? 0 : 16) : bg.blur
+  const backdrop = backdropFor(settings.background, settings.layout, character.avatar_url)
   const commentTarget = character.is_public ? { id: character.id, authorId: character.user_id } : null
   const commentsAvailable = !!commentTarget
   const isPlayer = character.user_id !== userId
@@ -285,83 +280,66 @@ export function ChatView({ sessionId }: { sessionId: string }) {
   )
 
   return (
-    <div id="cv_chat_root" className="relative flex h-dvh flex-col overflow-hidden">
-      <SkinStyle css={composeSkinCss(skin.knobs, skin.css || card.customCss)} allowedUrlHosts={skin.allowedUrlHosts} />
-      {bgUrl && (
-        <>
-          <div
-            id="cv_background_image"
-            aria-hidden
-            data-source={bg.url ? 'custom' : 'avatar'}
-            className="pointer-events-none absolute inset-0 -z-20 bg-cover"
-            style={{ backgroundImage: `url(${bgUrl})`, backgroundPosition: novel ? 'center 18%' : 'center', opacity: bgOpacity, filter: bgBlur ? `blur(${bgBlur}px)` : undefined, transform: bgBlur ? 'scale(1.06)' : undefined }}
-          />
-          <div id="cv_background_overlay" aria-hidden className={cn('pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b', novel ? 'from-cv-bg/35 via-transparent to-transparent' : 'from-cv-bg/40 via-transparent to-cv-bg/60')} />
-        </>
-      )}
-
-      {/* row: chat column + optional comments aside. #cv_chat_root keeps `flex h-dvh flex-col` for skins. */}
-      <div id="cv_chat_row" className="flex min-h-0 flex-1">
-        <div id="cv_chat_column" data-layout={settings.layout} className="relative flex min-w-0 flex-1 flex-col">
-          <ChatHeader
-            sessionId={sessionId}
-            character={{ id: character.id, ...characterSpeaker }}
-            title={session.title}
-            modelLabel={modelId ? conn.displayName(modelId) : undefined}
-            presetLabel={presetLabel}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onExport={() => setExportOpen(true)}
-            commentsAvailable={commentsAvailable}
-            commentsOpen={isLarge ? commentsOpen : commentsSheetOpen}
-            onToggleComments={toggleComments}
-            layout={settings.layout}
-            onToggleLayout={toggleLayout}
-            floating={novel}
-            revealed={headerPeek}
-            onNewBranchFromEnd={messages.length ? () => branch.mutate({ sessionId, messageId: messages[messages.length - 1].id }, { onSuccess: (id) => router.push(`/chat/${id}`) }) : undefined}
-          />
-          {isPlayer && character.is_public && character.published_at && (
-            <PublishNoteBanner characterId={character.id} publishedAt={character.published_at} note={character.release_note ?? null} className={cn('mx-3 shrink-0 sm:mx-4', novel ? 'mt-20' : 'mt-2')} />
-          )}
-
-          {novel ? (
-            <VisualNovelStage
-              messages={messages}
-              character={characterSpeaker}
-              user={userSpeaker}
-              skin={renderSkin}
-              streamingText={streamingText}
-              busy={busy}
-              onSwipe={(m, index) => selectSwipe.mutate({ messageId: m.id, index })}
-              onOpenSwipes={(m) => setSwipesId(m.id)}
-              onRegenerate={lastMessage?.role === 'assistant' ? handlersFor(lastMessage, true).onRegenerate : undefined}
-              onContinue={lastMessage?.role === 'assistant' ? handlersFor(lastMessage, true).onContinue : undefined}
-              onOpenLog={() => setLogOpen(true)}
-              onStageTap={() => setHeaderPeek((v) => !v)}
-              notice={noticeEl}
-              emptyState={emptyState}
-              composer={composerProps}
-            />
-          ) : (
-            <>
-              {messageList}
-              {noticeEl}
-              <Composer {...composerProps} />
-            </>
-          )}
-        </div>
-
-        {commentsAvailable && isLarge && commentsOpen && (
-          <aside id="cv_comments_panel" aria-label="评论" className="glass hidden w-[340px] shrink-0 flex-col border-l border-cv-border lg:flex">
-            <div className="flex shrink-0 items-center justify-between px-4 pb-1 pt-3">
-              <h2 className="font-display text-base font-semibold">评论</h2>
-              <IconButton label="收起评论" variant="ghost" size="sm" onClick={toggleComments}><X /></IconButton>
-            </div>
-            {commentTarget && <CommentThread variant="panel" characterId={commentTarget.id} authorId={commentTarget.authorId} className="min-h-0 flex-1" />}
-          </aside>
-        )}
-      </div>
-
+    <ChatSurface
+      className="h-dvh"
+      skinCss={composeSkinCss(skin.knobs, skin.css || card.customCss)}
+      allowedUrlHosts={skin.allowedUrlHosts}
+      layout={settings.layout}
+      backdrop={backdrop}
+      header={
+        <ChatHeader
+          sessionId={sessionId}
+          character={{ id: character.id, ...characterSpeaker }}
+          title={session.title}
+          modelLabel={modelId ? conn.displayName(modelId) : undefined}
+          presetLabel={presetLabel}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onExport={() => setExportOpen(true)}
+          commentsAvailable={commentsAvailable}
+          commentsOpen={isLarge ? commentsOpen : commentsSheetOpen}
+          onToggleComments={toggleComments}
+          layout={settings.layout}
+          onToggleLayout={toggleLayout}
+          floating={novel}
+          revealed={headerPeek}
+          onNewBranchFromEnd={messages.length ? () => branch.mutate({ sessionId, messageId: messages[messages.length - 1].id }, { onSuccess: (id) => router.push(`/chat/${id}`) }) : undefined}
+        />
+      }
+      banner={isPlayer && character.is_public && character.published_at ? (
+        <PublishNoteBanner characterId={character.id} publishedAt={character.published_at} note={character.release_note ?? null} className={cn('mx-3 shrink-0 sm:mx-4', novel ? 'mt-20' : 'mt-2')} />
+      ) : undefined}
+      messageList={messageList}
+      notice={noticeEl}
+      composer={<Composer {...composerProps} />}
+      stage={novel ? (
+        <VisualNovelStage
+          messages={messages}
+          character={characterSpeaker}
+          user={userSpeaker}
+          skin={renderSkin}
+          streamingText={streamingText}
+          busy={busy}
+          onSwipe={(m, index) => selectSwipe.mutate({ messageId: m.id, index })}
+          onOpenSwipes={(m) => setSwipesId(m.id)}
+          onRegenerate={lastMessage?.role === 'assistant' ? handlersFor(lastMessage, true).onRegenerate : undefined}
+          onContinue={lastMessage?.role === 'assistant' ? handlersFor(lastMessage, true).onContinue : undefined}
+          onOpenLog={() => setLogOpen(true)}
+          onStageTap={() => setHeaderPeek((v) => !v)}
+          notice={noticeEl}
+          emptyState={emptyState}
+          composer={composerProps}
+        />
+      ) : undefined}
+      aside={commentsAvailable && isLarge && commentsOpen ? (
+        <aside id="cv_comments_panel" aria-label="评论" className="glass hidden w-[340px] shrink-0 flex-col border-l border-cv-border lg:flex">
+          <div className="flex shrink-0 items-center justify-between px-4 pb-1 pt-3">
+            <h2 className="font-display text-base font-semibold">评论</h2>
+            <IconButton label="收起评论" variant="ghost" size="sm" onClick={toggleComments}><X /></IconButton>
+          </div>
+          {commentTarget && <CommentThread variant="panel" characterId={commentTarget.id} authorId={commentTarget.authorId} className="min-h-0 flex-1" />}
+        </aside>
+      ) : undefined}
+    >
       {novel && (
         <GlassSheet open={logOpen} onOpenChange={setLogOpen}>
           <GlassSheetContent side="right" title="对话记录" className="sm:max-w-2xl [&>div:last-child]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-1 [&>div:last-child]:flex-col">
@@ -415,6 +393,6 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         userName={userSpeaker.name}
         settings={settings}
       />
-    </div>
+    </ChatSurface>
   )
 }

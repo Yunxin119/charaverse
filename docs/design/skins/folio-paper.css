@@ -1,11 +1,13 @@
-/**
- * 「Folio · 纸面阅读」starter skin: no bubbles, the whole chat reads like a book page.
- * Light / dark follow the app theme (`.dark` / `[data-theme="dark"]` on <html>).
- * Dialogue colouring relies on the 「对白加粗」 regex template (added together with the preset).
- */
-export const FOLIO_PAPER_CSS = `/* ==========================================================================
-   Folio · 纸面阅读 —— 不见气泡，整页像一本书
-   跟随 App 的明暗模式。对白上色靠正则「对白加粗」把 “……” 变成粗体，这里再把粗体染成强调色。
+/* ==========================================================================
+   Folio · 纸面阅读 —— CharaVerse 皮肤（自用，复制到「皮肤 → 高级 CSS」即可）
+   不见气泡，整页像一本书；跟随 App 的明暗模式。
+
+   对白上色需要一条正则脚本（皮肤 → 正则脚本 → 从模板添加「对白加粗」，或手动加）：
+     查找   ([「“])([^」”\n]+)([」”])
+     flags  g
+     替换为 **$1$2$3**
+     作用于 AI 消息，不勾「输出为 HTML」
+   它把 “……” 变成粗体，下面的 CSS 再把粗体染成强调色。
    ========================================================================== */
 
 /* ---------- 0. 调节区：只需要改这里 ---------- */
@@ -177,4 +179,3 @@ export const FOLIO_PAPER_CSS = `/* =============================================
   .cv_message_row_ai .cv_message_avatar { width: 40px; height: 40px; }
   .cv_message_row_ai .cv_message_name { font-size: 20px; }
 }
-`
