@@ -103,6 +103,13 @@ export function SkinEditor({ character }: Props) {
     // give the tester something to bite on when the sample is still the default
     if (sample === SAMPLE_AI_MESSAGE || !sample.trim()) setSample(`${sample.trim()}\n\n${t.sample}`.trim())
   }
+  const applyPreset = (p: (typeof CSS_PRESETS)[number]) => {
+    if (skin.css.trim() && !confirm('替换当前 CSS？')) return
+    set('css', p.css)
+    // presets that need a regex (e.g. dialogue colouring) bring it along, once
+    const t = p.regexTemplateId ? REGEX_TEMPLATES.find((x) => x.id === p.regexTemplateId) : undefined
+    if (t && !skin.regexScripts.some((r) => r.name === t.script.name)) addTemplate(t.id)
+  }
   const noop = () => {}
   const now = new Date().toISOString()
   const previewMsgs = [
@@ -141,7 +148,9 @@ export function SkinEditor({ character }: Props) {
               </div>
             )}
             <div className="flex flex-wrap gap-2">
-              {CSS_PRESETS.map((p) => <Button key={p.name} size="sm" variant="neu" onClick={() => { if (!skin.css.trim() || confirm('替换当前 CSS？')) set('css', p.css) }}>{p.name}</Button>)}
+              {CSS_PRESETS.map((p) => (
+                <Button key={p.name} size="sm" variant="neu" title={p.desc} onClick={() => applyPreset(p)}>{p.name}</Button>
+              ))}
             </div>
             <GlassPanel padding="sm">
               <div className="mb-2 flex items-center justify-between text-xs"><span className="font-semibold">可用选择器</span><span className="text-cv-fg-subtle">点击复制</span></div>

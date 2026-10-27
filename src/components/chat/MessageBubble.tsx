@@ -74,7 +74,7 @@ export function MessageBubble({ message, speaker, skin, isLast, selected, onSele
         </motion.div>
 
         <div className={cn('cv_message_meta flex min-h-7 items-center gap-2 px-1 text-[11px] text-cv-fg-subtle', isUser && 'flex-row-reverse')}>
-          <span>{speaker.name} · {formatTime(message.created_at)}</span>
+          <span className="cv_message_byline"><span className="cv_message_name">{speaker.name}</span><span className="cv_message_sep"> · </span><span className="cv_message_time">{formatTime(message.created_at)}</span></span>
           {showSwipes && (
             <span className="inline-flex items-center gap-0.5 rounded-full glass-strong px-1 py-0.5 text-[11px] font-semibold text-cv-fg-muted">
               <button type="button" aria-label="上一个回复" disabled={busy || swipeIndex === 0} onClick={(e) => { e.stopPropagation(); onSwipe!(swipeIndex - 1) }} className="rounded-full p-0.5 hover:bg-cv-fg/10 disabled:opacity-30"><ChevronLeft className="size-3.5" /></button>
@@ -127,7 +127,7 @@ export function StreamingBubble({ text, speaker, skin }: { text: string; speaker
         <div className="cv_message_bubble cv_ai_message_bubble glass-strong min-w-0 max-w-full break-words [overflow-wrap:anywhere] rounded-cv-lg rounded-bl-md px-4 py-2.5 text-cv-fg">
           {text ? <MessageContent text={text} role="assistant" skin={skin} /> : <TypingIndicator />}
         </div>
-        <div className="cv_message_meta px-1 text-[11px] text-cv-fg-subtle">{speaker.name} · 正在输入…</div>
+        <div className="cv_message_meta px-1 text-[11px] text-cv-fg-subtle"><span className="cv_message_byline"><span className="cv_message_name">{speaker.name}</span><span className="cv_message_sep"> · </span><span className="cv_message_time">正在输入…</span></span></div>
       </div>
     </div>
   )

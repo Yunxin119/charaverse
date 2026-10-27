@@ -1,0 +1,180 @@
+/**
+ * 「Folio · 纸面阅读」starter skin: no bubbles, the whole chat reads like a book page.
+ * Light / dark follow the app theme (`.dark` / `[data-theme="dark"]` on <html>).
+ * Dialogue colouring relies on the 「对白加粗」 regex template (added together with the preset).
+ */
+export const FOLIO_PAPER_CSS = `/* ==========================================================================
+   Folio · 纸面阅读 —— 不见气泡，整页像一本书
+   跟随 App 的明暗模式。对白上色靠正则「对白加粗」把 “……” 变成粗体，这里再把粗体染成强调色。
+   ========================================================================== */
+
+/* ---------- 0. 调节区：只需要改这里 ---------- */
+#cv_chat_root {
+  --f-read: 16px;        /* 正文字号 */
+  --f-leading: 1.9;      /* 正文行距 */
+  --f-bg-show: 0.14;     /* 背景图浓度：0 看不见 … 1 完整显示 */
+  --f-measure: 42em;     /* 版心宽度 */
+
+  /* 玫瑰灰 · 白天 */
+  --f-paper: #FCF8F7;
+  --f-ink: #3D2826;
+  --f-secondary: #8E6F6B;
+  --f-muted: #C0A7A3;
+  --f-line: #E6D8D5;
+  --f-sunken: #F1E8E6;
+  --f-accent: #9C5A5C;
+  --f-on-accent: #FCF8F7;
+  --f-shade: rgba(142, 111, 107, 0.18);
+
+  --f-serif: "Noto Serif SC", "Source Han Serif SC", "思源宋体", "Songti SC", "STSong", ui-serif, Georgia, serif;
+}
+
+/* 玫瑰灰 · 夜间（App 切到深色时自动生效） */
+#cv_chat_root:is(.dark *, [data-theme="dark"] *) {
+  --f-paper: #1A1415;
+  --f-ink: #F0E4E2;
+  --f-secondary: #AC9391;
+  --f-muted: #6E5B5C;
+  --f-line: #3B2F30;
+  --f-sunken: #221B1C;
+  --f-accent: #D9A2A3;
+  --f-on-accent: #1A1415;
+  --f-shade: rgba(0, 0, 0, 0.45);
+}
+
+/* ---------- 1. 纸面：纸色打底，背景图淡淡透出来 ---------- */
+#cv_chat_root { background: var(--f-paper); color: var(--f-ink); }
+#cv_background_image { opacity: var(--f-bg-show) !important; filter: none !important; transform: none !important; }
+#cv_background_overlay { background: linear-gradient(180deg, var(--f-paper) 0%, transparent 28%, transparent 72%, var(--f-paper) 100%); }
+#cv_chat_body::-webkit-scrollbar { width: 6px; }
+#cv_chat_body::-webkit-scrollbar-thumb { background: var(--f-line); border-radius: 3px; }
+
+/* ---------- 2. 顶栏：透明，底下一道点线 ---------- */
+#cv_chat_header > div {
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 2px dotted color-mix(in srgb, var(--f-accent) 45%, transparent);
+  padding-bottom: 8px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: var(--f-ink);
+}
+
+/* ---------- 3. 版心 ---------- */
+#cv_messages_container { max-width: var(--f-measure); gap: 0; padding-top: 6px; }
+
+/* ---------- 4. 角色的话：头像在左，名字做成标题，正文整行铺开 ---------- */
+.cv_message_row_ai {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  grid-template-areas: "av meta" "body body";
+  column-gap: 16px;
+  row-gap: 14px;
+  align-items: center;
+  padding: 20px 0 24px;
+  border-bottom: 1px solid var(--f-line);
+}
+.cv_message_row_ai:last-child { border-bottom: 0; }
+.cv_message_row_ai > div { display: contents; }   /* 拆掉「气泡 + 名字行」的外层，让它们各自入格 */
+
+.cv_message_row_ai .cv_message_avatar {
+  grid-area: av;
+  width: 46px; height: 46px;
+  padding: 3px;
+  border-radius: 50%;
+  background: var(--f-paper);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--f-muted) 50%, transparent), 0 6px 16px -4px var(--f-shade);
+}
+.cv_message_row_ai .cv_message_avatar img { border-radius: 50%; object-position: center 20%; }
+
+/* 名字行：日期做眉题放上面，宋体名字在下，名字下一截短线 */
+.cv_message_row_ai .cv_message_meta { grid-area: meta; min-height: 0; padding: 0; gap: 10px; flex-wrap: wrap; }
+.cv_message_row_ai .cv_message_byline { position: relative; display: flex; flex-direction: column; gap: 3px; padding-bottom: 12px; }
+.cv_message_row_ai .cv_message_byline::after {
+  content: ""; position: absolute; left: 0; bottom: 0;
+  width: 28px; height: 1px; background: var(--f-accent); opacity: .55;
+}
+.cv_message_row_ai .cv_message_sep { display: none; }
+.cv_message_row_ai .cv_message_time { order: -1; font-size: 10px; letter-spacing: .26em; color: var(--f-muted); font-variant-numeric: tabular-nums; }
+.cv_message_row_ai .cv_message_name { font-family: var(--f-serif); font-weight: 600; font-size: 22px; line-height: 1.2; letter-spacing: .14em; color: var(--f-ink); }
+
+/* 正文：不要气泡，直接写在纸上 */
+.cv_message_row_ai .cv_ai_message_bubble {
+  grid-area: body;
+  max-width: none;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.cv_message_row_ai .cv_message_selected { box-shadow: inset 2px 0 0 var(--f-accent); padding-left: 12px; }
+.cv_message_row_ai .cv-markdown {
+  font-family: var(--f-serif);
+  font-size: var(--f-read);
+  line-height: var(--f-leading);
+  letter-spacing: .02em;
+  text-align: justify;
+  color: var(--f-ink);
+}
+.cv-markdown p { margin: 0 0 .9em; }
+.cv-markdown p:last-child { margin-bottom: 0; }
+.cv-markdown em { color: var(--f-secondary); opacity: 1; }
+/* 对白：配合正则「对白加粗」。不想加粗就把 600 改成 400 */
+.cv_message_row_ai .cv-markdown strong { color: var(--f-accent); font-weight: 600; }
+.cv-markdown blockquote { border-left: 2px solid var(--f-accent); color: var(--f-secondary); }
+.cv-markdown hr { border: 0; height: auto; margin: 1.5em 0; text-align: center; }
+.cv-markdown hr::after { content: "◆"; font-size: .55em; letter-spacing: 1.2em; color: var(--f-muted); }
+.cv-markdown code { background: var(--f-sunken); color: var(--f-ink); }
+.cv-markdown img { border-radius: 12px; }
+
+/* 操作按钮：淡一点，靠右 */
+.cv_message_row_ai .cv_message_actions_box { margin-left: auto; background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+/* ---------- 5. 你的话：右侧一张微微凸起的便笺，不写名字 ---------- */
+.cv_message_row_user { padding: 8px 0 12px; }
+.cv_message_row_user .cv_message_avatar { width: 32px; height: 32px; border-radius: 50%; box-shadow: 0 0 0 1px color-mix(in srgb, var(--f-muted) 45%, transparent); }
+.cv_message_row_user .cv_message_avatar img { border-radius: 50%; }
+.cv_user_message_bubble {
+  background: color-mix(in srgb, var(--f-accent) 8%, var(--f-paper));
+  color: var(--f-ink);
+  border-radius: 18px 4px 18px 18px;
+  padding: 10px 16px 12px;
+  box-shadow: 0 1px 2px var(--f-shade), 0 6px 16px -6px var(--f-shade);
+}
+.cv_user_message_bubble .cv-markdown { font-family: var(--f-serif); font-size: calc(var(--f-read) * .97); line-height: 1.75; color: var(--f-ink); }
+.cv_user_message_bubble .cv-markdown a { color: var(--f-accent); }
+.cv_user_message_bubble .cv-markdown code { background: var(--f-sunken); }
+.cv_message_row_user .cv_message_byline { display: none; }
+.cv_message_row_user .cv_message_actions_box { background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+/* ---------- 6. 输入框：一张便笺浮在纸上 ---------- */
+#cv_chat_input_box {
+  max-width: var(--f-measure);
+  background: color-mix(in srgb, var(--f-paper) 94%, var(--f-ink));
+  border: 0;
+  border-radius: 22px;
+  box-shadow: 0 2px 6px -2px var(--f-shade), 0 24px 56px -16px var(--f-shade);
+}
+#cv_chat_input_textarea { font-family: var(--f-serif); color: var(--f-ink); }
+#cv_chat_input_textarea::placeholder { font-family: var(--f-serif); font-style: italic; letter-spacing: .04em; color: var(--f-muted); }
+#cv_send_button { background: var(--f-accent); color: var(--f-on-accent); box-shadow: 0 4px 12px color-mix(in srgb, var(--f-accent) 30%, transparent); }
+
+/* ---------- 7. 视觉小说模式：对话框也是纸 ---------- */
+#cv_vn_textbox { background: color-mix(in srgb, var(--f-paper) 94%, transparent); box-shadow: 0 -8px 40px -12px var(--f-shade); backdrop-filter: none; -webkit-backdrop-filter: none; }
+#cv_vn_text { font-family: var(--f-serif); color: var(--f-ink); }
+#cv_vn_text strong { color: var(--f-accent); font-weight: 600; }
+#cv_vn_nametag { background: var(--f-accent); color: var(--f-on-accent); box-shadow: none; }
+
+/* ---------- 8. 手机 ---------- */
+@media (max-width: 640px) {
+  #cv_chat_root { --f-read: 15.5px; }
+  .cv_message_row_ai { grid-template-columns: 40px 1fr; column-gap: 12px; padding: 16px 0 20px; }
+  .cv_message_row_ai .cv_message_avatar { width: 40px; height: 40px; }
+  .cv_message_row_ai .cv_message_name { font-size: 20px; }
+}
+`

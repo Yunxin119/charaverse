@@ -1,3 +1,5 @@
+import { FOLIO_PAPER_CSS } from './folioPreset'
+
 /** Selector cheat-sheet and starter CSS presets for the skin editor. */
 export const SELECTOR_GROUPS: { label: string; items: { selector: string; desc: string }[] }[] = [
   { label: '整体布局', items: [
@@ -19,6 +21,7 @@ export const SELECTOR_GROUPS: { label: string; items: { selector: string; desc: 
     { selector: '.cv_ai_avatar / .cv_user_avatar', desc: 'AI / 用户头像' },
     { selector: '.cv_message_selected', desc: '被选中的消息气泡' },
     { selector: '.cv_message_meta', desc: '气泡下方的名字 / 时间行' },
+    { selector: '.cv_message_byline', desc: '名字 · 时间那一小段；里面是 .cv_message_name / .cv_message_sep / .cv_message_time，可分别改样式或换行' },
     { selector: '.cv_swipe_counter', desc: '备选回复计数（点开列出全部版本）' },
     { selector: '#cv_swipes_sheet', desc: '备选回复抽屉；每个版本是 .cv_swipe_card，当前版本带 data-chosen' },
     { selector: '.cv-markdown', desc: '气泡内的 Markdown 内容' },
@@ -49,7 +52,8 @@ export const SELECTOR_GROUPS: { label: string; items: { selector: string; desc: 
   ] },
 ]
 
-export const CSS_PRESETS: { name: string; css: string }[] = [
+export const CSS_PRESETS: { name: string; css: string; desc?: string; /** regex template to add alongside (REGEX_TEMPLATES id) */ regexTemplateId?: string }[] = [
+  { name: 'Folio · 纸面阅读', desc: '不见气泡，像翻一本书；对白染成强调色（会一起加上「对白加粗」正则）', css: FOLIO_PAPER_CSS, regexTemplateId: 'bold-dialogue' },
   { name: '紫色梦幻', css: `/* 紫色梦幻 */
 #cv_chat_root { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%) !important; }
 #cv_background_overlay { background: linear-gradient(180deg, rgba(118,75,162,.1), rgba(102,126,234,.15)); }
