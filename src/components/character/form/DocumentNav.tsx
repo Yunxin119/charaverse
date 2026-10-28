@@ -46,7 +46,7 @@ export function DocumentNav({ sections, active, onSelect, variant }: Props) {
     )
   }
   return (
-    <nav aria-label="文档分区" className="glass sticky top-24 rounded-cv-lg p-2">
+    <nav aria-label="文档分区" className="glass sticky top-20 rounded-cv-lg p-2">
       <ul className="space-y-0.5">
         {sections.map((s) => {
           const isActive = s.id === active
@@ -63,7 +63,7 @@ export function DocumentNav({ sections, active, onSelect, variant }: Props) {
               >
                 <s.icon className={cn('size-4 shrink-0', isActive ? 'text-cv-accent' : 'text-cv-fg-subtle')} />
                 <span className="min-w-0 flex-1 truncate">{s.label}</span>
-                {s.error ? <span aria-label="有错误" className="size-1.5 rounded-full bg-cv-danger" /> : s.meta ? <span className="text-[11px] text-cv-fg-subtle">{s.meta}</span> : null}
+                {s.error ? <span aria-label="有错误" className="size-1.5 rounded-full bg-cv-danger" /> : s.meta ? <span className="text-[11px] tabular-nums text-cv-fg-subtle">{s.meta}</span> : null}
               </button>
             </li>
           )

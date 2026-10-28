@@ -14,6 +14,7 @@ const MACROS: { token: string; label: string }[] = [
 interface Props {
   id: string
   label: ReactNode
+  /** shown under the field while it has focus (the placeholder carries the example) */
   hint?: ReactNode
   error?: string
   required?: boolean
@@ -23,7 +24,7 @@ interface Props {
   /** starting height in text lines */
   minRows?: number
   mono?: boolean
-  /** show the {{char}} / {{user}} insert chips */
+  /** show the {{char}} / {{user}} insert chips while focused */
   macros?: boolean
   maxLength?: number
   className?: string
@@ -31,7 +32,8 @@ interface Props {
 
 /**
  * The one long-text control of the character editor: auto-growing textarea with a
- * live 字数 / token estimate and optional macro chips that insert at the cursor.
+ * live 字数 / token estimate. The hint and the macro chips only appear while the field
+ * has focus, so the resting page reads as the card itself rather than its manual.
  */
 export function WriterField({ id, label, hint, error, required, value, onChange, placeholder, minRows = 4, mono, macros, maxLength, className }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null)
@@ -54,11 +56,12 @@ export function WriterField({ id, label, hint, error, required, value, onChange,
 
   const chars = value.length
   const tokens = estimateTokens(value)
+  const footer = error ? <p role="alert" className="text-xs text-cv-danger">{error}</p> : hint ? <p className="text-xs text-cv-fg-subtle">{hint}</p> : <span />
 
   return (
-    <div className={cn('space-y-1.5', className)}>
+    <div className={cn('group/writer space-y-1.5', className)}>
       <div className="flex items-end justify-between gap-3">
-        <Label htmlFor={id} className="flex items-center gap-1">
+        <Label htmlFor={id} className="flex items-center gap-1 text-xs font-semibold tracking-wide text-cv-fg-muted">
           {label}
           {required && <span aria-hidden className="text-cv-accent">*</span>}
         </Label>
@@ -74,18 +77,28 @@ export function WriterField({ id, label, hint, error, required, value, onChange,
         aria-invalid={!!error}
         spellCheck={!mono}
         className={cn(
-          'neu-in w-full resize-none rounded-cv-md px-4 py-3 text-cv-fg outline-none transition-shadow placeholder:text-cv-fg-subtle focus:ring-2 focus:ring-cv-ring',
-          mono ? 'font-mono text-xs leading-5' : 'text-[15px] leading-6',
+          'neu-in w-full resize-none rounded-cv-md px-4 py-3 text-cv-fg outline-none transition-shadow placeholder:text-cv-fg-subtle/80 focus:ring-2 focus:ring-cv-ring',
+          mono ? 'font-mono text-xs leading-5' : 'text-[15px] leading-7',
           error && 'ring-2 ring-cv-danger/60'
         )}
       />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        {error ? <p role="alert" className="text-xs text-cv-danger">{error}</p> : hint ? <p className="text-xs text-cv-fg-subtle">{hint}</p> : <span />}
+      {/* reserved height so revealing the hint never shifts the text below */}
+      <div className={cn('flex min-h-5 flex-wrap items-center justify-between gap-2 transition-opacity duration-(--cv-dur-fast)', error ? 'opacity-100' : 'opacity-0 group-focus-within/writer:opacity-100')}>
+        {footer}
         {macros && (
           <span className="flex items-center gap-1.5 text-[11px] text-cv-fg-subtle">
             插入
             {MACROS.map((m) => (
-              <Chip key={m.token} tone="outline" interactive className="px-2 py-0.5 text-[11px]" onClick={() => insert(m.token)} title={m.label}>
+              <Chip
+                key={m.token}
+                tone="outline"
+                interactive
+                className="px-2 py-0.5 text-[11px]"
+                title={m.label}
+                // keep the textarea focused (and the chips visible) while clicking
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => insert(m.token)}
+              >
                 <code className="font-mono">{m.token}</code>
               </Chip>
             ))}

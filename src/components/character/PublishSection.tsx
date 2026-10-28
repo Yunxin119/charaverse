@@ -96,15 +96,12 @@ export function PublishSection({ character, draft }: { character: Character; dra
   else status = { tone: 'success', text: publishedAgo ? `已发布于 ${publishedAgo}` : '已发布' }
 
   return (
-    <GlassPanel className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="font-display text-lg font-semibold">发布</h3>
-          <p className="mt-1 flex items-center gap-2 text-sm text-cv-fg-muted">
-            <StatusDot tone={status.tone} pulse={status.tone === 'warning'} />
-            {status.text}
-          </p>
-        </div>
+    <GlassPanel className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="flex min-w-0 items-center gap-2 text-sm font-semibold text-cv-fg">
+          <StatusDot tone={status.tone} pulse={status.tone === 'warning'} />
+          {status.text}
+        </p>
         <div className="flex flex-wrap gap-2">
           {row.is_public && (
             <Button variant="outline" size="sm" disabled={busy} onClick={() => unpublish.mutate()}>
@@ -117,7 +114,7 @@ export function PublishSection({ character, draft }: { character: Character; dra
         </div>
       </div>
       <p className="text-xs leading-relaxed text-cv-fg-muted">
-        发布会把当前名字、头像、人设和皮肤<b>拍一张快照</b>放到探索页；之后你继续改草稿不会影响公开内容，改好了再点「更新发布」。
+        发布会把当前名字、头像、设定、世界书和皮肤<b>拍一张快照</b>放到探索页；之后你继续改草稿不影响公开内容，改好了再点「更新发布」。
       </p>
       {error && <p className="text-xs text-cv-danger">{error}</p>}
 
