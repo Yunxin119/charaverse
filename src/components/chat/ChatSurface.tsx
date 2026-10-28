@@ -12,6 +12,8 @@ export interface Backdrop {
   source: 'custom' | 'avatar' | null
   opacity: number
   blur: number
+  /** 0 … 0.9: extra page-colour veil over the image (on top of the layout's own gradient) */
+  dim: number
 }
 
 /**
@@ -20,9 +22,18 @@ export interface Backdrop {
  */
 export function backdropFor(background: SessionSettings['background'], layout: ChatLayout, avatarUrl: string | null | undefined): Backdrop {
   const novel = layout === 'novel'
-  if (background.url) return { url: background.url, source: 'custom', opacity: background.opacity, blur: background.blur }
-  if (background.useAvatar && avatarUrl) return { url: avatarUrl, source: 'avatar', opacity: novel ? 1 : 0.5, blur: novel ? 0 : 16 }
-  return { source: null, opacity: 1, blur: 0 }
+  const dim = background.dim ?? 0
+  // sliders left on 「自动」 (undefined) fall back to per-layout defaults
+  if (background.url) return { url: background.url, source: 'custom', opacity: background.opacity ?? 0.85, blur: background.blur ?? 0, dim }
+  if (background.useAvatar && avatarUrl) return { url: avatarUrl, source: 'avatar', opacity: background.opacity ?? (novel ? 1 : 0.5), blur: background.blur ?? (novel ? 0 : 16), dim }
+  return { source: null, opacity: 1, blur: 0, dim }
+}
+
+/** What 「自动」 means for the current backdrop, for the settings sliders' labels. */
+export function backdropDefaults(source: Backdrop['source'], layout: ChatLayout): { opacity: number; blur: number } {
+  const novel = layout === 'novel'
+  if (source === 'avatar') return { opacity: novel ? 1 : 0.5, blur: novel ? 0 : 16 }
+  return { opacity: 0.85, blur: 0 }
 }
 
 interface Props {
@@ -56,7 +67,7 @@ interface Props {
 export function ChatSurface({ skinCss, allowedUrlHosts, layout, backdrop, header, banner, messageList, notice, composer, stage, aside, children, className }: Props) {
   const novel = layout === 'novel'
   return (
-    <div id="cv_chat_root" className={cn('relative flex flex-col overflow-hidden', className ?? 'h-dvh')}>
+    <div id="cv_chat_root" className={cn('relative isolate flex flex-col overflow-hidden', className ?? 'h-dvh')}>
       <SkinStyle css={skinCss} allowedUrlHosts={allowedUrlHosts} />
       {backdrop.url && (
         <>
@@ -73,7 +84,12 @@ export function ChatSurface({ skinCss, allowedUrlHosts, layout, backdrop, header
               transform: backdrop.blur ? 'scale(1.06)' : undefined,
             }}
           />
-          <div id="cv_background_overlay" aria-hidden className={cn('pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b', novel ? 'from-cv-bg/35 via-transparent to-transparent' : 'from-cv-bg/40 via-transparent to-cv-bg/60')} />
+          <div
+            id="cv_background_overlay"
+            aria-hidden
+            className={cn('pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b', novel ? 'from-cv-bg/35 via-transparent to-transparent' : 'from-cv-bg/40 via-transparent to-cv-bg/60')}
+            style={backdrop.dim ? { backgroundColor: `color-mix(in oklab, var(--cv-bg) ${Math.round(backdrop.dim * 100)}%, transparent)` } : undefined}
+          />
         </>
       )}
 

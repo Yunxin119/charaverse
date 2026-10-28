@@ -11,7 +11,8 @@ import { Field } from '@/components/character/form/Field'
 import { AvatarField } from '@/components/character/form/AvatarField'
 import { WriterField } from '@/components/character/form/WriterField'
 import { GENDER_OPTIONS } from '@/components/character/form/types'
-import type { PersonaGender } from '@/lib/personas/format'
+import { formatPersonaText, type PersonaGender } from '@/lib/personas/format'
+import { estimateTokens } from '@/lib/prompt/tokens'
 import type { PersonaInput, PersonaRow } from '@/queries/usePersonas'
 
 export interface PersonaDraft {
@@ -60,6 +61,9 @@ function EditorBody({ initial, editingId, saving, onSave, onClose }: { initial: 
   const [draft, setDraft] = useState<PersonaDraft>(() => (initial ? (isRow(initial) ? draftFromPersona(initial) : initial) : emptyPersonaDraft()))
   const [error, setError] = useState<string | null>(null)
   const set = <K extends keyof PersonaDraft>(k: K, v: PersonaDraft[K]) => setDraft((d) => ({ ...d, [k]: v }))
+  // what the 「用户人设」 block will cost: name line + formatted fields
+  const promptText = `名字：${draft.name.trim() || '…'}\n${formatPersonaText(draft) ?? ''}`.trim()
+  const promptTokens = estimateTokens(promptText)
 
   const save = async () => {
     if (!draft.name.trim()) { setError('人设需要一个名字'); return }
@@ -105,7 +109,8 @@ function EditorBody({ initial, editingId, saving, onSave, onClose }: { initial: 
           macros
         />
       </div>
-      <div className="flex justify-end gap-2">
+      <div className="flex items-center justify-end gap-2">
+        <span className="mr-auto text-[11px] text-cv-fg-subtle" title="进入提示词「用户人设」块的全部文字（名字 + 性别 / 年龄 + 设定）">进入提示词约 {promptTokens} tok</span>
         <Button variant="ghost" onClick={onClose} disabled={saving}>取消</Button>
         <Button onClick={() => void save()} disabled={saving}>{saving ? <Loader2 className="animate-spin" /> : null} 保存</Button>
       </div>

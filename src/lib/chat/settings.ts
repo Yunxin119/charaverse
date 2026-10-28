@@ -19,8 +19,12 @@ export const sessionSettingsSchema = z.object({
   background: z
     .object({
       url: z.string().max(1024).optional(),
-      opacity: z.number().min(0).max(1).default(0.85),
-      blur: z.number().min(0).max(40).default(0),
+      /** undefined = auto (0.85 for an uploaded image; avatar backdrop: 0.5 in flow, 1 in novel) */
+      opacity: z.number().min(0).max(1).optional(),
+      /** undefined = auto (0 for an uploaded image; avatar backdrop: 16 in flow, 0 in novel) */
+      blur: z.number().min(0).max(40).optional(),
+      /** page-colour veil over the backdrop, 0 = none */
+      dim: z.number().min(0).max(0.9).default(0),
       /** no custom image → fall back to the character's avatar as the backdrop */
       useAvatar: z.boolean().default(true),
     })

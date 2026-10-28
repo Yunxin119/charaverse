@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { SessionSettings } from '@/lib/chat/settings'
 import type { UserPreset } from '@/app/lib/supabase'
 import { uploadChatBackground, removeChatBackground } from '@/lib/chat/background'
+import { backdropDefaults } from './ChatSurface'
 import { PersonaPicker } from '@/components/personas/PersonaPicker'
 
 interface Props {
@@ -218,16 +219,49 @@ export function ChatSettingsSheet({ open, onOpenChange, sessionId, userId, title
               <div><div className="text-sm">没有上传图片时用角色头像当背景</div><div className="text-xs text-cv-fg-subtle">对话流里会压暗模糊，视觉小说里铺满显示</div></div>
               <Switch checked={draft.background.useAvatar} onCheckedChange={(v) => set('background', { ...draft.background, useAvatar: v })} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <label className={draft.background.url ? 'space-y-1 text-xs text-cv-fg-muted' : 'space-y-1 text-xs text-cv-fg-muted opacity-50'}>不透明度 {Math.round(draft.background.opacity * 100)}%
-                <input type="range" min={0.1} max={1} step={0.05} value={draft.background.opacity} className="w-full accent-[var(--cv-accent)]"
-                  onChange={(e) => set('background', { ...draft.background, opacity: Number(e.target.value) })} />
-              </label>
-              <label className={draft.background.url ? 'space-y-1 text-xs text-cv-fg-muted' : 'space-y-1 text-xs text-cv-fg-muted opacity-50'}>模糊 {draft.background.blur}px
-                <input type="range" min={0} max={40} step={1} value={draft.background.blur} className="w-full accent-[var(--cv-accent)]"
-                  onChange={(e) => set('background', { ...draft.background, blur: Number(e.target.value) })} />
-              </label>
-            </div>
+            {(() => {
+              const source = draft.background.url ? 'custom' as const : draft.background.useAvatar ? 'avatar' as const : null
+              const auto = backdropDefaults(source, draft.layout)
+              const bg = draft.background
+              const setBg = (patch: Partial<typeof bg>) => set('background', { ...bg, ...patch })
+              const off = !source
+              return (
+                <div className={off ? 'space-y-3 opacity-50' : 'space-y-3'}>
+                  {off && <p className="text-[11px] text-cv-fg-subtle">没有背景可调：上传一张图，或打开上面的「用角色头像当背景」。</p>}
+                  <Slider
+                    id="cv-bg-opacity"
+                    label="图片不透明度"
+                    value={bg.opacity}
+                    auto={auto.opacity}
+                    format={(v) => `${Math.round(v * 100)}%`}
+                    min={0.05} max={1} step={0.05}
+                    disabled={off}
+                    onChange={(v) => setBg({ opacity: v })}
+                  />
+                  <Slider
+                    id="cv-bg-blur"
+                    label="模糊"
+                    value={bg.blur}
+                    auto={auto.blur}
+                    format={(v) => `${v}px`}
+                    min={0} max={40} step={1}
+                    disabled={off}
+                    onChange={(v) => setBg({ blur: v })}
+                  />
+                  <Slider
+                    id="cv-bg-dim"
+                    label="压暗 / 提亮（盖一层页面底色）"
+                    value={bg.dim}
+                    auto={0}
+                    format={(v) => (v === 0 ? '无' : `${Math.round(v * 100)}%`)}
+                    min={0} max={0.9} step={0.05}
+                    disabled={off}
+                    onChange={(v) => setBg({ dim: v === 0 ? undefined : v })}
+                  />
+                  <p className="text-[11px] text-cv-fg-subtle">「自动」= 跟随布局的默认值（头像背景在对话流里半透明 + 模糊，视觉小说里铺满）。皮肤作者写的 CSS 仍然可以再覆盖。</p>
+                </div>
+              )
+            })()}
           </section>
 
           {error && <p className="text-sm text-cv-danger">{error}</p>}
@@ -244,5 +278,22 @@ export function ChatSettingsSheet({ open, onOpenChange, sessionId, userId, title
         </div>
       </GlassSheetContent>
     </GlassSheet>
+  )
+}
+
+/** Range slider whose unset value means 「自动」; the label shows the effective value and a reset. */
+function Slider({ id, label, value, auto, format, min, max, step, disabled, onChange }: {
+  id: string; label: string; value: number | undefined; auto: number; format: (v: number) => string
+  min: number; max: number; step: number; disabled?: boolean; onChange: (v: number | undefined) => void
+}) {
+  const effective = value ?? auto
+  return (
+    <label htmlFor={id} className="block space-y-1 text-xs text-cv-fg-muted">
+      <span className="flex items-center justify-between">
+        <span>{label} <span className="text-cv-fg-subtle">· {format(effective)}{value === undefined ? '（自动）' : ''}</span></span>
+        {value !== undefined && <button type="button" onClick={() => onChange(undefined)} className="rounded-full px-2 py-0.5 text-[11px] text-cv-accent hover:bg-cv-fg/5">自动</button>}
+      </span>
+      <input id={id} type="range" min={min} max={max} step={step} value={effective} disabled={disabled} className="w-full accent-[var(--cv-accent)]" onChange={(e) => onChange(Number(e.target.value))} />
+    </label>
   )
 }

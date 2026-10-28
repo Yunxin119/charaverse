@@ -27,13 +27,12 @@ interface Props {
 }
 
 const noop = () => {}
-const PREVIEW_USER_LINE = '不急。茶就茶吧，反正也睡不着。'
 
 /**
  * The real chat page, fed with the character's opening line(s), a user line and an
  * editable sample reply. Same DOM as the live chat (ChatSurface + the real header,
- * list, stage and composer), so what you see here is what players get. Typing in the
- * composer appends a user bubble locally; nothing is sent or saved.
+ * list, stage and composer), so what you see here is what players get. There is no canned
+ * user line: type in the composer to add your own bubbles locally; nothing is sent or saved.
  */
 export function SkinPreview({ character, skin, sample, onSampleChange, className }: Props) {
   const card = useMemo(() => parseCharacterCard(character), [character])
@@ -50,7 +49,6 @@ export function SkinPreview({ character, skin, sample, onSampleChange, className
     if (greetings.length) {
       out.push({ id: id++, session_id: 'preview', role: 'assistant', content: greetings[0], type: 'message', created_at: t, swipes: greetings.length > 1 ? greetings : [], swipe_index: 0 })
     }
-    out.push({ id: id++, session_id: 'preview', role: 'user', content: PREVIEW_USER_LINE, type: 'message', created_at: t })
     out.push({ id: id++, session_id: 'preview', role: 'assistant', content: sample, type: 'message', created_at: t })
     for (const line of typed) out.push({ id: id++, session_id: 'preview', role: 'user', content: line, type: 'message', created_at: t })
     return out
@@ -97,7 +95,7 @@ export function SkinPreview({ character, skin, sample, onSampleChange, className
     <div className={cn('flex min-h-0 flex-col gap-2', className)}>
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="font-semibold uppercase tracking-[0.14em] text-cv-fg-subtle">实时预览</span>
-        <span className="text-cv-fg-subtle">开场白 + 一句你的话 + 测试回复，和玩家看到的一样</span>
+        <span className="text-cv-fg-subtle">开场白 + 测试回复；想看自己的气泡就在下面输入框里发一句</span>
         <span className="ml-auto flex items-center gap-1">
           <Button size="sm" variant={sampleOpen ? 'accent' : 'ghost'} onClick={() => setSampleOpen((v) => !v)} title="改测试用的 AI 回复"><PencilLine /> 测试回复</Button>
           <Button size="sm" variant="ghost" onClick={() => { setTyped([]); setInput('') }} disabled={!typed.length} title="清掉你在预览里打的话"><RotateCcw /> 重置</Button>

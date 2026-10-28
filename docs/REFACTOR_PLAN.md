@@ -350,6 +350,7 @@ docs/                       # 本文件 + design/
 - [x] 「Folio · 纸面阅读」皮肤样例改为自用文件 `docs/design/skins/folio-paper.css`（不内置到编辑器；头部注释写了配套的「对白加粗」正则），测试里读文件过清洗器；气泡名字行拆成 `.cv_message_byline / name / sep / time`
 - [x] 聊天 DOM 抽成 `ChatSurface`（`#cv_chat_root` / 背景层 / `#cv_chat_row` / `#cv_chat_column[data-layout]`，`backdropFor` 算背景），聊天页和皮肤编辑器的预览共用，选择器永远一致
 - [x] 皮肤编辑页重做：左编辑 / 右「真正的聊天页」预览（`SkinPreview`：真实 header、头像背景、开场白（多开场白带 1/n）、一句用户话、可编辑的测试回复，输入框打字会在预览里加一条用户消息，可切对话流 / 视觉小说），整页高度、大屏并排、小屏「编辑 / 预览」切换；修了保存后仍显示「未保存」（基线没更新 + 角色查询缓存没刷新）
+- [x] 背景可调：`#cv_chat_root` 加 `isolate`（皮肤给根容器上底色不再盖住负 z 的背景层，Folio 的背景能透出来了）；会话设置里「图片不透明度 / 模糊 / 压暗」三根滑杆对头像背景也生效，留空 = 自动（跟随布局默认），`background.dim` 新增；皮肤预览去掉预置的用户气泡（作者自己在输入框发）；人设编辑框显示「进入提示词约 N tok」
 - [ ] 下一步候选：视觉小说模式的打字机节奏
 - [ ] 待修：直接删除 auth 用户会 500（有表的 `user_id` 外键没有 `on delete cascade`，清掉 `chat_sessions` 后才能删）；做「注销账号」前先补一遍级联
 
