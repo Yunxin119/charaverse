@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -12,6 +11,7 @@ import { useAuth } from '@/providers/AuthProvider'
 import { qk } from '@/queries/keys'
 import { useSavePersona } from '@/queries/usePersonas'
 import { estimateTokens } from '@/lib/prompt/tokens'
+import { parseSkin, skinIsEmpty } from '@/lib/skins/schema'
 import { Button } from '@/components/ui/button'
 import { Chip, GlassPanel, GlassSheet, GlassSheetContent, IconButton } from '@/components/glass'
 import { PublishSection } from '@/components/character/PublishSection'
@@ -23,6 +23,7 @@ import { OpeningSection } from './form/OpeningSection'
 import { RulesSection } from './form/RulesSection'
 import { PersonaSection } from './form/PersonaSection'
 import { LorebookSection } from './form/LorebookSection'
+import { SkinSection } from './form/SkinSection'
 import { PreviewDock } from './preview/PreviewDock'
 import { buildPromptTemplate, draftFromCharacter, emptyDraft, emptyPersona, personaHasContent, validateDraft, type CharacterDraft, type DraftErrors } from './form/types'
 
@@ -34,10 +35,10 @@ interface Props {
 }
 
 const NO_ERRORS: DraftErrors = {}
-const SECTION_IDS = ['identity', 'core', 'opening', 'rules', 'persona', 'lorebook', 'publish'] as const
+const SECTION_IDS = ['identity', 'core', 'opening', 'rules', 'persona', 'lorebook', 'skin', 'publish'] as const
 type SectionId = (typeof SECTION_IDS)[number]
 /** old `?section=` values from links and bookmarks */
-const LEGACY_SECTION: Record<string, SectionId> = { basic: 'identity', modules: 'core', extras: 'core', skin: 'publish' }
+const LEGACY_SECTION: Record<string, SectionId> = { basic: 'identity', modules: 'core', extras: 'core' }
 const XL_QUERY = '(min-width: 1280px)' // tailwind `xl`: where the preview fits beside the page
 
 /**
@@ -190,6 +191,7 @@ export function CharacterForm({ mode, character }: Props) {
     { id: 'rules', label: '规则', icon: ScrollText, meta: tokMeta(tokensOf(draft.systemPrompt, draft.postHistory)) },
     ...(legacyPersona ? [{ id: 'persona' as const, label: '卡内人设', icon: Users, meta: '旧' }] : []),
     { id: 'lorebook', label: '世界书', icon: BookOpen, meta: draft.lorebook.entries.length ? String(draft.lorebook.entries.length) : undefined },
+    { id: 'skin', label: '皮肤', icon: Palette, meta: editing && character && !skinIsEmpty(parseSkin(character.skin)) ? '已设' : undefined },
     { id: 'publish', label: '发布', icon: Globe, meta: editing && character?.is_public ? '公开' : undefined },
   ]
 
@@ -206,11 +208,6 @@ export function CharacterForm({ mode, character }: Props) {
             <IconButton label="返回" variant="ghost" size="sm" onClick={back}><ArrowLeft /></IconButton>
             <h1 className="min-w-0 flex-1 truncate font-display text-lg font-semibold leading-tight sm:text-xl">{title}</h1>
             {dirty ? <Chip tone="warning" title="⌘S 保存">未保存</Chip> : saved ? <Chip tone="success">已保存</Chip> : null}
-            {editing && character && (
-              <Button asChild type="button" variant="ghost" size="sm" title="打开皮肤编辑器">
-                <Link href={`/characters/${character.id}/skin`}><Palette /><span className="hidden sm:inline">皮肤</span></Link>
-              </Button>
-            )}
             <Button type="button" variant={dock ? 'neu' : 'ghost'} size="sm" aria-pressed={dock} onClick={() => setDock((v) => !v)} title={dock ? '收起预览' : '打开预览：模型会看到什么 / 试聊'}>
               {dock ? <PanelRightClose /> : <PanelRightOpen />}<span className="hidden sm:inline">预览</span>
             </Button>
@@ -261,7 +258,10 @@ export function CharacterForm({ mode, character }: Props) {
           <Section id="lorebook" index="04" title="世界书" description="随角色一起保存的背景设定。关键词出现在最近几条消息里时注入对应条目；常驻条目总是注入。">
             <LorebookSection value={draft.lorebook} onChange={(v) => set('lorebook', v)} characterName={draft.name.trim() || undefined} />
           </Section>
-          <Section id="publish" index="05" title="发布" description="发布会冻结一份当前内容给其他人看；之后的修改要再次发布才会公开。">
+          <Section id="skin" index="05" title="皮肤" description="给聊天页换一套样子：CSS、正则美化脚本和沙箱 HTML 块。随发布快照一起公开。">
+            <SkinSection character={editing ? character : undefined} />
+          </Section>
+          <Section id="publish" index="06" title="发布" description="发布会冻结一份当前内容给其他人看；之后的修改要再次发布才会公开。">
             {editing && character ? (
               <PublishSection character={character} draft={{ name: draft.name, avatar_url: draft.avatar_url || null, prompt_template: buildPromptTemplate(draft, character.prompt_template) }} />
             ) : (
