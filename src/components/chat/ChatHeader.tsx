@@ -104,7 +104,7 @@ export function ChatHeader({ sessionId, character, title, modelLabel, presetLabe
             <DropdownMenuSeparator />
             {onNewBranchFromEnd && <DropdownMenuItem onClick={onNewBranchFromEnd}><GitBranch />从当前进度分支</DropdownMenuItem>}
             <DropdownMenuItem asChild><Link href={`/characters/${character.id}/edit`}><Settings2 />编辑角色卡</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link href={`/characters/${character.id}/skin`}><Palette />角色皮肤</Link></DropdownMenuItem>
+            <DropdownMenuItem asChild><Link href={`/characters/${character.id}/edit?section=skin`}><Palette />角色皮肤</Link></DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

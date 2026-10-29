@@ -99,7 +99,7 @@ src/
     api/chat/             流式聊天（唯一 LLM 出口）、branch、memory、summary
     api/connections/test  连接测试（8 token ping）
     chat/[sessionId]/     聊天页 + memory / history 子页
-    characters/           我的角色、新建、[id]/edit、[id]/skin
+    characters/           我的角色、新建、[id]/edit（含皮肤；[id]/skin 重定向到 edit?section=skin）
     character/public/[id] 公开角色页（只读快照）
     explore/ user/[id]/   探索、作者主页
     settings/             资料 hub + connections / appearance / presets
@@ -107,7 +107,7 @@ src/
     lib/                  旧的 Supabase 客户端导出与实体类型（仍在使用）
   components/
     chat/                 ChatView、MessageList/Bubble、Composer、Markdown、HtmlBlockFrame、SkinStyle
-    presets/ skins/ theme/  预设编辑器、皮肤编辑器、主题导入
+    presets/ skins/ theme/  预设编辑器、皮肤字段（SkinFields，嵌在角色卡编辑页里）、主题导入
     memory/ history/      记忆表单（schema 驱动）、摘要时间线、历史
     character/            CharacterForm（新建/编辑合一）、发布、快照
     glass/ ui/ shell/     Glass/Neu/Poster 面、shadcn 原子、AppShell + 导航
@@ -194,11 +194,11 @@ schema 在 `src/lib/prompt/presets.ts`。通用预设格式的 chat-completion �
 - 支持宏 `{{char}}` `{{user}}` `{{date}}` `{{time}}` `{{newline}}` `{{trim}}` 等（`src/lib/prompt/macros.ts`）。
 - 上限：200 条、单条 50k 字、整体 300k 字。
 
-### 角色皮肤（角色 → 编辑 → 外观皮肤，或 `/characters/<id>/skin`）
+### 角色皮肤（角色 → 编辑 → 05 皮肤；新建时就能写，和卡一起保存）
 
 `characters.skin` 结构：`{ version: 1, css, regexScripts[], renderHtml, allowedUrlHosts[] }`。
 
-CSS 只作用于聊天页，常用选择器（完整列表见编辑器侧栏 / `src/lib/skins/docs.ts`）：
+CSS 只作用于聊天页，常用选择器（完整列表见皮肤区的「可用选择器」/ `src/lib/skins/docs.ts`）：
 
 | 选择器 | 说明 |
 |---|---|

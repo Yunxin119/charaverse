@@ -1,5 +1,6 @@
 import type { Character } from '@/app/lib/supabase'
 import { EMPTY_LOREBOOK, parseLorebook, type Lorebook } from '@/lib/lorebook/schema'
+import { EMPTY_SKIN, parseSkin, type Skin } from '@/lib/skins/schema'
 
 /**
  * Editable draft behind `CharacterForm`. Fields follow the common character-card
@@ -64,6 +65,8 @@ export interface CharacterDraft {
   extras: DraftExtra[]
   /** world book embedded in the card; stored in `characters.lorebook`, not in prompt_template */
   lorebook: Lorebook
+  /** chat look: knobs / css / regex scripts / html option; stored in `characters.skin` */
+  skin: Skin
 }
 
 export type DraftErrors = Partial<Record<'name' | 'content', string>>
@@ -80,8 +83,16 @@ export function emptyDraft(): CharacterDraft {
     description: '', personality: '', scenario: '',
     initialMessage: '', alternateGreetings: [], exampleDialogue: '',
     systemPrompt: '', postHistory: '',
-    persona: emptyPersona(), extras: [], lorebook: EMPTY_LOREBOOK,
+    persona: emptyPersona(), extras: [], lorebook: EMPTY_LOREBOOK, skin: EMPTY_SKIN,
   }
+}
+
+/** `characters.skin`, with the pre-v2 `prompt_template.custom_css` as a fallback for cards never opened in the skin editor. */
+export function skinFromCharacter(c: Pick<Character, 'skin' | 'prompt_template'>): Skin {
+  const s = parseSkin(c.skin)
+  const tpl = isRecord(c.prompt_template) ? c.prompt_template : {}
+  const legacyCss = str(tpl.custom_css)
+  return s.css || !legacyCss ? s : { ...s, css: legacyCss }
 }
 
 /** Tolerant: a missing or malformed column becomes an empty book instead of blocking the form. */
@@ -158,16 +169,18 @@ export function draftFromCharacter(c: Character): CharacterDraft {
     age: str(basic.age),
     gender: isGender(basic.gender) ? basic.gender : '',
     lorebook: lorebookFromCharacter(c),
+    skin: skinFromCharacter(c),
   }
 }
 
 /**
- * Stored shape. Unknown top-level keys of the existing template (e.g. a not
- * yet migrated `custom_css`) are preserved; `basic_info` and `modules` are
- * rewritten from the draft. Module order: persona, scenario, rules, post-history, extras.
+ * Stored shape. Unknown top-level keys of the existing template are preserved, except the
+ * pre-v2 `custom_css` (the skin column is the one source of truth now); `basic_info` and
+ * `modules` are rewritten from the draft. Module order: persona, scenario, rules, post-history, extras.
  */
 export function buildPromptTemplate(draft: CharacterDraft, existing?: unknown): Record<string, unknown> {
   const base = isRecord(existing) ? { ...existing } : {}
+  delete base.custom_css
   const modules: AnyRecord[] = []
   if (personaHasContent(draft.persona)) {
     const p = draft.persona

@@ -4,16 +4,19 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, BookOpen, Check, Globe, Loader2, MessageSquareQuote, Palette, PanelRightClose, PanelRightOpen, Save, ScrollText, Sparkles, UserRound, Users } from 'lucide-react'
+import { ArrowLeft, BookOpen, Check, Globe, Loader2, Maximize2, MessageSquareQuote, Minimize2, Palette, PanelRightClose, PanelRightOpen, Save, ScrollText, Sparkles, UserRound, Users } from 'lucide-react'
 import { supabase, type Character } from '@/app/lib/supabase'
 import { deleteAvatar } from '@/app/lib/avatarUpload'
 import { useAuth } from '@/providers/AuthProvider'
 import { qk } from '@/queries/keys'
 import { useSavePersona } from '@/queries/usePersonas'
 import { estimateTokens } from '@/lib/prompt/tokens'
-import { parseSkin, skinIsEmpty } from '@/lib/skins/schema'
+import { skinIsEmpty, skinSchema } from '@/lib/skins/schema'
+import { SAMPLE_AI_MESSAGE } from '@/lib/skins/docs'
+import { parseCharacterCard } from '@/lib/chat/characterCard'
 import { Button } from '@/components/ui/button'
 import { Chip, GlassPanel, GlassSheet, GlassSheetContent, IconButton } from '@/components/glass'
+import { cn } from '@/lib/utils'
 import { PublishSection } from '@/components/character/PublishSection'
 import { DocumentNav, type DocSection } from './form/DocumentNav'
 import { SectionHeader } from './form/Field'
@@ -82,6 +85,9 @@ export function CharacterForm({ mode, character }: Props) {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [active, setActive] = useState<SectionId>('identity')
+  // the sample AI reply shared by the live preview and the regex test benches
+  const [sample, setSample] = useState(SAMPLE_AI_MESSAGE)
+  const [wide, setWide] = useState(false)
 
   const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(baseline), [draft, baseline])
   const errors = useMemo(() => validateDraft(draft), [draft])
@@ -100,7 +106,8 @@ export function CharacterForm({ mode, character }: Props) {
     deepLinked.current = true
     const q = new URLSearchParams(window.location.search).get('section')
     const id = q && (SECTION_IDS as readonly string[]).includes(q) ? (q as SectionId) : q ? LEGACY_SECTION[q] : undefined
-    if (id) setTimeout(() => scrollTo(id), 50)
+    // twice: once right away, once after the avatar / dock have taken their room above the target
+    if (id) { setTimeout(() => scrollTo(id), 100); setTimeout(() => scrollTo(id), 700) }
   }, [mode])
   useEffect(() => {
     const els = SECTION_IDS.map((id) => document.getElementById(`sec-${id}`)).filter((el): el is HTMLElement => !!el)
@@ -125,7 +132,7 @@ export function CharacterForm({ mode, character }: Props) {
       if (!user) throw new Error('请先登录')
       const prompt_template = buildPromptTemplate(d, character?.prompt_template)
       // the embedded world book lives in its own jsonb column, not inside prompt_template
-      const row = { name: d.name.trim(), avatar_url: d.avatar_url || null, prompt_template, lorebook: d.lorebook }
+      const row = { name: d.name.trim(), avatar_url: d.avatar_url || null, prompt_template, lorebook: d.lorebook, skin: skinSchema.parse(d.skin) }
       if (!editing || !character) {
         const { data, error } = await supabase.from('characters').insert({ user_id: user.id, ...row, is_public: false }).select('id').single()
         if (error) throw error
@@ -191,13 +198,14 @@ export function CharacterForm({ mode, character }: Props) {
     { id: 'rules', label: '规则', icon: ScrollText, meta: tokMeta(tokensOf(draft.systemPrompt, draft.postHistory)) },
     ...(legacyPersona ? [{ id: 'persona' as const, label: '卡内人设', icon: Users, meta: '旧' }] : []),
     { id: 'lorebook', label: '世界书', icon: BookOpen, meta: draft.lorebook.entries.length ? String(draft.lorebook.entries.length) : undefined },
-    { id: 'skin', label: '皮肤', icon: Palette, meta: editing && character && !skinIsEmpty(parseSkin(character.skin)) ? '已设' : undefined },
+    { id: 'skin', label: '皮肤', icon: Palette, meta: skinIsEmpty(draft.skin) ? undefined : (draft.skin.regexScripts.length ? `${draft.skin.regexScripts.length} 条正则` : '已设') },
     { id: 'publish', label: '发布', icon: Globe, meta: editing && character?.is_public ? '公开' : undefined },
   ]
 
   const title = editing ? (draft.name.trim() || character?.name || '编辑角色') : '新建角色'
   const canSave = dirty && !save.isPending
-  const dockPanel = <PreviewDock draft={draft} className="min-h-0 flex-1" />
+  const dockPanel = <PreviewDock draft={draft} sample={sample} onSampleChange={setSample} className="min-h-0 flex-1" />
+  const cardUserName = parseCharacterCard({ name: draft.name || '角色', prompt_template: buildPromptTemplate(draft) }).userName
 
   return (
     <form className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6" onSubmit={(e) => { e.preventDefault(); submit() }} noValidate>
@@ -223,7 +231,7 @@ export function CharacterForm({ mode, character }: Props) {
         {error && <p role="alert" className="mt-2 rounded-cv-md bg-[color-mix(in_oklab,var(--cv-danger)_12%,transparent)] px-3 py-2 text-sm text-cv-danger">{error}</p>}
       </div>
 
-      <div className={dock && isXl ? 'grid gap-6 lg:grid-cols-[150px_minmax(0,1fr)] xl:grid-cols-[150px_minmax(0,1fr)_minmax(360px,420px)]' : 'grid gap-6 lg:grid-cols-[150px_minmax(0,1fr)]'}>
+      <div className={cn('grid gap-6 lg:grid-cols-[150px_minmax(0,1fr)]', dock && isXl && (wide ? 'xl:grid-cols-[150px_minmax(420px,1fr)_minmax(560px,1.25fr)]' : 'xl:grid-cols-[150px_minmax(0,1fr)_minmax(430px,0.8fr)]'))}>
         <aside className="hidden lg:block">
           <DocumentNav variant="rail" sections={sections} active={active} onSelect={(id) => scrollTo(id as SectionId)} />
         </aside>
@@ -258,12 +266,12 @@ export function CharacterForm({ mode, character }: Props) {
           <Section id="lorebook" index="04" title="世界书" description="随角色一起保存的背景设定。关键词出现在最近几条消息里时注入对应条目；常驻条目总是注入。">
             <LorebookSection value={draft.lorebook} onChange={(v) => set('lorebook', v)} characterName={draft.name.trim() || undefined} />
           </Section>
-          <Section id="skin" index="05" title="皮肤" description="给聊天页换一套样子：CSS、正则美化脚本和沙箱 HTML 块。随发布快照一起公开。">
-            <SkinSection character={editing ? character : undefined} />
+          <Section id="skin" index="05" title="皮肤" description="给聊天页换一套样子：外观调节、CSS、正则美化脚本和沙箱 HTML。和卡一起保存，右边的预览实时显示。">
+            <SkinSection value={draft.skin} onChange={(v) => set('skin', v)} sample={sample} onSampleChange={setSample} char={draft.name.trim() || '角色'} user={cardUserName} />
           </Section>
           <Section id="publish" index="06" title="发布" description="发布会冻结一份当前内容给其他人看；之后的修改要再次发布才会公开。">
             {editing && character ? (
-              <PublishSection character={character} draft={{ name: draft.name, avatar_url: draft.avatar_url || null, prompt_template: buildPromptTemplate(draft, character.prompt_template) }} />
+              <PublishSection character={character} draft={{ name: draft.name, avatar_url: draft.avatar_url || null, prompt_template: buildPromptTemplate(draft, character.prompt_template), skin: draft.skin }} />
             ) : (
               <p className="text-sm text-cv-fg-muted">保存角色后就可以在这里发布到探索页。</p>
             )}
@@ -271,8 +279,9 @@ export function CharacterForm({ mode, character }: Props) {
         </div>
 
         {dock && isXl && (
-          <aside>
-            <GlassPanel className="sticky top-20 flex max-h-[calc(100dvh-6rem)] flex-col">
+          <aside className="min-w-0">
+            <GlassPanel padding="sm" className="sticky top-20 flex h-[calc(100dvh-6rem)] flex-col sm:p-4">
+              <IconButton label={wide ? '收窄预览' : '放宽预览'} size="sm" variant="ghost" className="absolute -left-3 top-3 z-10 glass-strong" onClick={() => setWide((v) => !v)}>{wide ? <Minimize2 /> : <Maximize2 />}</IconButton>
               {dockPanel}
             </GlassPanel>
           </aside>

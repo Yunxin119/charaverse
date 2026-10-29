@@ -279,7 +279,7 @@ export default function CharactersPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="min-w-40">
                       <DropdownMenuItem asChild><Link href={`/characters/${c.id}/edit`}><Pencil />编辑</Link></DropdownMenuItem>
-                      <DropdownMenuItem asChild><Link href={`/characters/${c.id}/skin`}><Palette />皮肤</Link></DropdownMenuItem>
+                      <DropdownMenuItem asChild><Link href={`/characters/${c.id}/edit?section=skin`}><Palette />皮肤</Link></DropdownMenuItem>
                       <DropdownMenuItem asChild><Link href={`/characters/${c.id}/edit?section=publish`}>{c.is_public ? <><Globe />发布设置</> : <><Globe />发布到探索</>}</Link></DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => exportJson(c)}><FileJson />导出 JSON</DropdownMenuItem>
@@ -293,7 +293,7 @@ export default function CharactersPage() {
                   <>
                     <Button size="sm" variant="accent" onClick={() => router.push(`/chat/new?characterId=${c.id}`)}><MessageCircle />聊天</Button>
                     <Button asChild size="sm" variant="glass" className="text-white"><Link href={`/characters/${c.id}/edit`}><Pencil />编辑</Link></Button>
-                    <Button asChild size="sm" variant="glass" className="text-white"><Link href={`/characters/${c.id}/skin`}><Palette />皮肤</Link></Button>
+                    <Button asChild size="sm" variant="glass" className="text-white"><Link href={`/characters/${c.id}/edit?section=skin`}><Palette />皮肤</Link></Button>
                   </>
                 }
               />

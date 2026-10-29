@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react'
 import { ChevronDown, Info } from 'lucide-react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Chip } from '@/components/glass'
 import { parseCharacterCard } from '@/lib/chat/characterCard'
 import { activateLorebooks } from '@/lib/lorebook/activate'
@@ -16,9 +15,8 @@ export interface PresetOption { id: string | null; name: string; preset: PresetF
 
 interface Props {
   draft: CharacterDraft
-  presets: PresetOption[]
-  presetId: string | null
-  onPresetChange: (id: string | null) => void
+  /** chosen in the dock header, shared with the live preview */
+  preset: PresetOption
 }
 
 /**
@@ -26,11 +24,8 @@ interface Props {
  * an empty history and the world book's constant entries. Shows every block in order with
  * a token estimate, and explains which card parts the preset leaves out.
  */
-export function PromptPreview({ draft, presets, presetId, onPresetChange }: Props) {
-  const chosen = presets.find((p) => p.id === presetId) ?? presets[0]
-
+export function PromptPreview({ draft, preset: chosen }: Props) {
   const result = useMemo(() => {
-    if (!chosen) return null
     const tpl = buildPromptTemplate(draft)
     const card = parseCharacterCard({ name: draft.name || '角色', prompt_template: tpl })
     const books = draft.lorebook.entries.length > 0 ? [draft.lorebook] : []
@@ -65,20 +60,14 @@ export function PromptPreview({ draft, presets, presetId, onPresetChange }: Prop
     return { blocks, total, silent, dropped, greetingTokens, opening: card.greetings.length }
   }, [draft, chosen])
 
-  if (!chosen || !result) return null
-
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <Select value={chosen.id ?? '__builtin__'} onValueChange={(v) => onPresetChange(v === '__builtin__' ? null : v)}>
-          <SelectTrigger className="h-8 flex-1 text-xs" aria-label="预览用的预设"><SelectValue /></SelectTrigger>
-          <SelectContent>{presets.map((p) => <SelectItem key={p.id ?? '__builtin__'} value={p.id ?? '__builtin__'}>{p.name}</SelectItem>)}</SelectContent>
-        </Select>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] leading-relaxed text-cv-fg-subtle">
+          不含对话历史、记忆和摘要；开场白另算 ≈{result.greetingTokens} tok{result.opening > 1 ? `（${result.opening} 条备选）` : ''}。世界书只显示常驻条目。
+        </p>
         <Chip tone="accent" className="shrink-0 tabular-nums">≈ {result.total} tok</Chip>
       </div>
-      <p className="text-[11px] leading-relaxed text-cv-fg-subtle">
-        不含对话历史、记忆和摘要；开场白另算 ≈{result.greetingTokens} tok{result.opening > 1 ? `（${result.opening} 条备选）` : ''}。世界书只显示常驻条目。
-      </p>
       {result.silent.length > 0 && (
         <div className="rounded-cv-md border border-cv-warning/30 bg-[color-mix(in_oklab,var(--cv-warning)_10%,transparent)] px-3 py-2 text-xs text-cv-fg">
           <div className="mb-1 flex items-center gap-1 font-semibold"><Info className="size-3.5 text-cv-warning" />这个预设会忽略</div>

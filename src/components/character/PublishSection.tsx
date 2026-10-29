@@ -20,6 +20,8 @@ export interface PublishDraft {
   name: string
   avatar_url?: string | null
   prompt_template: unknown
+  /** the draft skin (edited with the card); falls back to the saved column */
+  skin?: unknown
 }
 
 type PublishableCharacter = Character & {
@@ -45,7 +47,7 @@ export function PublishSection({ character, draft }: { character: Character; dra
         name: draft?.name ?? row.name,
         avatar_url: draft ? draft.avatar_url : row.avatar_url,
         prompt_template: draft?.prompt_template ?? row.prompt_template,
-        skin: row.skin,
+        skin: draft?.skin ?? row.skin,
         lorebook: row.lorebook,
       }),
     [draft, row.name, row.avatar_url, row.prompt_template, row.skin, row.lorebook]

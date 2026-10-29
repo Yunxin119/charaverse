@@ -131,7 +131,7 @@ export default function CharacterHubPage() {
           {isOwner ? (
             <>
               <Button variant="glass" className="text-white" asChild><Link href={`/characters/${c.id}/edit`}><Pencil /> 编辑</Link></Button>
-              <Button variant="glass" className="text-white" asChild><Link href={`/characters/${c.id}/skin`}><Palette /> 皮肤</Link></Button>
+              <Button variant="glass" className="text-white" asChild><Link href={`/characters/${c.id}/edit?section=skin`}><Palette /> 皮肤</Link></Button>
             </>
           ) : (
             <Button variant="glass" className="text-white" asChild><Link href={`/character/public/${c.id}`}><ExternalLink /> 公开页 · 评论</Link></Button>
