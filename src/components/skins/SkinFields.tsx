@@ -7,7 +7,7 @@ import { sanitizeCss } from '@/lib/skins/sanitizeCss'
 import { importRegexJson, regexScriptSchema, type RegexScript } from '@/lib/skins/regexScripts'
 import { REGEX_TEMPLATES } from '@/lib/skins/regexTest'
 import { composeSkinCss } from '@/lib/skins/knobs'
-import { SELECTOR_GROUPS, CSS_PRESETS, SAMPLE_AI_MESSAGE } from '@/lib/skins/docs'
+import { SELECTOR_GROUPS, CSS_PRESETS } from '@/lib/skins/docs'
 import { KnobsPanel } from './KnobsPanel'
 import { RegexTester } from './RegexTester'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -69,7 +69,7 @@ export function SkinFields({ value: skin, onChange, sample, onSampleChange, char
     if (!t) return
     set('regexScripts', [...skin.regexScripts, templateScript(t)].slice(0, 100))
     // give the tester something to bite on when the sample is still the default
-    if (sample === SAMPLE_AI_MESSAGE || !sample.trim()) onSampleChange(`${sample.trim()}\n\n${t.sample}`.trim())
+    if (!sample.trim()) onSampleChange(t.sample)
   }
   const applyPreset = (p: (typeof CSS_PRESETS)[number]) => {
     if (skin.css.trim() && !confirm('替换当前 CSS？')) return
@@ -79,7 +79,7 @@ export function SkinFields({ value: skin, onChange, sample, onSampleChange, char
       ? [...skin.regexScripts, templateScript(t)].slice(0, 100)
       : skin.regexScripts
     onChange({ ...skin, css: p.css, regexScripts: scripts })
-    if (t && (sample === SAMPLE_AI_MESSAGE || !sample.trim())) onSampleChange(`${sample.trim()}\n\n${t.sample}`.trim())
+    if (t && !sample.trim()) onSampleChange(t.sample)
   }
 
   return (

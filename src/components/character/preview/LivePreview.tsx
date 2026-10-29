@@ -8,6 +8,7 @@ import { authedFetch } from '@/lib/authedFetch'
 import { readUiTextStream } from '@/lib/llm/readStream'
 import { useConnection } from '@/lib/llm/useConnection'
 import { composeSkinCss } from '@/lib/skins/knobs'
+import { SAMPLE_AI_MESSAGE } from '@/lib/skins/docs'
 import { parseSessionSettings } from '@/lib/chat/settings'
 import { parseCharacterCard } from '@/lib/chat/characterCard'
 import { Button } from '@/components/ui/button'
@@ -144,8 +145,8 @@ export function LivePreview({ draft, presetId, sample, onSampleChange, className
       </div>
       {sampleOpen && (
         <div className="space-y-1.5">
-          <Label htmlFor="skin-sample" className="text-xs">测试用的 AI 回复（可粘贴美化卡输出；没有真回复时显示它）</Label>
-          <Textarea id="skin-sample" value={sample} onChange={(e) => onSampleChange(e.target.value)} className="min-h-24 font-mono text-xs" spellCheck={false} />
+          <Label htmlFor="skin-sample" className="text-xs">测试用的 AI 回复：粘贴一段美化卡输出，预览会把它当作一条回复显示，正则测试台也跑它</Label>
+          <Textarea id="skin-sample" value={sample} onChange={(e) => onSampleChange(e.target.value)} placeholder={SAMPLE_AI_MESSAGE} className="min-h-24 font-mono text-xs" spellCheck={false} />
         </div>
       )}
       {error && <p className="text-xs text-cv-danger">{error}</p>}

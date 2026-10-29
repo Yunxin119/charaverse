@@ -12,7 +12,6 @@ import { qk } from '@/queries/keys'
 import { useSavePersona } from '@/queries/usePersonas'
 import { estimateTokens } from '@/lib/prompt/tokens'
 import { skinIsEmpty, skinSchema } from '@/lib/skins/schema'
-import { SAMPLE_AI_MESSAGE } from '@/lib/skins/docs'
 import { parseCharacterCard } from '@/lib/chat/characterCard'
 import { Button } from '@/components/ui/button'
 import { Chip, GlassPanel, GlassSheet, GlassSheetContent, IconButton } from '@/components/glass'
@@ -85,8 +84,8 @@ export function CharacterForm({ mode, character }: Props) {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [active, setActive] = useState<SectionId>('identity')
-  // the sample AI reply shared by the live preview and the regex test benches
-  const [sample, setSample] = useState(SAMPLE_AI_MESSAGE)
+  // optional sample AI reply shared by the live preview and the regex test benches (empty = only the card's own lines show)
+  const [sample, setSample] = useState('')
   const [wide, setWide] = useState(false)
 
   const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(baseline), [draft, baseline])
